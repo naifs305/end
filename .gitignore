@@ -1,0 +1,38 @@
+# ================================================================
+# ملفات يتجاهلها جيت
+# ================================================================
+
+# الحزم المثبتة
+node_modules/
+
+# مخرجات البناء
+.next/
+out/
+build/
+dist/
+
+# ملفات البيئة (حساسة!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# سجلات
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# بيئة نظام التشغيل
+.DS_Store
+Thumbs.db
+
+# محرّرات
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# بريزما
+prisma/migrations/dev/
