@@ -85,240 +85,425 @@ export default function Home() {
   }, [activeRole]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (activeRole !== 'MANAGER') return;
 
-    if (activeRole === 'MANAGER') {
-      setEmployeeCourses([]);
-      setEmployeeKpi(null);
-      setEmployeeLoading(false);
+    setManagerCoursesLoading(true);
+    api
+      .get('/courses')
+      .then((res) => {
+        const rows = Array.isArray(res.data) ? res.data : [];
+        setManagerCourses(rows);
+      })
+      .catch(() => setManagerCourses([]))
+      .finally(() => setManagerCoursesLoading(false));
+  }, [activeRole]);
 
-      setManagerCoursesLoading(true);
-      api
-        .get('/courses')
-        .then((res) => setManagerCourses(res.data || []))
-        .catch(() => setManagerCourses([]))
-        .finally(() => setManagerCoursesLoading(false));
-
-      return;
-    }
-
-    setManagerCourses([]);
-    setManagerCoursesLoading(false);
-
-    setEmployeeLoading(true);
+  useEffect(() => {
+    if (activeRole !== 'EMPLOYEE' || !user?.id) return;
 
     const now = new Date();
     const periodLabel = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+    setEmployeeLoading(true);
+
     Promise.all([
-      api
-        .get('/analytics/employee', {
-          params: { userId: user.id },
-        })
-        .then((res) => res.data)
-        .catch(() => null),
-      api
-        .get(`/kpis/${user.id}/MONTHLY/${periodLabel}`)
-        .then((res) => res.data)
-        .catch(() => null),
+      api.get('/courses'),
+      api.get('/kpis', {
+        params: {
+          periodType: 'MONTHLY',
+          periodLabel,
+        },
+      }),
     ])
-      .then(([employeeAnalytics, employeeKpiSnapshot]) => {
-        setEmployeeCourses(employeeAnalytics?.courses || []);
-        setEmployeeKpi(employeeKpiSnapshot);
+      .then(([coursesRes, kpiRes]) => {
+        const courseRows = Array.isArray(coursesRes.data) ? coursesRes.data : [];
+        const kpiRowsData = Array.isArray(kpiRes.data) ? kpiRes.data : [];
+
+        setEmployeeCourses(courseRows);
+
+        const myKpi =
+          kpiRowsData.find((row) => row.user?.id === user.id || row.userId === user.id) || null;
+
+        setEmployeeKpi(myKpi);
+      })
+      .catch(() => {
+        setEmployeeCourses([]);
+        setEmployeeKpi(null);
       })
       .finally(() => setEmployeeLoading(false));
-  }, [activeRole, user?.id]);
+  }, [activeRole, user]);
 
-  const dashboardCards = useMemo(() => {
-    if (!stats) return [];
+  const topPerformer = kpiRows?.length ? kpiRows[0] : null;
+  const lowPerformer = kpiRows?.length ? kpiRows[kpiRows.length - 1] : null;
+  const averageScore = kpiRows?.length
+    ? formatNumber(
+        kpiRows.reduce((sum, item) => sum + Number(item.finalScore || 0), 0) / kpiRows.length,
+      )
+    : '0.00';
 
-    return [
-      {
-        title: 'الدورات',
-        value: stats.totalCourses ?? 0,
-        subtitle: 'إجمالي الدورات المسجلة',
-      },
-      {
-        title: 'بانتظار الإقفال',
-        value: stats.awaitingClosureCourses ?? 0,
-        subtitle: 'دورات منتهية لم تُقفل بعد',
-      },
-      {
-        title: 'العناصر المعلقة',
-        value: stats.pendingElements ?? 0,
-        subtitle: 'عناصر بانتظار الإجراء أو الاعتماد',
-      },
-      {
-        title: 'الإشعارات غير المقروءة',
-        value: stats.unreadNotifications ?? 0,
-        subtitle: 'إشعارات جديدة تحتاج متابعة',
-      },
-    ];
-  }, [stats]);
+  const managerPendingApprovalElements = Number(stats?.pendingApprovals || 0);
 
-  if (loading || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        جاري التحميل...
-      </div>
-    );
+  const managerEndedNotClosedCourses = useMemo(
+    () => managerCourses.filter((course) => isCourseEndedAndNotClosed(course)),
+    [managerCourses],
+  );
+
+  const employeeClosedCourses = useMemo(
+    () => employeeCourses.filter((course) => ['CLOSED', 'ARCHIVED'].includes(course.status)),
+    [employeeCourses],
+  );
+
+  const employeeOpenCourses = useMemo(
+    () => employeeCourses.filter((course) => !['CLOSED', 'ARCHIVED'].includes(course.status)),
+    [employeeCourses],
+  );
+
+  const employeePendingApprovalCourses = useMemo(
+    () =>
+      employeeCourses.filter((course) =>
+        Array.isArray(course.closureElements)
+          ? course.closureElements.some((el) => el.status === 'PENDING_APPROVAL')
+          : false,
+      ),
+    [employeeCourses],
+  );
+
+  if (loading) {
+    return <div className="p-10 font-cairo text-text-main">جاري التحميل...</div>;
   }
 
-  return (
-    <MainLayout title="لوحة المعلومات">
-      <div className="space-y-6">
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {dashboardCards.map((card) => (
-            <KPICard
-              key={card.title}
-              title={card.title}
-              value={card.value}
-              subtitle={card.subtitle}
-            />
-          ))}
-        </section>
+  if (!user) return null;
 
-        {activeRole === 'MANAGER' ? (
-          <>
-            <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">
-                    أداء الموظفين الشهري
-                  </h2>
-                  <p className="text-sm text-gray-500">
-                    ملخص آخر لقطة KPI للفترة الحالية
-                  </p>
+  return (
+    <MainLayout>
+      <div className="min-h-full bg-background p-4 md:p-6">
+        <div className="mb-6 rounded-3xl border border-border bg-white p-6 shadow-card">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-2xl font-extrabold text-text-main">مرحبًا، {user.firstName}</h1>
+              <p className="mt-2 text-sm text-text-soft">
+                منصة حوكمة العمليات التدريبية بهوية جامعة نايف العربية للعلوم الأمنية
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {activeRole === 'EMPLOYEE' && (
+                <Link href="/courses/create">
+                  <button className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-bold text-white transition hover:bg-primary-dark">
+                    + إضافة دورة جديدة
+                  </button>
+                </Link>
+              )}
+
+              <div className="inline-flex w-fit items-center rounded-2xl border border-primary/20 bg-primary-light px-4 py-2 text-sm font-bold text-primary">
+                {isAdmin ? 'لوحة المدير' : 'لوحة المعلومات'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {isAdmin && stats && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <Link href="/courses">
+                <div className="cursor-pointer">
+                  <KPICard title="إجمالي الدورات" value={stats.total} />
+                </div>
+              </Link>
+
+              <Link href="/courses?status=PREPARATION">
+                <div className="cursor-pointer">
+                  <KPICard title="قيد الإعداد" value={stats.preparation} />
+                </div>
+              </Link>
+
+              <Link href="/courses?status=EXECUTION">
+                <div className="cursor-pointer">
+                  <KPICard title="قيد التنفيذ" value={stats.execution} />
+                </div>
+              </Link>
+
+              <Link href="/courses?status=AWAITING_CLOSURE">
+                <div className="cursor-pointer">
+                  <KPICard title="بانتظار الإغلاق" value={stats.awaiting} />
+                </div>
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <Link href="/kpis">
+                <div className="cursor-pointer">
+                  <KPICard title="عدد الموظفين" value={kpiRows.length || 0} />
+                </div>
+              </Link>
+
+              <Link href="/approvals">
+                <div className="cursor-pointer">
+                  <KPICard title="العناصر بانتظار الاعتماد" value={managerPendingApprovalElements} color="yellow" />
+                </div>
+              </Link>
+
+              <Link href="/courses">
+                <div className="cursor-pointer">
+                  <KPICard title="دورات منتهية لم تغلق" value={managerEndedNotClosedCourses.length} color="red" />
+                </div>
+              </Link>
+
+              <Link href="/kpis">
+                <div className="cursor-pointer">
+                  <KPICard
+                    title="الأعلى أداءً"
+                    value={
+                      topPerformer
+                        ? `${topPerformer.user?.firstName || ''} ${topPerformer.user?.lastName || ''}`.trim()
+                        : '-'
+                    }
+                  />
+                </div>
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <Link href="/reports">
+                <div className="cursor-pointer rounded-2xl border border-border bg-white p-5 shadow-card transition hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary-light/30">
+                  <div className="mb-2 text-lg font-extrabold text-primary">التقارير</div>
+                  <div className="text-sm leading-7 text-text-soft">
+                    تقارير متقدمة مع فلاتر وتصدير Excel و PDF
+                  </div>
+                </div>
+              </Link>
+
+              <Link href="/archive">
+                <div className="cursor-pointer rounded-2xl border border-border bg-white p-5 shadow-card transition hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary-light/30">
+                  <div className="mb-2 text-lg font-extrabold text-primary">أرشيف الإقفالات</div>
+                  <div className="text-sm leading-7 text-text-soft">
+                    أرشفة متقدمة للدورات المغلقة وسجل الإقفالات
+                  </div>
+                </div>
+              </Link>
+
+              <Link href="/messages">
+                <div className="cursor-pointer rounded-2xl border border-border bg-white p-5 shadow-card transition hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary-light/30">
+                  <div className="mb-2 text-lg font-extrabold text-primary">المراسلات</div>
+                  <div className="text-sm leading-7 text-text-soft">
+                    نظام مراسلة داخلي بسيط بين المستخدمين
+                  </div>
+                </div>
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-white p-6 shadow-card">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-extrabold text-primary">ملخص الأداء الشهري</h3>
+                  <Link href="/kpis" className="text-sm font-bold text-primary hover:text-primary-dark">
+                    فتح مؤشرات الأداء
+                  </Link>
                 </div>
 
-                <Link
-                  href="/kpis"
-                  className="text-sm font-medium text-primary-700 hover:text-primary-800"
-                >
-                  عرض التفاصيل
-                </Link>
+                {kpiLoading ? (
+                  <div className="text-sm text-text-soft">جاري تحميل البيانات...</div>
+                ) : kpiRows.length === 0 ? (
+                  <div className="text-sm text-text-soft">لا توجد بيانات KPI للشهر الحالي</div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between rounded-2xl border border-border bg-background px-4 py-3">
+                      <span className="text-sm text-text-soft">الأعلى أداءً</span>
+                      <span className="text-sm font-extrabold text-text-main">
+                        {topPerformer
+                          ? `${topPerformer.user?.firstName || ''} ${topPerformer.user?.lastName || ''}`.trim()
+                          : '-'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-2xl border border-border bg-background px-4 py-3">
+                      <span className="text-sm text-text-soft">الأقل أداءً</span>
+                      <span className="text-sm font-extrabold text-text-main">
+                        {lowPerformer
+                          ? `${lowPerformer.user?.firstName || ''} ${lowPerformer.user?.lastName || ''}`.trim()
+                          : '-'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-2xl border border-border bg-background px-4 py-3">
+                      <span className="text-sm text-text-soft">متوسط الدرجة</span>
+                      <span className="text-sm font-extrabold text-primary">{averageScore}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-2xl border border-border bg-background px-4 py-3">
+                      <span className="text-sm text-text-soft">الدورات المنتهية غير المغلقة</span>
+                      <span className="text-sm font-extrabold text-danger">{managerEndedNotClosedCourses.length}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {kpiLoading ? (
-                <div className="text-sm text-gray-500">جاري تحميل المؤشرات...</div>
-              ) : kpiRows.length === 0 ? (
-                <div className="text-sm text-gray-500">لا توجد بيانات KPI حالياً.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="text-right text-gray-500 border-b">
-                        <th className="py-3 px-3">الموظف</th>
-                        <th className="py-3 px-3">النتيجة النهائية</th>
-                        <th className="py-3 px-3">المستوى</th>
-                        <th className="py-3 px-3">إكمال العناصر</th>
-                        <th className="py-3 px-3">إقفال الدورات</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {kpiRows.map((row) => (
-                        <tr key={row.userId} className="border-b last:border-0">
-                          <td className="py-3 px-3 font-medium text-gray-900">
-                            {row.userName}
-                          </td>
-                          <td className="py-3 px-3">{formatNumber(row.finalScore)}</td>
-                          <td className="py-3 px-3">{row.performanceLevel}</td>
-                          <td className="py-3 px-3">
-                            {formatPercent(row.closureCompletionRate)}
-                          </td>
-                          <td className="py-3 px-3">
-                            {formatPercent(row.dueCourseClosureRate)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <div className="rounded-2xl border border-danger/20 bg-white p-6 shadow-card">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-extrabold text-danger">
+                    الاعتمادات المعلقة ({managerPendingApprovalElements})
+                  </h3>
+                  <Link href="/approvals" className="text-sm font-bold text-primary hover:text-primary-dark">
+                    عرض الكل
+                  </Link>
                 </div>
-              )}
-            </section>
-
-            <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">
-                    الدورات التي تحتاج تدخلاً
-                  </h2>
-                  <p className="text-sm text-gray-500">
-                    الدورات المنتهية التي لم تُقفل حتى الآن
-                  </p>
+                <div className="rounded-2xl border border-danger/10 bg-red-50 px-4 py-4 text-sm leading-7 text-danger">
+                  يوجد {managerPendingApprovalElements} عنصر بانتظار اعتمادك الآن. مراجعة هذه العناصر أولًا تضمن
+                  عدم تعطّل الإقفالات وتأخر الفرق التشغيلية.
                 </div>
 
-                <Link
-                  href="/courses"
-                  className="text-sm font-medium text-primary-700 hover:text-primary-800"
-                >
-                  الانتقال إلى الدورات
+                <div className="mt-4 rounded-2xl border border-border bg-background px-4 py-4 text-sm leading-7 text-text-soft">
+                  {managerCoursesLoading
+                    ? 'جاري تحميل الدورات المنتهية غير المغلقة...'
+                    : `يوجد ${managerEndedNotClosedCourses.length} دورة انتهى تاريخها ولم تغلق بعد.`}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-white p-6 shadow-card">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-extrabold text-primary">الدورات المنتهية ولم تغلق بعد</h3>
+                <Link href="/courses" className="text-sm font-bold text-primary hover:text-primary-dark">
+                  فتح إدارة الدورات
                 </Link>
               </div>
 
               {managerCoursesLoading ? (
-                <div className="text-sm text-gray-500">جاري تحميل الدورات...</div>
+                <div className="text-sm text-text-soft">جاري تحميل البيانات...</div>
+              ) : managerEndedNotClosedCourses.length === 0 ? (
+                <div className="text-sm text-text-soft">لا توجد دورات منتهية غير مغلقة حاليًا</div>
               ) : (
                 <div className="space-y-3">
-                  {managerCourses.filter(isCourseEndedAndNotClosed).length === 0 ? (
-                    <div className="text-sm text-gray-500">
-                      لا توجد دورات متأخرة حالياً.
-                    </div>
-                  ) : (
-                    managerCourses
-                      .filter(isCourseEndedAndNotClosed)
-                      .slice(0, 8)
-                      .map((course) => (
-                        <div
-                          key={course.id}
-                          className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 p-4 rounded-lg border border-amber-200 bg-amber-50"
-                        >
-                          <div>
-                            <div className="font-semibold text-gray-900">{course.name}</div>
-                            <div className="text-sm text-gray-600">
-                              انتهاء الدورة: {formatDate(course.endDate)}
-                            </div>
-                          </div>
-
-                          <Link
-                            href={`/courses/${course.id}`}
-                            className="text-sm font-medium text-primary-700 hover:text-primary-800"
-                          >
-                            فتح الدورة
-                          </Link>
+                  {managerEndedNotClosedCourses.slice(0, 6).map((course) => (
+                    <Link key={course.id} href={`/courses/${course.id}`}>
+                      <div className="cursor-pointer rounded-2xl border border-border bg-background px-4 py-3 transition hover:border-primary/30 hover:bg-primary-light/30">
+                        <div className="mb-1 text-sm font-extrabold text-text-main">{course.name || '-'}</div>
+                        <div className="text-xs text-text-soft">
+                          {formatDate(course.startDate)} — {formatDate(course.endDate)}
                         </div>
-                      ))
-                  )}
+                      </div>
+                    </Link>
+                  ))}
                 </div>
               )}
-            </section>
-          </>
-        ) : (
-          <>
-            <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">
-                    مؤشري التشغيلي لهذا الشهر
-                  </h2>
-                  <p className="text-sm text-gray-500">
-                    لقطة مختصرة لأداء الإقفال والتنفيذ
-                  </p>
-                </div>
+            </div>
+          </div>
+        )}
 
-                <Link
-                  href="/kpis"
-                  className="text-sm font-medium text-primary-700 hover:text-primary-800"
-                >
-                  عرض المؤشرات
-                </Link>
+        {activeRole === 'EMPLOYEE' && stats && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <Link href="/courses/create">
+                <div className="cursor-pointer">
+                  <KPICard title="إضافة دورة جديدة" value="+" color="primary" />
+                </div>
+              </Link>
+
+              <Link href="/courses">
+                <div className="cursor-pointer">
+                  <KPICard title="الدورات غير المنتهية" value={employeeOpenCourses.length} color="yellow" />
+                </div>
+              </Link>
+
+              <Link href="/archive">
+                <div className="cursor-pointer">
+                  <KPICard title="الدورات المنتهية" value={employeeClosedCourses.length} color="green" />
+                </div>
+              </Link>
+
+              <Link href="/courses">
+                <div className="cursor-pointer">
+                  <KPICard title="لم تعتمد بعد" value={employeePendingApprovalCourses.length} color="red" />
+                </div>
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <MetricCard
+                title="نسبة سرعة الإنجاز"
+                value={formatPercent(employeeKpi?.speedScore)}
+                subtitle="تعكس سرعة تنفيذك وإقفال العناصر خلال الفترة الحالية"
+              />
+              <MetricCard
+                title="نسبة الانضباط"
+                value={formatPercent(employeeKpi?.disciplineScore)}
+                subtitle="تعكس انتظامك وتقليل التأخر والعناصر المعلقة"
+              />
+              <MetricCard
+                title="أداء الموظف"
+                value={formatPercent(employeeKpi?.finalScore)}
+                subtitle="المحصلة العامة لأدائك بحسب مؤشرات المنصة"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+              <CourseListCard
+                title="الدورات المنتهية"
+                items={employeeClosedCourses}
+                emptyText="لا توجد دورات منتهية حاليًا"
+              />
+
+              <CourseListCard
+                title="الدورات غير المنتهية"
+                items={employeeOpenCourses}
+                emptyText="لا توجد دورات غير منتهية حاليًا"
+              />
+
+              <CourseListCard
+                title="الدورات التي لم تعتمد بعد"
+                items={employeePendingApprovalCourses}
+                emptyText="لا توجد دورات بانتظار الاعتماد حاليًا"
+              />
+            </div>
+
+            {employeeLoading && (
+              <div className="rounded-2xl border border-border bg-white p-4 text-sm text-text-soft shadow-card">
+                جاري تحميل بيانات لوحة المعلومات...
               </div>
+            )}
+          </div>
+        )}
+      </div>
+    </MainLayout>
+  );
+}
 
-              {employeeLoading ? (
-                <div className="text-sm text-gray-500">جاري تحميل البيانات...</div>
-              ) : !employeeKpi ? (
-                <div className="text-sm text-gray-500">
-                  لا توجد لقطة KPI متاحة لهذا الشهر حتى الآن.
+function MetricCard({ title, value, subtitle }) {
+  return (
+    <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
+      <div className="mb-2 text-sm font-bold text-text-soft">{title}</div>
+      <div className="mb-2 text-3xl font-extrabold text-primary">{value}</div>
+      <div className="text-sm leading-7 text-text-soft">{subtitle}</div>
+    </div>
+  );
+}
+
+function CourseListCard({ title, items, emptyText }) {
+  return (
+    <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-lg font-extrabold text-primary">{title}</h3>
+        <span className="rounded-full bg-primary-light px-3 py-1 text-xs font-bold text-primary">
+          {items.length}
+        </span>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="text-sm text-text-soft">{emptyText}</div>
+      ) : (
+        <div className="space-y-3">
+          {items.slice(0, 5).map((course) => (
+            <Link key={course.id} href={`/courses/${course.id}`}>
+              <div className="cursor-pointer rounded-2xl border border-border bg-background px-4 py-3 transition hover:border-primary/30 hover:bg-primary-light/30">
+                <div className="mb-1 text-sm font-extrabold text-text-main">{course.name || '-'}</div>
+                <div className="text-xs text-text-soft">
+                  {formatDate(course.startDate)} — {formatDate(course.endDate)}
                 </div>
-              ) : (
-                <div
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
