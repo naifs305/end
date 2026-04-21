@@ -12,6 +12,7 @@ enum Role {
   EMPLOYEE
   PROJECT_SUPERVISOR
   MANAGER
+  QUALITY_VIEWER
 }
 
 enum ElementStatus {
