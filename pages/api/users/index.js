@@ -1,9 +1,6 @@
-// =============================================================
-// GET/POST /api/users  (قائمة المستخدمين للمدير)
-// =============================================================
-
 const prisma = require('../../../lib/db/prisma');
-const { withManager, withMethods, withAuth } = require('../../../lib/middleware/auth');
+const { withAuth, withMethods } = require('../../../lib/middleware/auth');
+const { buildUsersWhere } = require('../../../lib/services/permissions');
 
 const userSelect = {
   id: true,
@@ -21,24 +18,15 @@ const userSelect = {
 };
 
 async function handler(req, res) {
-  if (req.method === 'GET') {
-    // المدير يرى كل المستخدمين، الموظف يرى زملاءه فقط (نفس المشروع)
-    const isManager = req.user.roles.includes('MANAGER') && req.activeRole === 'MANAGER';
+  const where = await buildUsersWhere(req.user, req.activeRole);
 
-    const where = isManager
-      ? {}
-      : { operationalProjectId: req.user.operationalProjectId, isActive: true };
+  const users = await prisma.user.findMany({
+    where,
+    select: userSelect,
+    orderBy: [{ isActive: 'desc' }, { firstName: 'asc' }],
+  });
 
-    const users = await prisma.user.findMany({
-      where,
-      select: userSelect,
-      orderBy: [{ isActive: 'desc' }, { firstName: 'asc' }],
-    });
-
-    return res.status(200).json(users);
-  }
-
-  return res.status(405).json({ message: 'طريقة غير مسموحة' });
+  return res.status(200).json(users);
 }
 
 module.exports = withMethods(['GET'], withAuth(handler));

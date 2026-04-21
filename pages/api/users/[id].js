@@ -1,9 +1,9 @@
-// =============================================================
-// GET/PUT /api/users/[id]
-// =============================================================
-
 const prisma = require('../../../lib/db/prisma');
-const { withManager, withMethods } = require('../../../lib/middleware/auth');
+const { withAuth, withMethods } = require('../../../lib/middleware/auth');
+const {
+  canEditUserBasicInfo,
+  canChangeUserRoles,
+} = require('../../../lib/services/permissions');
 
 const userSelect = {
   id: true,
@@ -23,31 +23,44 @@ const userSelect = {
 async function handler(req, res) {
   const { id } = req.query;
 
+  const targetUser = await prisma.user.findUnique({
+    where: { id },
+    select: userSelect,
+  });
+
+  if (!targetUser) {
+    return res.status(404).json({ message: 'المستخدم غير موجود' });
+  }
+
   if (req.method === 'GET') {
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: userSelect,
-    });
+    const allowed = await canEditUserBasicInfo(req.user, req.activeRole, targetUser);
+    if (!allowed) {
+      return res.status(403).json({ message: 'لا تملك صلاحية عرض هذا المستخدم' });
+    }
 
-    if (!user) return res.status(404).json({ message: 'المستخدم غير موجود' });
-    return res.status(200).json(user);
+    return res.status(200).json(targetUser);
   }
 
-  if (req.method === 'PUT') {
-    // حذف الحقول غير المسموح بها مباشرة
-    const { passwordHash, id: _id, createdAt, updatedAt, ...safe } = req.body || {};
-
-    const updated = await prisma.user.update({
-      where: { id },
-      data: safe,
-      select: userSelect,
-    });
-
-    return res.status(200).json(updated);
+  const allowed = await canEditUserBasicInfo(req.user, req.activeRole, targetUser);
+  if (!allowed) {
+    return res.status(403).json({ message: 'لا تملك صلاحية تعديل هذا المستخدم' });
   }
 
-  return res.status(405).json({ message: 'طريقة غير مسموحة' });
+  const { passwordHash, id: _id, createdAt, updatedAt, roles, ...safe } = req.body || {};
+  const data = { ...safe };
+
+  if (Array.isArray(roles) && canChangeUserRoles(req.activeRole)) {
+    data.roles = roles;
+  }
+
+  const updated = await prisma.user.update({
+    where: { id },
+    data,
+    select: userSelect,
+  });
+
+  return res.status(200).json(updated);
 }
 
-module.exports = withMethods(['GET', 'PUT'], withManager(handler));
+module.exports = withMethods(['GET', 'PUT'], withAuth(handler));
 module.exports.default = module.exports;
