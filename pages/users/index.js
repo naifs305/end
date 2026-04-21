@@ -1,77 +1,69 @@
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { toast } from 'react-hot-toast';
+import { useState, useEffect } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
 import api from '../../lib/axios';
-import { translateRoles } from '../../lib/roles';
+import Link from 'next/link';
 
-export default function UsersIndexPage() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  const loadUsers = async () => {
-    setLoading(true);
-    try {
-      const response = await api.get('/users');
-      setUsers(response.data || []);
-    } catch (error) {
-      toast.error('تعذر تحميل المستخدمين');
-    } finally {
-      setLoading(false);
-    }
+function RoleBadge({ role }) {
+  const map = {
+    MANAGER: 'bg-purple-100 text-purple-700',
+    PROJECT_SUPERVISOR: 'bg-blue-100 text-blue-700',
+    EMPLOYEE: 'bg-gray-100 text-gray-700',
+    QUALITY_VIEWER: 'bg-amber-100 text-amber-700',
   };
 
-  return (
-    <MainLayout title="المستخدمون">
-      <div className="space-y-6 p-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-primary">المستخدمون</h1>
-          <p className="mt-1 text-sm text-text-soft">عرض المستخدمين وفق نطاق صلاحيتك الحالي</p>
-        </div>
+  const labelMap = {
+    MANAGER: 'مدير',
+    PROJECT_SUPERVISOR: 'مشرف مشروع',
+    EMPLOYEE: 'موظف',
+    QUALITY_VIEWER: 'جودة',
+  };
 
-        <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-card">
-          <table className="min-w-full text-sm">
-            <thead className="bg-background">
-              <tr className="text-right text-text-soft">
-                <th className="px-4 py-3">الاسم</th>
-                <th className="px-4 py-3">البريد</th>
-                <th className="px-4 py-3">المشروع</th>
-                <th className="px-4 py-3">الأدوار</th>
-                <th className="px-4 py-3">الحالة</th>
-                <th className="px-4 py-3"></th>
+  return <span className={`px-2 py-1 rounded text-xs font-bold ${map[role] || 'bg-gray-100 text-gray-700'}`}>{labelMap[role] || role}</span>;
+}
+
+export default function UserManagement() {
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    api.get('/users').then((res) => setUsers(res.data || []));
+  }, []);
+
+  return (
+    <MainLayout>
+      <div className="p-6">
+        <h1 className="text-2xl font-bold mb-6">إدارة المستخدمين</h1>
+
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">الاسم</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">البريد</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">الأدوار</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">الحالة</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase"></th>
               </tr>
             </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="6" className="px-4 py-8 text-center text-text-soft">جاري التحميل...</td>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {users.map((user) => (
+                <tr key={user.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{user.firstName} {user.lastName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div className="flex flex-wrap gap-1">
+                      {(user.roles || []).map((role) => <RoleBadge key={role} role={role} />)}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`px-2 py-1 rounded text-xs ${user.isActive ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                      {user.isActive ? 'فعال' : 'معطل'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-primary hover:underline">
+                    <Link href={`/users/${user.id}`}>تعديل</Link>
+                  </td>
                 </tr>
-              ) : users.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="px-4 py-8 text-center text-text-soft">لا يوجد مستخدمون</td>
-                </tr>
-              ) : (
-                users.map((user) => (
-                  <tr key={user.id} className="border-t border-border">
-                    <td className="px-4 py-3 font-bold text-text-main">{user.firstName} {user.lastName}</td>
-                    <td className="px-4 py-3 text-text-soft">{user.email}</td>
-                    <td className="px-4 py-3 text-text-soft">{user.operationalProject?.name || '-'}</td>
-                    <td className="px-4 py-3 text-text-soft">{translateRoles(user.roles)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded-lg px-2 py-1 text-xs font-bold ${user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {user.isActive ? 'فعال' : 'معطل'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link href={`/users/${user.id}`} className="text-primary hover:underline">فتح</Link>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>
