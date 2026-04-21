@@ -3,258 +3,126 @@ import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 
+function getDisplayName(person) {
+  if (!person) return '-';
+  const fullName = `${person.firstName || ''} ${person.lastName || ''}`.trim();
+  return fullName || person.email || '-';
+}
+
+function getRoleLabel(roles = []) {
+  if (roles.includes('MANAGER')) return 'مدير';
+  if (roles.includes('PROJECT_SUPERVISOR')) return 'مشرف مشروع';
+  if (roles.includes('QUALITY_VIEWER')) return 'جودة';
+  if (roles.includes('EMPLOYEE')) return 'موظف';
+  return 'مستخدم';
+}
+
+function formatDate(value) {
+  if (!value) return '-';
+  try {
+    return new Date(value).toLocaleString('ar-SA');
+  } catch {
+    return value;
+  }
+}
+
 export default function MessagesPage() {
   const { activeRole } = useAuth();
-
-  const [tab, setTab] = useState('inbox');
-  const [composeOpen, setComposeOpen] = useState(false);
-  const [mobileListOpen, setMobileListOpen] = useState(true);
-
   const [users, setUsers] = useState([]);
-  const [inboxMessages, setInboxMessages] = useState([]);
-  const [sentMessages, setSentMessages] = useState([]);
-
-  const [selectedMessageId, setSelectedMessageId] = useState(null);
-
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [loadingInbox, setLoadingInbox] = useState(false);
-  const [loadingSent, setLoadingSent] = useState(false);
+  const [conversations, setConversations] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [thread, setThread] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [threadLoading, setThreadLoading] = useState(false);
   const [sending, setSending] = useState(false);
-
   const [error, setError] = useState('');
+  const [messageText, setMessageText] = useState('');
+  const [search, setSearch] = useState('');
 
-  const [form, setForm] = useState({
-    recipientIds: [],
-    subject: '',
-    message: '',
-  });
-
-  const getDisplayName = (person) => {
-    if (!person) return '-';
-    const fullName = `${person.firstName || ''} ${person.lastName || ''}`.trim();
-    return fullName || person.email || '-';
-  };
-
-  const getRoleLabel = (roles = []) => {
-    if (roles.includes('MANAGER')) return 'مدير';
-    if (roles.includes('EMPLOYEE')) return 'موظف';
-    return 'مستخدم';
-  };
-
-  const getUserOptionLabel = (user) => {
-    const name = getDisplayName(user);
-    const role = getRoleLabel(user.roles || []);
-    const project = user.operationalProject?.name ? ` - ${user.operationalProject.name}` : '';
-    const email = user.email ? ` - ${user.email}` : '';
-    return `${name} (${role})${project}${email}`;
-  };
-
-  const normalizeInbox = (items) => {
-    return (items || []).map((item) => ({
-      id: item.message?.id,
-      recipientRecordId: item.id,
-      subject: item.message?.subject || '',
-      body: item.message?.body || '',
-      createdAt: item.message?.createdAt || null,
-      isRead: item.isRead,
-      fromUser: item.message?.sender || null,
-      course: item.message?.course || null,
-      folder: 'inbox',
-    }));
-  };
-
-  const normalizeSent = (items) => {
-    return (items || []).map((item) => ({
-      id: item.id,
-      subject: item.subject || '',
-      body: item.body || '',
-      createdAt: item.createdAt || null,
-      recipients: item.recipients || [],
-      course: item.course || null,
-      folder: 'sent',
-    }));
-  };
-
-  const loadUsers = async () => {
+  const loadPage = async () => {
     try {
-      setLoadingUsers(true);
-      const res = await api.get('/messages/users');
-      setUsers(res.data || []);
+      setLoading(true);
+      setError('');
+      const [usersRes, conversationsRes] = await Promise.all([
+        api.get('/messages/users'),
+        api.get('/messages/conversations'),
+      ]);
+      setUsers(usersRes.data || []);
+      const list = conversationsRes.data || [];
+      setConversations(list);
+      setSelectedUserId((prev) => prev || list[0]?.user?.id || usersRes.data?.[0]?.id || null);
     } catch (err) {
-      setError(err?.response?.data?.message || 'فشل تحميل المستخدمين');
+      setError(err?.response?.data?.message || 'فشل تحميل المحادثات');
     } finally {
-      setLoadingUsers(false);
+      setLoading(false);
     }
   };
 
-  const loadInbox = async (silent = false) => {
-    try {
-      if (!silent) setLoadingInbox(true);
-      const res = await api.get('/messages/inbox');
-      const normalized = normalizeInbox(res.data);
-      setInboxMessages(normalized);
-
-      setSelectedMessageId((prev) => {
-        if (tab !== 'inbox') return prev;
-        if (!normalized.length) return null;
-        const stillExists = normalized.some((m) => m.id === prev);
-        return stillExists ? prev : normalized[0].id;
-      });
-    } catch (err) {
-      if (!silent) {
-        setError(err?.response?.data?.message || 'فشل تحميل الرسائل الواردة');
-      }
-    } finally {
-      if (!silent) setLoadingInbox(false);
+  const loadThread = async (userId) => {
+    if (!userId) {
+      setThread([]);
+      return;
     }
-  };
-
-  const loadSent = async (silent = false) => {
     try {
-      if (!silent) setLoadingSent(true);
-      const res = await api.get('/messages/sent');
-      const normalized = normalizeSent(res.data);
-      setSentMessages(normalized);
-
-      setSelectedMessageId((prev) => {
-        if (tab !== 'sent') return prev;
-        if (!normalized.length) return null;
-        const stillExists = normalized.some((m) => m.id === prev);
-        return stillExists ? prev : normalized[0].id;
-      });
+      setThreadLoading(true);
+      const res = await api.get(`/messages/thread/${userId}`);
+      setThread(res.data || []);
     } catch (err) {
-      if (!silent) {
-        setError(err?.response?.data?.message || 'فشل تحميل الرسائل المرسلة');
-      }
+      setError(err?.response?.data?.message || 'فشل تحميل المحادثة');
     } finally {
-      if (!silent) setLoadingSent(false);
+      setThreadLoading(false);
     }
-  };
-
-  const loadAll = async () => {
-    setError('');
-    await Promise.all([loadUsers(), loadInbox(), loadSent()]);
   };
 
   useEffect(() => {
     if (!activeRole) return;
-    if (activeRole !== 'MANAGER' && activeRole !== 'EMPLOYEE') return;
-    loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadPage();
   }, [activeRole]);
 
   useEffect(() => {
-    if (!activeRole) return;
-    if (activeRole !== 'MANAGER' && activeRole !== 'EMPLOYEE') return;
+    if (!selectedUserId) return;
+    loadThread(selectedUserId);
+  }, [selectedUserId]);
 
-    const interval = setInterval(() => {
-      loadInbox(true);
-      loadSent(true);
-    }, 10000);
+  const userMap = useMemo(() => {
+    const map = new Map();
+    for (const user of users) map.set(user.id, user);
+    for (const item of conversations) if (item.user?.id) map.set(item.user.id, item.user);
+    return map;
+  }, [users, conversations]);
 
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRole, tab]);
+  const filteredConversations = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const base = conversations.length
+      ? conversations
+      : users.map((user) => ({ user, unreadCount: 0, lastMessage: null, updatedAt: null }));
 
-  const currentMessages = useMemo(() => {
-    return tab === 'inbox' ? inboxMessages : sentMessages;
-  }, [tab, inboxMessages, sentMessages]);
+    if (!q) return base;
 
-  const selectedMessage = useMemo(() => {
-    return currentMessages.find((message) => message.id === selectedMessageId) || null;
-  }, [currentMessages, selectedMessageId]);
+    return base.filter((item) => {
+      const name = getDisplayName(item.user).toLowerCase();
+      const email = (item.user?.email || '').toLowerCase();
+      const project = (item.user?.operationalProject?.name || '').toLowerCase();
+      return name.includes(q) || email.includes(q) || project.includes(q);
+    });
+  }, [conversations, users, search]);
 
-  const unreadInboxCount = useMemo(() => {
-    return inboxMessages.filter((message) => !message.isRead).length;
-  }, [inboxMessages]);
-
-  const handleOpenTab = (nextTab) => {
-    setTab(nextTab);
-    const source = nextTab === 'inbox' ? inboxMessages : sentMessages;
-    setSelectedMessageId(source[0]?.id || null);
-    setMobileListOpen(true);
-  };
-
-  const handleComposeChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleRecipientChange = (e) => {
-    const value = e.target.value;
-    setForm((prev) => ({
-      ...prev,
-      recipientIds: value ? [value] : [],
-    }));
-  };
-
-  const markMessageAsRead = async (messageId) => {
-    try {
-      await api.put(`/messages/${messageId}/read`);
-      setInboxMessages((prev) =>
-        prev.map((message) =>
-          message.id === messageId ? { ...message, isRead: true } : message,
-        ),
-      );
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleSelectMessage = async (message) => {
-    setSelectedMessageId(message.id);
-    setMobileListOpen(false);
-
-    if (tab === 'inbox' && !message.isRead) {
-      await markMessageAsRead(message.id);
-    }
-  };
+  const selectedUser = selectedUserId ? userMap.get(selectedUserId) : null;
 
   const handleSend = async (e) => {
     e.preventDefault();
-
-    if (!form.recipientIds.length || !form.subject.trim() || !form.message.trim()) {
-      return;
-    }
+    if (!selectedUserId || !messageText.trim()) return;
 
     try {
       setSending(true);
       setError('');
-
-      const res = await api.post('/messages', {
-        recipientIds: form.recipientIds,
-        subject: form.subject,
-        message: form.message,
+      await api.post('/messages', {
+        recipientIds: [selectedUserId],
+        message: messageText.trim(),
+        subject: 'محادثة داخلية',
       });
-
-      const data = res.data;
-
-      const normalizedSentItem = {
-        id: data.id,
-        subject: data.subject || '',
-        body: data.body || '',
-        createdAt: data.createdAt || null,
-        recipients: data.recipients || [],
-        course: data.course || null,
-        folder: 'sent',
-      };
-
-      setSentMessages((prev) => [normalizedSentItem, ...prev]);
-      setComposeOpen(false);
-      setForm({
-        recipientIds: [],
-        subject: '',
-        message: '',
-      });
-      setTab('sent');
-      setSelectedMessageId(normalizedSentItem.id);
-      setMobileListOpen(false);
-
-      await loadInbox(true);
-      await loadSent(true);
+      setMessageText('');
+      await Promise.all([loadPage(), loadThread(selectedUserId)]);
     } catch (err) {
       setError(err?.response?.data?.message || 'فشل إرسال الرسالة');
     } finally {
@@ -262,278 +130,133 @@ export default function MessagesPage() {
     }
   };
 
-  const formatDate = (date) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleString('ar-SA');
-  };
-
-  const renderSentRecipients = (message) => {
-    const names = (message?.recipients || []).map((item) => {
-      const name = getDisplayName(item.recipient);
-      const role = getRoleLabel(item.recipient?.roles || []);
-      return `${name} (${role})`;
-    });
-    return names.length ? names.join('، ') : '-';
-  };
-
-  if (activeRole !== 'MANAGER' && activeRole !== 'EMPLOYEE') {
-    return (
-      <MainLayout>
-        <div className="rounded-3xl border border-danger/20 bg-white p-6 text-danger shadow-card">
-          غير مصرح لك بالدخول إلى هذه الصفحة.
-        </div>
-      </MainLayout>
-    );
-  }
-
-  const inputClass =
-    'w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10';
-
   return (
-    <MainLayout>
-      <div className="space-y-4 md:space-y-6 overflow-x-hidden">
-        <div className="rounded-3xl border border-border bg-white p-4 shadow-card md:p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="min-w-0">
-              <h1 className="truncate text-2xl font-extrabold text-primary md:text-3xl">المراسلات</h1>
-              <p className="mt-1 text-sm text-text-soft">نظام المراسلات الداخلي</p>
+    <MainLayout title="المراسلات الداخلية">
+      <div className="grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] gap-6 h-[calc(100vh-180px)]">
+        <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-gray-100 space-y-3">
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">المحادثات</h1>
+              <p className="text-sm text-gray-500">دردشة داخلية بين المستخدمين</p>
             </div>
-
-            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-              <button
-                onClick={loadAll}
-                className="rounded-2xl border border-border bg-white px-5 py-2.5 text-sm font-bold text-text-main transition hover:bg-background"
-              >
-                تحديث
-              </button>
-
-              <button
-                onClick={() => setComposeOpen(true)}
-                className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-soft transition hover:bg-primary-dark"
-              >
-                رسالة جديدة
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {error ? (
-          <div className="rounded-3xl border border-danger/20 bg-red-50 px-4 py-3 text-sm text-danger">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="overflow-hidden rounded-3xl border border-border bg-white shadow-card">
-          <div className="flex flex-wrap gap-2 border-b border-border p-3 md:p-4">
-            <button
-              onClick={() => handleOpenTab('inbox')}
-              className={`rounded-2xl px-4 py-2.5 text-sm font-bold transition md:px-5 ${
-                tab === 'inbox'
-                  ? 'bg-primary text-white'
-                  : 'bg-background text-text-main hover:bg-primary-light hover:text-primary'
-              }`}
-            >
-              الوارد {unreadInboxCount > 0 ? `(${unreadInboxCount})` : ''}
-            </button>
-
-            <button
-              onClick={() => handleOpenTab('sent')}
-              className={`rounded-2xl px-4 py-2.5 text-sm font-bold transition md:px-5 ${
-                tab === 'sent'
-                  ? 'bg-primary text-white'
-                  : 'bg-background text-text-main hover:bg-primary-light hover:text-primary'
-              }`}
-            >
-              المرسل
-            </button>
-
-            <button
-              onClick={() => setMobileListOpen((prev) => !prev)}
-              className="mr-auto rounded-2xl border border-border bg-white px-4 py-2.5 text-sm font-bold text-text-main transition hover:bg-background md:hidden"
-            >
-              {mobileListOpen ? 'إخفاء القائمة' : 'إظهار القائمة'}
-            </button>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-200"
+              placeholder="ابحث عن مستخدم"
+            />
           </div>
 
-          <div className="grid min-h-[560px] grid-cols-1 md:grid-cols-3">
-            <div
-              className={`border-b border-border bg-background/40 md:border-b-0 md:border-l ${
-                mobileListOpen ? 'block' : 'hidden'
-              } md:block`}
-            >
-              {(tab === 'inbox' && loadingInbox) || (tab === 'sent' && loadingSent) ? (
-                <div className="p-4 text-sm text-text-soft md:p-6">جاري التحميل...</div>
-              ) : currentMessages.length === 0 ? (
-                <div className="p-4 text-sm text-text-soft md:p-6">لا توجد رسائل</div>
-              ) : (
-                currentMessages.map((message) => (
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="p-4 text-sm text-gray-500">جاري التحميل...</div>
+            ) : filteredConversations.length === 0 ? (
+              <div className="p-4 text-sm text-gray-500">لا توجد محادثات حالياً.</div>
+            ) : (
+              filteredConversations.map((item) => {
+                const selected = selectedUserId === item.user?.id;
+                return (
                   <button
-                    key={message.id}
-                    onClick={() => handleSelectMessage(message)}
-                    className={`w-full border-b border-border p-4 text-right transition ${
-                      selectedMessageId === message.id
-                        ? 'bg-primary-light/50'
-                        : 'bg-white hover:bg-background'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1 truncate text-sm font-bold text-text-main">
-                        {tab === 'inbox'
-                          ? getDisplayName(message.fromUser)
-                          : renderSentRecipients(message)}
-                      </div>
-
-                      {tab === 'inbox' && !message.isRead ? (
-                        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-danger"></span>
-                      ) : null}
-                    </div>
-
-                    <div className="mt-1 truncate text-sm text-text-main">
-                      {message.subject}
-                    </div>
-
-                    <div className="mt-1 truncate text-xs text-text-soft">
-                      {formatDate(message.createdAt)}
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-
-            <div className={`p-4 md:col-span-2 md:p-8 ${mobileListOpen ? 'hidden md:block' : 'block'}`}>
-              {selectedMessage ? (
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between gap-3 md:hidden">
-                    <button
-                      onClick={() => setMobileListOpen(true)}
-                      className="rounded-2xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background"
-                    >
-                      العودة للقائمة
-                    </button>
-                  </div>
-
-                  <div className="border-b border-border pb-5">
-                    <h2 className="break-words text-xl font-extrabold text-primary md:text-2xl">
-                      {selectedMessage.subject}
-                    </h2>
-
-                    <div className="mt-3 break-words text-sm leading-7 text-text-main">
-                      {tab === 'inbox'
-                        ? `من: ${getDisplayName(selectedMessage.fromUser)}`
-                        : `إلى: ${renderSentRecipients(selectedMessage)}`}
-                    </div>
-
-                    <div className="mt-1 text-sm text-text-soft">
-                      {formatDate(selectedMessage.createdAt)}
-                    </div>
-
-                    {selectedMessage.course ? (
-                      <div className="mt-3 inline-flex max-w-full items-center rounded-full bg-primary-light px-3 py-1 text-xs font-bold text-primary">
-                        <span className="truncate">
-                          الدورة المرتبطة: {selectedMessage.course.name}
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="whitespace-pre-wrap break-words text-sm leading-8 text-text-main md:text-[15px]">
-                    {selectedMessage.body}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-full min-h-[220px] items-center justify-center text-center text-base text-text-soft md:text-lg">
-                  اختر رسالة لعرضها
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {composeOpen ? (
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#2F3437]/45 p-0 backdrop-blur-sm md:items-center md:p-4">
-            <div className="max-h-[92vh] w-full overflow-hidden rounded-t-3xl border border-border bg-white shadow-[0_24px_60px_rgba(0,0,0,0.18)] md:max-w-3xl md:rounded-3xl">
-              <div className="flex items-center justify-between border-b border-border px-4 py-4 md:px-6 md:py-5">
-                <h2 className="text-xl font-extrabold text-primary md:text-2xl">رسالة جديدة</h2>
-                <button
-                  onClick={() => setComposeOpen(false)}
-                  className="text-sm font-bold text-text-soft transition hover:text-primary"
-                >
-                  إغلاق
-                </button>
-              </div>
-
-              <form onSubmit={handleSend} className="max-h-[calc(92vh-72px)] space-y-5 overflow-y-auto p-4 md:p-6">
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-text-main">
-                    إلى
-                  </label>
-
-                  <select
-                    value={form.recipientIds[0] || ''}
-                    onChange={handleRecipientChange}
-                    className={inputClass}
-                    required
-                  >
-                    <option value="">
-                      {loadingUsers ? 'جاري تحميل المستخدمين...' : 'اختر المستلم'}
-                    </option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {getUserOptionLabel(u)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-text-main">
-                    الموضوع
-                  </label>
-                  <input
-                    type="text"
-                    name="subject"
-                    value={form.subject}
-                    onChange={handleComposeChange}
-                    className={inputClass}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-text-main">
-                    نص الرسالة
-                  </label>
-                  <textarea
-                    name="message"
-                    value={form.message}
-                    onChange={handleComposeChange}
-                    rows="8"
-                    className={`${inputClass} resize-none py-3`}
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
-                  <button
+                    key={item.user?.id}
                     type="button"
-                    onClick={() => setComposeOpen(false)}
-                    className="rounded-2xl border border-border bg-white px-5 py-2.5 font-bold text-text-main transition hover:bg-background"
+                    onClick={() => setSelectedUserId(item.user?.id)}
+                    className={`w-full text-right px-4 py-4 border-b border-gray-100 transition ${selected ? 'bg-primary-50' : 'bg-white hover:bg-gray-50'}`}
                   >
-                    إلغاء
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-gray-900 truncate">{getDisplayName(item.user)}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {getRoleLabel(item.user?.roles || [])}
+                          {item.user?.operationalProject?.name ? ` - ${item.user.operationalProject.name}` : ''}
+                        </div>
+                        <div className="text-sm text-gray-600 mt-2 truncate">
+                          {item.lastMessage?.body || 'ابدأ محادثة جديدة'}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-left">
+                        <div className="text-[11px] text-gray-400">{formatDate(item.updatedAt || item.lastMessage?.createdAt)}</div>
+                        {item.unreadCount > 0 ? (
+                          <div className="mt-2 inline-flex min-w-[24px] h-6 px-2 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold">
+                            {item.unreadCount}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
                   </button>
-
-                  <button
-                    type="submit"
-                    disabled={sending}
-                    className="rounded-2xl bg-primary px-6 py-2.5 font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
-                  >
-                    {sending ? 'جاري الإرسال...' : 'إرسال'}
-                  </button>
-                </div>
-              </form>
-            </div>
+                );
+              })
+            )}
           </div>
-        ) : null}
+        </section>
+
+        <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col min-h-0">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">{selectedUser ? getDisplayName(selectedUser) : 'اختر محادثة'}</h2>
+              {selectedUser ? (
+                <p className="text-sm text-gray-500">
+                  {getRoleLabel(selectedUser.roles || [])}
+                  {selectedUser?.operationalProject?.name ? ` - ${selectedUser.operationalProject.name}` : ''}
+                </p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                loadPage();
+                if (selectedUserId) loadThread(selectedUserId);
+              }}
+              className="px-3 py-2 rounded-xl border border-gray-200 text-sm hover:bg-gray-50"
+            >
+              تحديث
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-3 min-h-[320px]">
+            {threadLoading ? (
+              <div className="text-sm text-gray-500">جاري تحميل المحادثة...</div>
+            ) : !selectedUserId ? (
+              <div className="text-sm text-gray-500">اختر مستخدمًا لبدء المحادثة.</div>
+            ) : thread.length === 0 ? (
+              <div className="text-sm text-gray-500">لا توجد رسائل بعد. ابدأ أول رسالة الآن.</div>
+            ) : (
+              thread.map((item) => (
+                <div
+                  key={`${item.id}-${item.createdAt}`}
+                  className={`flex ${item.direction === 'out' ? 'justify-start' : 'justify-end'}`}
+                >
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${item.direction === 'out' ? 'bg-primary-600 text-white' : 'bg-white text-gray-900 border border-gray-200'}`}>
+                    <div className="text-sm whitespace-pre-wrap break-words">{item.body}</div>
+                    <div className={`mt-2 text-[11px] ${item.direction === 'out' ? 'text-primary-100' : 'text-gray-400'}`}>
+                      {formatDate(item.createdAt)}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <form onSubmit={handleSend} className="p-4 border-t border-gray-100 bg-white">
+            {error ? <div className="mb-3 text-sm text-red-600">{error}</div> : null}
+            <div className="flex items-end gap-3">
+              <textarea
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                rows={3}
+                placeholder={selectedUserId ? 'اكتب رسالتك هنا' : 'اختر محادثة أولاً'}
+                disabled={!selectedUserId || sending}
+                className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-200 disabled:bg-gray-100"
+              />
+              <button
+                type="submit"
+                disabled={!selectedUserId || !messageText.trim() || sending}
+                className="px-5 py-3 rounded-2xl bg-primary-600 text-white text-sm font-semibold disabled:opacity-50"
+              >
+                {sending ? 'جاري الإرسال...' : 'إرسال'}
+              </button>
+            </div>
+          </form>
+        </section>
       </div>
     </MainLayout>
   );

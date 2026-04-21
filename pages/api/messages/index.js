@@ -1,13 +1,13 @@
-// GET/POST /api/messages
 const { withAuth, withMethods } = require('../../../lib/middleware/auth');
 const messagesService = require('../../../lib/services/messages');
 
 async function handler(req, res) {
   try {
     if (req.method === 'GET') {
-      const sent = await messagesService.getSent(req.user.id);
-      return res.status(200).json(sent);
+      const conversations = await messagesService.getConversationList(req.user.id);
+      return res.status(200).json(conversations);
     }
+
     if (req.method === 'POST') {
       const msg = await messagesService.sendMessage(req.user.id, req.body || {});
       return res.status(201).json(msg);
