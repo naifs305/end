@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
-import api from '../../lib/axios';
+import api from '../lib/axios';
 import Link from 'next/link';
 
 export default function UserManagement() {

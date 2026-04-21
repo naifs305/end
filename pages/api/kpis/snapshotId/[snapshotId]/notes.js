@@ -1,6 +1,6 @@
 // POST /api/kpis/[snapshotId]/notes
-const { withManager, withMethods } = require('../../../../lib/middleware/auth');
-const kpis = require('../../../../lib/services/kpis');
+const { withManager, withMethods } = require('../../../../../lib/middleware/auth');
+const kpis = require('../../../../../lib/services/kpis');
 
 async function handler(req, res) {
   const { snapshotId } = req.query;
