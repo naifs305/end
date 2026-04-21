@@ -1,4 +1,3 @@
-// GET/PUT/DELETE /api/courses/[id]
 const { withAuth, withMethods } = require('../../../lib/middleware/auth');
 const coursesService = require('../../../lib/services/courses');
 
@@ -7,22 +6,16 @@ async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const course = await coursesService.findOneCourse(id, req.user, req.activeRole);
-      return res.status(200).json(course);
+      return res.status(200).json(await coursesService.findOneCourse(id, req.user, req.activeRole));
     }
 
     if (req.method === 'PUT') {
-      const updated = await coursesService.updateCourse(id, req.body, req.user, req.activeRole);
-      return res.status(200).json(updated);
+      return res.status(200).json(await coursesService.updateCourse(id, req.body || {}, req.user, req.activeRole));
     }
 
-    if (req.method === 'DELETE') {
-      const result = await coursesService.deleteCourse(id, req.user, req.activeRole);
-      return res.status(200).json(result);
-    }
-  } catch (err) {
-    console.error('خطأ في دورة:', err);
-    return res.status(err.statusCode || 500).json({ message: err.message });
+    return res.status(200).json(await coursesService.deleteCourse(id, req.user, req.activeRole));
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ message: error.message });
   }
 }
 
