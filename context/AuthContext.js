@@ -5,35 +5,67 @@ import { getDefaultRole } from '../lib/roles';
 
 const AuthContext = createContext({});
 
+function getStorageScope() {
+  if (typeof window === 'undefined') return null;
+
+  if (localStorage.getItem('token')) return localStorage;
+  if (sessionStorage.getItem('token')) return sessionStorage;
+  return null;
+}
+
+function persistUserSession(user, role, rememberMe) {
+  const storage = rememberMe ? localStorage : sessionStorage;
+  storage.setItem('cachedUser', JSON.stringify(user));
+  storage.setItem('activeRole', role);
+}
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [activeRole, setActiveRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkUser();
+    hydrateSession();
   }, []);
 
-  const checkUser = async () => {
+  const hydrateSession = async () => {
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (token) {
-        const res = await api.get('/users/me');
-        setUser(res.data);
+      const storage = getStorageScope();
+      const token = storage?.getItem('token');
 
-        const savedRole = localStorage.getItem('activeRole') || sessionStorage.getItem('activeRole');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
-        if (savedRole && res.data.roles.includes(savedRole)) {
-          setActiveRole(savedRole);
-        } else {
-          const defaultRole = getDefaultRole(res.data.roles);
-          setActiveRole(defaultRole);
-          localStorage.setItem('activeRole', defaultRole);
+      const cachedRaw = storage.getItem('cachedUser');
+      const savedRole = storage.getItem('activeRole');
+
+      if (cachedRaw) {
+        try {
+          const cachedUser = JSON.parse(cachedRaw);
+          setUser(cachedUser);
+
+          const defaultRole = getDefaultRole(cachedUser.roles);
+          setActiveRole(savedRole && cachedUser.roles?.includes(savedRole) ? savedRole : defaultRole);
+          setLoading(false);
+        } catch {
+          storage.removeItem('cachedUser');
         }
       }
+
+      const res = await api.get('/users/me');
+      const freshUser = res.data;
+      const defaultRole = getDefaultRole(freshUser.roles);
+      const resolvedRole = savedRole && freshUser.roles?.includes(savedRole) ? savedRole : defaultRole;
+
+      setUser(freshUser);
+      setActiveRole(resolvedRole);
+      storage.setItem('cachedUser', JSON.stringify(freshUser));
+      storage.setItem('activeRole', resolvedRole);
     } catch (error) {
-      console.error('Session invalid - AuthContext.js:36', error);
-      logout();
+      console.error('Session invalid - AuthContext.js', error);
+      logout(false);
     } finally {
       setLoading(false);
     }
@@ -41,23 +73,14 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password, rememberMe) => {
     const res = await api.post('/auth/login', { email, password });
+    const storage = rememberMe ? localStorage : sessionStorage;
 
-    if (rememberMe) {
-      localStorage.setItem('token', res.data.access_token);
-    } else {
-      sessionStorage.setItem('token', res.data.access_token);
-    }
-
-    setUser(res.data.user);
+    storage.setItem('token', res.data.access_token);
 
     const defaultRole = getDefaultRole(res.data.user.roles);
+    setUser(res.data.user);
     setActiveRole(defaultRole);
-
-    if (rememberMe) {
-      localStorage.setItem('activeRole', defaultRole);
-    } else {
-      sessionStorage.setItem('activeRole', defaultRole);
-    }
+    persistUserSession(res.data.user, defaultRole, rememberMe);
 
     return res.data;
   };
@@ -65,33 +88,48 @@ export const AuthProvider = ({ children }) => {
   const register = async (data) => {
     const res = await api.post('/auth/register', data);
     localStorage.setItem('token', res.data.access_token);
-    localStorage.setItem('activeRole', 'EMPLOYEE');
     setUser(res.data.user);
     setActiveRole('EMPLOYEE');
+    localStorage.setItem('cachedUser', JSON.stringify(res.data.user));
+    localStorage.setItem('activeRole', 'EMPLOYEE');
     return res.data;
   };
 
-  const logout = () => {
+  const logout = (redirect = true) => {
     localStorage.removeItem('token');
     sessionStorage.removeItem('token');
+    localStorage.removeItem('cachedUser');
+    sessionStorage.removeItem('cachedUser');
     localStorage.removeItem('activeRole');
     sessionStorage.removeItem('activeRole');
     setUser(null);
     setActiveRole(null);
-    Router.push('/login');
+    if (redirect) Router.push('/login');
   };
 
   const switchRole = (role) => {
-    if (user && user.roles.includes(role)) {
-      setActiveRole(role);
-      localStorage.setItem('activeRole', role);
-      sessionStorage.setItem('activeRole', role);
-      Router.push('/');
-    }
+    if (!user?.roles?.includes(role)) return;
+
+    setActiveRole(role);
+
+    const storage = getStorageScope() || localStorage;
+    storage.setItem('activeRole', role);
+    Router.push('/');
   };
 
   return (
-    <AuthContext.Provider value={{ user, activeRole, login, register, logout, switchRole, loading, setUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        activeRole,
+        login,
+        register,
+        logout,
+        switchRole,
+        loading,
+        setUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
