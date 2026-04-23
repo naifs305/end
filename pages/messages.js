@@ -143,7 +143,7 @@ export default function MessagesPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-200"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
               placeholder="ابحث عن مستخدم"
             />
           </div>
@@ -161,7 +161,7 @@ export default function MessagesPage() {
                     key={item.user?.id}
                     type="button"
                     onClick={() => setSelectedUserId(item.user?.id)}
-                    className={`w-full text-right px-4 py-4 border-b border-gray-100 transition ${selected ? 'bg-primary-50' : 'bg-white hover:bg-gray-50'}`}
+                    className={`w-full text-right px-4 py-4 border-b border-gray-100 transition ${selected ? 'bg-primary-light' : 'bg-white hover:bg-gray-50'}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -226,9 +226,9 @@ export default function MessagesPage() {
                   key={`${item.id}-${item.createdAt}`}
                   className={`flex ${item.direction === 'out' ? 'justify-start' : 'justify-end'}`}
                 >
-                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${item.direction === 'out' ? 'bg-primary-600 text-white' : 'bg-white text-gray-900 border border-gray-200'}`}>
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${item.direction === 'out' ? 'bg-primary text-white' : 'bg-white text-gray-900 border border-gray-200'}`}>
                     <div className="text-sm whitespace-pre-wrap break-words">{item.body}</div>
-                    <div className={`mt-2 text-[11px] ${item.direction === 'out' ? 'text-primary-100' : 'text-gray-400'}`}>
+                    <div className={`mt-2 text-[11px] ${item.direction === 'out' ? 'text-white/80' : 'text-gray-400'}`}>
                       {formatDate(item.createdAt)}
                     </div>
                   </div>
@@ -246,12 +246,12 @@ export default function MessagesPage() {
                 rows={3}
                 placeholder={selectedUserId ? 'اكتب رسالتك هنا' : 'اختر محادثة أولاً'}
                 disabled={!selectedUserId || sending}
-                className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-200 disabled:bg-gray-100"
+                className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100"
               />
               <button
                 type="submit"
                 disabled={!selectedUserId || !messageText.trim() || sending}
-                className="px-5 py-3 rounded-2xl bg-primary-600 text-white text-sm font-semibold disabled:opacity-50"
+                className="px-5 py-3 rounded-2xl bg-primary text-white text-sm font-semibold disabled:opacity-50"
               >
                 {sending ? 'جاري الإرسال...' : 'إرسال'}
               </button>
