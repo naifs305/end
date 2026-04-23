@@ -54,12 +54,12 @@ export default function Header() {
             </svg>
           </button>
 
-          <div className="min-w-0">
+          <Link href="/" className="min-w-0">
             <h2 className="truncate text-lg font-extrabold text-primary md:text-2xl">نظام إقفال الدورات التدريبية</h2>
             <p className="mt-1 text-[11px] text-text-soft md:text-xs">
-              {activeRole === 'MANAGER' ? 'وضع المدير' : activeRole === 'PROJECT_SUPERVISOR' ? 'وضع مشرف المشروع' : 'وضع الموظف'}
+              {activeRole === 'MANAGER' ? 'وضع المدير' : activeRole === 'PROJECT_SUPERVISOR' ? 'وضع مشرف المشروع' : activeRole === 'QUALITY_VIEWER' ? 'وضع الجودة' : 'وضع الموظف'}
             </p>
-          </div>
+          </Link>
         </div>
 
         <div className="flex items-center gap-2 md:gap-4">

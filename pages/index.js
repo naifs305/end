@@ -77,23 +77,34 @@ export default function Home() {
     <MainLayout>
       <div className="min-h-full bg-background p-4 md:p-6">
         <div className="mb-6 rounded-3xl border border-border bg-white p-6 shadow-card">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-xl font-extrabold text-text-main md:text-2xl">مرحبًا، {user.firstName}</h1>
-              <p className="mt-2 text-sm text-text-soft">لوحة متابعة سريعة مختصرة حسب الدور النشط</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {canCreateCourse(activeRole) && (
-                <Link
-                  href="/courses/create"
-                  className="inline-flex items-center justify-center rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary-dark"
-                >
-                  إضافة دورة جديدة
-                </Link>
-              )}
-              <div className="inline-flex w-fit items-center rounded-2xl border border-primary/20 bg-primary-light px-4 py-2 text-sm font-bold text-primary">
-                {getDashboardTitle(activeRole, isAdmin)}
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h1 className="text-xl font-extrabold text-text-main md:text-2xl">مرحبًا، {user.firstName}</h1>
+                  <p className="mt-2 text-sm text-text-soft">لوحة متابعة سريعة مختصرة حسب الدور النشط</p>
+                </div>
+                <div className="inline-flex w-fit items-center rounded-2xl border border-primary/20 bg-primary-light px-4 py-2 text-sm font-bold text-primary">
+                  {getDashboardTitle(activeRole, isAdmin)}
+                </div>
               </div>
+
+              {!isAdmin && canCreateCourse(activeRole) && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link
+                    href="/courses/create"
+                    className="inline-flex items-center justify-center rounded-2xl bg-primary px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-primary-dark"
+                  >
+                    إضافة دورة جديدة
+                  </Link>
+                  <Link
+                    href="/courses"
+                    className="inline-flex items-center justify-center rounded-2xl border border-border px-4 py-2.5 text-sm font-bold text-primary transition hover:bg-primary-light"
+                  >
+                    إدارة الدورات
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
