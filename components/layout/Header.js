@@ -1,23 +1,44 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Link from 'next/link';
 import api from '../../lib/axios';
 import RoleSwitcher from './RoleSwitcher';
+
+const NOTIFICATION_CACHE_TTL_MS = 30000;
 
 export default function Header() {
   const { user, logout, activeRole } = useAuth();
   const [notifCount, setNotifCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const cacheKey = useMemo(() => {
+    if (!user?.id) return null;
+    return `notif-count-${user.id}`;
+  }, [user]);
+
   useEffect(() => {
-    if (!user) return;
+    if (!user || !cacheKey) return;
 
     let mounted = true;
 
     const loadNotifications = async () => {
       try {
+        const cachedRaw = sessionStorage.getItem(cacheKey);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw);
+            if (cached.timestamp && Date.now() - cached.timestamp < NOTIFICATION_CACHE_TTL_MS) {
+              if (mounted) setNotifCount(Number(cached.count || 0));
+              return;
+            }
+          } catch {
+            sessionStorage.removeItem(cacheKey);
+          }
+        }
+
         const res = await api.get('/notifications');
         const unread = (res.data || []).filter((n) => !n.isRead).length;
+        sessionStorage.setItem(cacheKey, JSON.stringify({ count: unread, timestamp: Date.now() }));
         if (mounted) setNotifCount(unread);
       } catch (error) {
         console.error('Header notifications error:', error);
@@ -29,47 +50,31 @@ export default function Header() {
     return () => {
       mounted = false;
     };
-  }, [user]);
+  }, [user, cacheKey]);
 
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [activeRole]);
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/90">
-      <div className="flex min-h-[72px] items-center justify-between gap-3 px-4 md:min-h-[80px] md:px-6">
-        <div className="flex min-w-0 items-center gap-3 md:gap-4">
+    <header className="sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur">
+      <div className="flex items-center justify-between gap-3 px-4 py-4 md:px-6">
+        <div className="flex items-center gap-3 md:hidden">
           <button
             type="button"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-white text-text-main transition hover:border-primary hover:bg-primary-light hover:text-primary md:hidden"
-            aria-label="فتح القائمة"
+            className="rounded-xl border border-border px-3 py-2 text-sm font-bold text-text-main"
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {mobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
+            القائمة
           </button>
-
-          <Link href="/" className="min-w-0">
-            <h2 className="truncate text-lg font-extrabold text-primary md:text-2xl">نظام إقفال الدورات التدريبية</h2>
-            <p className="mt-1 text-[11px] text-text-soft md:text-xs">
-              {activeRole === 'MANAGER' ? 'وضع المدير' : activeRole === 'PROJECT_SUPERVISOR' ? 'وضع مشرف المشروع' : activeRole === 'QUALITY_VIEWER' ? 'وضع الجودة' : 'وضع الموظف'}
-            </p>
-          </Link>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-4">
-          <Link href="/notifications">
-            <div className="relative cursor-pointer rounded-xl border border-border bg-white p-2 transition hover:border-primary hover:bg-primary-light">
-              <svg className="h-5 w-5 text-text-main" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
+        <div className="flex flex-1 items-center justify-end gap-3">
+          <Link href="/notifications" className="relative">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-white text-text-main transition hover:bg-background">
+              <span className="text-lg">🔔</span>
               {notifCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
+                <span className="absolute -right-1 -top-1 flex min-h-[22px] min-w-[22px] items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold text-white">
                   {notifCount}
                 </span>
               )}
@@ -79,7 +84,7 @@ export default function Header() {
           {user && user.roles.length > 1 && <RoleSwitcher />}
 
           {user && (
-            <div className="hidden md:flex max-w-[240px] flex-col items-end">
+            <div className="hidden max-w-[240px] flex-col items-end md:flex">
               <span className="truncate text-sm font-semibold text-text-main">{user.firstName} {user.lastName}</span>
               <span className="truncate text-xs text-text-soft">{user.email}</span>
             </div>

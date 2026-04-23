@@ -7,10 +7,13 @@ import { isAdminRole } from '../lib/roles';
 
 export default function Archive() {
   const { activeRole } = useAuth();
-  const isAdmin = isAdminRole(activeRole); // مدير أو مشرف
+  const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
+  const isAdmin = isAdminRole(activeRole) || isSupervisor;
   const [courses, setCourses] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const [filters, setFilters] = useState({
     search: '',
@@ -87,6 +90,21 @@ export default function Archive() {
       );
     });
   }, [courses, filters, activeRole]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
+
+  const paginatedCourses = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredCourses.slice(start, start + PAGE_SIZE);
+  }, [filteredCourses, page]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCourses.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const stats = useMemo(() => {
     return {
@@ -216,7 +234,7 @@ export default function Archive() {
     doc.save(isAdmin ? 'course-closure-archive.pdf' : 'my-course-archive.pdf');
   };
 
-  if (activeRole !== 'MANAGER' && activeRole !== 'EMPLOYEE') {
+  if (!['MANAGER', 'PROJECT_SUPERVISOR', 'EMPLOYEE'].includes(activeRole)) {
     return (
       <MainLayout>
         <div className="rounded-3xl border border-danger/20 bg-white p-6 text-danger shadow-card">
@@ -385,7 +403,7 @@ export default function Archive() {
                       </td>
                     </tr>
                   ) : (
-                    filteredCourses.map((course) => (
+                    paginatedCourses.map((course, index) => (
                       <tr
                         key={course.id}
                         className="border-t border-border transition hover:bg-background"
@@ -424,6 +442,16 @@ export default function Archive() {
               </table>
             </div>
           )}
+          {filteredCourses.length > 0 ? (
+            <div className="flex flex-col gap-3 border-t border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
+              <div className="text-sm text-text-soft">عرض {Math.min((page - 1) * PAGE_SIZE + 1, filteredCourses.length)} إلى {Math.min(page * PAGE_SIZE, filteredCourses.length)} من {filteredCourses.length}</div>
+              <div className="flex items-center gap-2">
+                <button type="button" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))} className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background disabled:opacity-50">السابق</button>
+                <div className="rounded-xl bg-background px-4 py-2 text-sm font-bold text-text-main">{page} / {totalPages}</div>
+                <button type="button" disabled={page >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))} className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background disabled:opacity-50">التالي</button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </MainLayout>

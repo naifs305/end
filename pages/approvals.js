@@ -1,166 +1,245 @@
 import { useEffect, useMemo, useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import api from '../lib/axios';
-import Link from 'next/link';
-import toast from 'react-hot-toast';
 
-function formatDate(value) {
-  if (!value) return '-';
-  return new Date(value).toLocaleDateString('ar-SA');
-}
+const PAGE_SIZE = 10;
 
-function formatTime(value) {
+function formatDateTime(value) {
   if (!value) return '-';
-  return new Date(value).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+  try {
+    return new Date(value).toLocaleString('ar-SA');
+  } catch {
+    return '-';
+  }
 }
 
 export default function ApprovalsQueue() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [actingId, setActingId] = useState('');
+  const [error, setError] = useState('');
+  const [busyId, setBusyId] = useState('');
+  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState({ search: '', project: '', employee: '' });
 
-  const fetchQueue = async () => {
-    setLoading(true);
+  const loadQueue = async () => {
     try {
+      setLoading(true);
+      setError('');
       const res = await api.get('/analytics/approvals-queue');
       setItems(Array.isArray(res.data) ? res.data : []);
-    } catch {
+    } catch (err) {
       setItems([]);
+      setError(err?.response?.data?.message || 'تعذر تحميل طابور الاعتمادات');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchQueue();
+    loadQueue();
   }, []);
 
-  const stats = useMemo(() => ({
-    total: items.length,
-    oldest: items.length ? formatDate(items[0].submittedAt) : '-',
-  }), [items]);
+  const filteredItems = useMemo(() => {
+    const q = filters.search.trim().toLowerCase();
+    return items.filter((item) => {
+      const matchesSearch = !q || [item.courseName, item.elementName, item.projectName, item.employeeName, item.ownerName]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesProject = !filters.project || item.projectName === filters.project;
+      const matchesEmployee = !filters.employee || item.employeeName === filters.employee;
+      return matchesSearch && matchesProject && matchesEmployee;
+    });
+  }, [items, filters]);
 
-  const handleAction = async (item, status) => {
-    const needsReason = status === 'RETURNED' || status === 'REJECTED';
+  const projects = useMemo(() => [...new Set(items.map((item) => item.projectName).filter(Boolean))], [items]);
+  const employees = useMemo(() => [...new Set(items.map((item) => item.employeeName).filter(Boolean))], [items]);
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+  const currentItems = filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters.search, filters.project, filters.employee]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const decideItem = async (itemId, decision) => {
     let notes = '';
-
-    if (needsReason) {
-      const promptText = status === 'RETURNED' ? 'سبب إعادة العنصر للموظف:' : 'سبب رفض العنصر:';
-      const reason = window.prompt(promptText);
-      if (reason === null) return;
-      if (!String(reason).trim()) {
-        toast.error('السبب مطلوب');
-        return;
-      }
-      notes = String(reason).trim();
+    if (decision === 'RETURNED') {
+      notes = window.prompt('اكتب سبب إعادة العنصر للموظف', '') || '';
+      if (!notes.trim()) return;
+    }
+    if (decision === 'REJECTED') {
+      notes = window.prompt('اكتب سبب رفض العنصر', '') || '';
+      if (!notes.trim()) return;
     }
 
-    setActingId(item.id);
     try {
-      await api.put(`/closure/${item.id}`, { status, notes });
-      toast.success(
-        status === 'APPROVED'
-          ? 'تم اعتماد العنصر'
-          : status === 'RETURNED'
-          ? 'تمت إعادة العنصر للموظف'
-          : 'تم رفض العنصر',
-      );
-      await fetchQueue();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'تعذر تنفيذ الإجراء');
+      setBusyId(itemId);
+      setError('');
+      await api.put(`/closure/${itemId}`, { status: decision, notes });
+      await loadQueue();
+    } catch (err) {
+      setError(err?.response?.data?.message || 'تعذر تنفيذ الإجراء على العنصر');
     } finally {
-      setActingId('');
+      setBusyId('');
     }
   };
 
   return (
     <MainLayout>
-      <div className="p-6">
-        <div className="mb-6 rounded-3xl border border-border bg-white p-6 shadow-card">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="space-y-6">
+        <section className="rounded-3xl border border-border bg-white p-6 shadow-card">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-2xl font-extrabold text-text-main">طابور الاعتمادات</h1>
+              <h1 className="text-3xl font-extrabold text-primary">طابور الاعتمادات</h1>
               <p className="mt-2 text-sm text-text-soft">يعرض جميع العناصر التي تحتاج اعتمادًا مباشرًا من الأقدم إلى الأحدث</p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <div className="rounded-2xl border border-border bg-background px-4 py-3 text-sm font-bold text-text-main">
-                العناصر الحالية: <span className="text-primary">{stats.total}</span>
-              </div>
-              <div className="rounded-2xl border border-border bg-background px-4 py-3 text-sm font-bold text-text-main">
-                أقدم تقديم: <span className="text-primary">{stats.oldest}</span>
-              </div>
+            <div className="rounded-2xl border border-border bg-background px-4 py-3 text-sm font-bold text-text-main">
+              إجمالي العناصر: {filteredItems.length}
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="overflow-hidden rounded-3xl border border-border bg-white shadow-card">
+        <section className="rounded-3xl border border-border bg-white p-4 md:p-6 shadow-card">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-extrabold text-primary">الفلاتر</h2>
+            <button
+              type="button"
+              onClick={() => setFilters({ search: '', project: '', employee: '' })}
+              className="rounded-2xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background"
+            >
+              إعادة تعيين
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <input
+              value={filters.search}
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              placeholder="بحث باسم الدورة أو العنصر أو الموظف"
+              className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+            />
+            <select
+              value={filters.project}
+              onChange={(e) => setFilters((prev) => ({ ...prev, project: e.target.value }))}
+              className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+            >
+              <option value="">كل المشاريع</option>
+              {projects.map((name) => <option key={name} value={name}>{name}</option>)}
+            </select>
+            <select
+              value={filters.employee}
+              onChange={(e) => setFilters((prev) => ({ ...prev, employee: e.target.value }))}
+              className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+            >
+              <option value="">كل الموظفين</option>
+              {employees.map((name) => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </div>
+        </section>
+
+        {error ? (
+          <div className="rounded-2xl border border-danger/20 bg-white p-4 text-sm font-bold text-danger shadow-card">
+            {error}
+          </div>
+        ) : null}
+
+        <section className="rounded-3xl border border-border bg-white shadow-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full">
+            <table className="min-w-full text-sm">
               <thead className="bg-background">
-                <tr className="border-b border-border text-right text-xs font-extrabold text-text-soft">
-                  <th className="px-4 py-4">الدورة</th>
-                  <th className="px-4 py-4">العنصر</th>
-                  <th className="px-4 py-4">الموظف</th>
-                  <th className="px-4 py-4">المشرف</th>
-                  <th className="px-4 py-4">التاريخ</th>
-                  <th className="px-4 py-4">الوقت</th>
-                  <th className="px-4 py-4">الإجراء</th>
+                <tr className="text-right text-text-soft">
+                  <th className="px-4 py-3 font-bold">الدورة</th>
+                  <th className="px-4 py-3 font-bold">العنصر</th>
+                  <th className="px-4 py-3 font-bold">المشروع</th>
+                  <th className="px-4 py-3 font-bold">الموظف</th>
+                  <th className="px-4 py-3 font-bold">المعتمد</th>
+                  <th className="px-4 py-3 font-bold">تاريخ ووقت التقديم</th>
+                  <th className="px-4 py-3 font-bold">الإجراء</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="7" className="py-12 text-center text-sm text-text-soft">جاري التحميل...</td>
+                    <td colSpan="7" className="px-4 py-12 text-center text-text-soft">جاري تحميل الاعتمادات...</td>
                   </tr>
-                ) : items.length === 0 ? (
+                ) : currentItems.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="py-12 text-center text-sm text-text-soft">لا توجد عناصر بانتظار الاعتماد حاليًا</td>
+                    <td colSpan="7" className="px-4 py-12 text-center text-text-soft">لا توجد عناصر بانتظار الاعتماد حاليًا</td>
                   </tr>
-                ) : (
-                  items.map((item) => (
-                    <tr key={item.id} className="border-b border-border last:border-b-0 hover:bg-primary-light/20">
-                      <td className="px-4 py-4 text-sm font-bold text-text-main">
-                        <Link href={`/courses/${item.courseId}`} className="hover:text-primary">
-                          {item.courseName}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-text-main">{item.elementName}</td>
-                      <td className="px-4 py-4 text-sm text-text-main">{item.employeeName}</td>
-                      <td className="px-4 py-4 text-sm text-text-main">{item.supervisorName}</td>
-                      <td className="px-4 py-4 text-sm text-text-soft">{formatDate(item.submittedAt)}</td>
-                      <td className="px-4 py-4 text-sm text-text-soft">{formatTime(item.submittedAt)}</td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() => handleAction(item, 'APPROVED')}
-                            disabled={actingId === item.id}
-                            className="rounded-xl bg-success px-3 py-2 text-xs font-extrabold text-white disabled:opacity-50"
-                          >
-                            اعتماد
-                          </button>
-                          <button
-                            onClick={() => handleAction(item, 'RETURNED')}
-                            disabled={actingId === item.id}
-                            className="rounded-xl bg-warning px-3 py-2 text-xs font-extrabold text-white disabled:opacity-50"
-                          >
-                            إعادة للموظف
-                          </button>
-                          <button
-                            onClick={() => handleAction(item, 'REJECTED')}
-                            disabled={actingId === item.id}
-                            className="rounded-xl bg-danger px-3 py-2 text-xs font-extrabold text-white disabled:opacity-50"
-                          >
-                            رفض
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ) : currentItems.map((item) => (
+                  <tr key={item.id} className="border-t border-border hover:bg-background transition">
+                    <td className="px-4 py-3 font-bold text-text-main">{item.courseName}</td>
+                    <td className="px-4 py-3 text-text-soft">{item.elementName}</td>
+                    <td className="px-4 py-3 text-text-soft">{item.projectName || '-'}</td>
+                    <td className="px-4 py-3 text-text-soft">{item.employeeName || '-'}</td>
+                    <td className="px-4 py-3 text-text-soft">{item.approverName || '-'}</td>
+                    <td className="px-4 py-3 text-text-soft">{formatDateTime(item.submittedAt)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={busyId === item.id}
+                          onClick={() => decideItem(item.id, 'APPROVED')}
+                          className="rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition hover:bg-primary-dark disabled:opacity-50"
+                        >
+                          اعتماد
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyId === item.id}
+                          onClick={() => decideItem(item.id, 'RETURNED')}
+                          className="rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-text-main transition hover:bg-background disabled:opacity-50"
+                        >
+                          إعادة للموظف
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyId === item.id}
+                          onClick={() => decideItem(item.id, 'REJECTED')}
+                          className="rounded-xl border border-danger/20 bg-white px-3 py-2 text-xs font-bold text-danger transition hover:bg-red-50 disabled:opacity-50"
+                        >
+                          رفض
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-        </div>
+
+          {!loading && filteredItems.length > 0 ? (
+            <div className="flex flex-col gap-3 border-t border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
+              <div className="text-sm text-text-soft">
+                عرض {Math.min((page - 1) * PAGE_SIZE + 1, filteredItems.length)} إلى {Math.min(page * PAGE_SIZE, filteredItems.length)} من {filteredItems.length}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background disabled:opacity-50"
+                >
+                  السابق
+                </button>
+                <div className="rounded-xl bg-background px-4 py-2 text-sm font-bold text-text-main">
+                  {page} / {totalPages}
+                </div>
+                <button
+                  type="button"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                  className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background disabled:opacity-50"
+                >
+                  التالي
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </section>
       </div>
     </MainLayout>
   );

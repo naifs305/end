@@ -5,10 +5,11 @@ import Header from './Header';
 import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
 
+const MESSAGE_CACHE_TTL_MS = 30000;
+
 export default function MainLayout({ children }) {
   const router = useRouter();
   const { user } = useAuth();
-
   const [newMessagePopup, setNewMessagePopup] = useState(null);
 
   const popupStorageKey = useMemo(() => {
@@ -16,13 +17,39 @@ export default function MainLayout({ children }) {
     return `seen-message-popup-${user.id}`;
   }, [user]);
 
+  const messageCacheKey = useMemo(() => {
+    if (!user?.id) return null;
+    return `latest-message-cache-${user.id}`;
+  }, [user]);
+
   useEffect(() => {
-    if (!user?.id || !popupStorageKey || router.pathname === '/messages') return;
+    if (!user?.id || !popupStorageKey || !messageCacheKey || router.pathname === '/messages') return;
 
     let isCancelled = false;
 
+    const openPopupIfNeeded = (latest) => {
+      if (!latest?.id || isCancelled) return;
+      const seenIds = JSON.parse(sessionStorage.getItem(popupStorageKey) || '[]');
+      if (!seenIds.includes(latest.id)) {
+        setNewMessagePopup(latest);
+      }
+    };
+
     const checkForNewMessages = async () => {
       try {
+        const cachedRaw = sessionStorage.getItem(messageCacheKey);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw);
+            if (cached.timestamp && Date.now() - cached.timestamp < MESSAGE_CACHE_TTL_MS) {
+              openPopupIfNeeded(cached.latest);
+              return;
+            }
+          } catch {
+            sessionStorage.removeItem(messageCacheKey);
+          }
+        }
+
         const res = await api.get('/messages/inbox');
         const items = res.data || [];
         if (!items.length || isCancelled) return;
@@ -40,21 +67,19 @@ export default function MainLayout({ children }) {
 
         if (!latest?.id) return;
 
-        const seenIds = JSON.parse(sessionStorage.getItem(popupStorageKey) || '[]');
-        if (!seenIds.includes(latest.id)) {
-          setNewMessagePopup(latest);
-        }
+        sessionStorage.setItem(messageCacheKey, JSON.stringify({ latest, timestamp: Date.now() }));
+        openPopupIfNeeded(latest);
       } catch (error) {
-        console.error('MainLayout new message popup error - MainLayout.js:48', error);
+        console.error('MainLayout new message popup error - MainLayout.js', error);
       }
     };
 
-    const timer = setTimeout(checkForNewMessages, 1500);
+    const timer = setTimeout(checkForNewMessages, 300);
     return () => {
       isCancelled = true;
       clearTimeout(timer);
     };
-  }, [user, popupStorageKey, router.pathname]);
+  }, [user, popupStorageKey, messageCacheKey, router.pathname]);
 
   const rememberPopupMessage = () => {
     if (!newMessagePopup?.id || !popupStorageKey) {
