@@ -32,23 +32,6 @@ export default function CourseDetail() {
     }
   };
 
-  const handleReportEmlDownload = async (elementId) => {
-    try {
-      const res = await api.get(`/closure/${elementId}/export-eml`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'message/rfc822' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `report-${elementId}.eml`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      alert('تعذر تنزيل مسودة البريد');
-    }
-  };
-
   const handleReportDownload = async (elementId) => {
     try {
       const res = await api.get(`/closure/${elementId}/export`, {
@@ -73,6 +56,24 @@ export default function CourseDetail() {
     }
   };
 
+
+  const handleReportEmlDownload = async (elementId) => {
+    try {
+      const res = await api.get(`/closure/${elementId}/export-eml`, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'message/rfc822' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `report-${elementId}.eml`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert('تعذر تنزيل ملف EML');
+    }
+  };
   const elementOrder = {
     trainee_registration: 1,
     registration_message: 2,
@@ -164,10 +165,10 @@ export default function CourseDetail() {
   const renderAction = (el) => {
     if (
       isReportKey(el.element.key) &&
-      (el.status === 'PENDING_APPROVAL' || el.status === 'APPROVED')
+      ['PENDING_APPROVAL', 'APPROVED', 'RETURNED', 'REJECTED'].includes(el.status)
     ) {
       return (
-        <>
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => handleReportDownload(el.id)}
             className="text-sm font-bold text-primary hover:text-primary-dark"
@@ -180,7 +181,7 @@ export default function CourseDetail() {
           >
             تنزيل EML
           </button>
-        </>
+        </div>
       );
     }
 
