@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
-import { isAdminRole, canEvaluatePerformance, canViewReportsOnly } from '../../lib/roles';
+import { isAdminRole, canAccessKpis, canViewReportsOnly } from '../../lib/roles';
 
 export default function Sidebar() {
   const router = useRouter();
@@ -10,7 +10,8 @@ export default function Sidebar() {
 
   const isAdmin = isAdminRole(activeRole);
   const isManager = activeRole === 'MANAGER';
-  const canEvaluate = canEvaluatePerformance(activeRole);
+  const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
+  const canViewKpis = canAccessKpis(activeRole);
   const isQualityViewer = canViewReportsOnly(activeRole);
 
   const isActive = (href) => router.pathname === href;
@@ -44,7 +45,7 @@ export default function Sidebar() {
             <div className={itemWrapperClass}>
               <div className={sectionTitleClass}>العمليات</div>
               <Link href="/courses" className={getLinkClass('/courses')}><span className="mx-2">إدارة الدورات</span></Link>
-              {isAdmin && (
+              {(isAdmin || isSupervisor) && (
                 <>
                   <Link href="/approvals" className={getLinkClass('/approvals')}><span className="mx-2">الاعتمادات</span></Link>
                   <Link href="/archive" className={getLinkClass('/archive')}><span className="mx-2">أرشيف الإقفالات</span></Link>
@@ -60,7 +61,7 @@ export default function Sidebar() {
         <div className={itemWrapperClass}>
           <div className={sectionTitleClass}>التقارير والمتابعة</div>
           <Link href="/reports" className={getLinkClass('/reports')}><span className="mx-2">التقارير الميدانية</span></Link>
-          {!isQualityViewer && canEvaluate && (
+          {!isQualityViewer && canViewKpis && (
             <Link href="/kpis" className={getLinkClass('/kpis')}><span className="mx-2">مؤشرات الأداء</span></Link>
           )}
           {!isQualityViewer && isAdmin && (

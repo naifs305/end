@@ -1,5 +1,5 @@
 // GET/POST /api/kpis/assignments
-const { withManager, withMethods } = require('../../../lib/middleware/auth');
+const { withManagerOrSupervisor, withMethods } = require('../../../lib/middleware/auth');
 const kpis = require('../../../lib/services/kpis');
 
 async function handler(req, res) {
@@ -13,11 +13,20 @@ async function handler(req, res) {
         periodType,
         Number(year),
         value ? Number(value) : undefined,
+        {
+          activeRole: req.activeRole,
+          userId: req.user.id,
+          supervisedProjectIds: req.scope?.supervisedProjectIds || [],
+        },
       );
       return res.status(200).json(data);
     }
 
     if (req.method === 'POST') {
+      if (req.activeRole !== 'MANAGER') {
+        return res.status(403).json({ message: 'يتطلب صلاحية المدير للتعديل' });
+      }
+
       const { userId, periodType, year, value, assignedCoursesCount, notes } = req.body || {};
       if (!userId || !periodType || !year) {
         return res.status(400).json({ message: 'بيانات الإسناد غير مكتملة' });
@@ -38,5 +47,5 @@ async function handler(req, res) {
   }
 }
 
-module.exports = withMethods(['GET', 'POST'], withManager(handler));
+module.exports = withMethods(['GET', 'POST'], withManagerOrSupervisor(handler));
 module.exports.default = module.exports;

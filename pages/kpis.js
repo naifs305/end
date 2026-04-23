@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
+import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
 
@@ -79,6 +80,9 @@ function toneByLevel(level) {
 
 export default function KpisPage() {
   const currentYear = new Date().getFullYear();
+  const { activeRole } = useAuth();
+  const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
+  const isManager = activeRole === 'MANAGER';
   const [periodType, setPeriodType] = useState('MONTHLY');
   const [year, setYear] = useState(currentYear);
   const [value, setValue] = useState(new Date().getMonth() + 1);
@@ -167,6 +171,7 @@ export default function KpisPage() {
   const handleCalculate = async () => {
     setLoadingCalculation(true);
     try {
+      if (!isManager) return;
       await api.post('/kpis/calculate', {
         periodType,
         year: Number(year),
@@ -202,6 +207,7 @@ export default function KpisPage() {
 
     setSavingNote(true);
     try {
+      if (!isManager) return;
       await api.post(`/kpis/${selectedSnapshot.id}/notes`, {
         userId: selectedSnapshot.userId,
         note: note.trim(),
@@ -245,6 +251,7 @@ export default function KpisPage() {
 
     setSavingAssignments((prev) => ({ ...prev, [row.userId]: true }));
     try {
+      if (!isManager) return;
       await api.post('/kpis/assignments', {
         userId: row.userId,
         periodType,
@@ -306,7 +313,7 @@ export default function KpisPage() {
             <div>
               <h1 className="text-2xl font-extrabold text-primary">مؤشرات الأداء</h1>
               <p className="mt-1 text-sm text-text-soft">
-                إدارة الإسناد الشهري ومراجعة أداء المستخدمين وجودة إقفال الدورات
+                {isSupervisor ? 'متابعة أداء موظفي المشروع والدورات التابعة له' : 'إدارة الإسناد الشهري ومراجعة أداء المستخدمين وجودة إقفال الدورات'}
               </p>
             </div>
 
@@ -381,13 +388,19 @@ export default function KpisPage() {
                 </div>
               )}
 
-              <button
-                onClick={handleCalculate}
-                disabled={loadingCalculation}
-                className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
-              >
-                {loadingCalculation ? 'جاري الاحتساب...' : 'احتساب المؤشرات'}
-              </button>
+              {isManager ? (
+                <button
+                  onClick={handleCalculate}
+                  disabled={loadingCalculation}
+                  className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
+                >
+                  {loadingCalculation ? 'جاري الاحتساب...' : 'احتساب المؤشرات'}
+                </button>
+              ) : (
+                <div className="rounded-2xl border border-primary/20 bg-primary-light px-4 py-2 text-sm font-bold text-primary">
+                  عرض مؤشرات مشروعك فقط
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -408,7 +421,7 @@ export default function KpisPage() {
             <div>
               <h2 className="text-lg font-extrabold text-primary">سجل إسناد الدورات</h2>
               <p className="mt-1 text-sm text-text-soft">
-                أدخل عدد الدورات المسندة لكل مستخدم، وسيقارن النظام العدد الفعلي المسجل تلقائيًا
+                {isSupervisor ? 'عرض عدد الدورات الفعلية والمسندة لموظفي المشروع دون صلاحية تعديل' : 'أدخل عدد الدورات المسندة لكل مستخدم، وسيقارن النظام العدد الفعلي المسجل تلقائيًا'}
               </p>
             </div>
             <Badge tone="gray">{periodLabel}</Badge>
@@ -423,7 +436,7 @@ export default function KpisPage() {
                   <th className="px-4 py-3 text-right font-bold">عدد الدورات الفعلي</th>
                   <th className="px-4 py-3 text-right font-bold">عدد الدورات المسندة</th>
                   <th className="px-4 py-3 text-right font-bold">ملاحظات</th>
-                  <th className="px-4 py-3 text-right font-bold">تعديل</th>
+                  <th className="px-4 py-3 text-right font-bold">الإجراء</th>
                 </tr>
               </thead>
               <tbody>
@@ -466,38 +479,50 @@ export default function KpisPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={row.assignedCoursesCountInput}
-                          onChange={(e) =>
-                            handleAssignmentInputChange(
-                              row.userId,
-                              'assignedCoursesCountInput',
-                              e.target.value,
-                            )
-                          }
-                          className="w-28 rounded-2xl border border-border bg-white px-3 py-2 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                        />
+                        {isManager ? (
+                          <input
+                            type="number"
+                            min="0"
+                            value={row.assignedCoursesCountInput}
+                            onChange={(e) =>
+                              handleAssignmentInputChange(
+                                row.userId,
+                                'assignedCoursesCountInput',
+                                e.target.value,
+                              )
+                            }
+                            className="w-28 rounded-2xl border border-border bg-white px-3 py-2 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                          />
+                        ) : (
+                          <span className="font-extrabold text-text-main">{row.assignedCoursesCount ?? 0}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
-                        <textarea
-                          value={row.notesInput}
-                          onChange={(e) =>
-                            handleAssignmentInputChange(row.userId, 'notesInput', e.target.value)
-                          }
-                          className="min-h-[72px] w-full min-w-[240px] rounded-2xl border border-border bg-white px-3 py-2 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                          placeholder="ملاحظات مختصرة"
-                        />
+                        {isManager ? (
+                          <textarea
+                            value={row.notesInput}
+                            onChange={(e) =>
+                              handleAssignmentInputChange(row.userId, 'notesInput', e.target.value)
+                            }
+                            className="min-h-[72px] w-full min-w-[240px] rounded-2xl border border-border bg-white px-3 py-2 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                            placeholder="ملاحظات مختصرة"
+                          />
+                        ) : (
+                          <div className="min-w-[240px] text-sm text-text-main">{row.notes || '-'}</div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleSaveAssignment(row)}
-                          disabled={!!savingAssignments[row.userId]}
-                          className="rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
-                        >
-                          {savingAssignments[row.userId] ? 'جاري الحفظ...' : 'حفظ'}
-                        </button>
+                        {isManager ? (
+                          <button
+                            onClick={() => handleSaveAssignment(row)}
+                            disabled={!!savingAssignments[row.userId]}
+                            className="rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
+                          >
+                            {savingAssignments[row.userId] ? 'جاري الحفظ...' : 'حفظ'}
+                          </button>
+                        ) : (
+                          <Badge tone="gray">عرض فقط</Badge>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -753,24 +778,28 @@ export default function KpisPage() {
             </div>
 
             <div className="space-y-3 rounded-3xl border border-border p-4">
-              <h4 className="font-extrabold text-text-main">ملاحظات المدير</h4>
+              <h4 className="font-extrabold text-text-main">{isManager ? 'ملاحظات المدير' : 'الملاحظات الإدارية'}</h4>
 
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="min-h-[110px] w-full rounded-2xl border border-border p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                placeholder="اكتب ملاحظة مهنية عن أداء المستخدم خلال هذه الفترة"
-              />
+              {isManager ? (
+                <>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    className="min-h-[110px] w-full rounded-2xl border border-border p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                    placeholder="اكتب ملاحظة مهنية عن أداء المستخدم خلال هذه الفترة"
+                  />
 
-              <div className="flex justify-end">
-                <button
-                  onClick={handleSaveNote}
-                  disabled={savingNote}
-                  className="rounded-2xl bg-primary px-5 py-2.5 font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
-                >
-                  {savingNote ? 'جاري الحفظ...' : 'حفظ الملاحظة'}
-                </button>
-              </div>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSaveNote}
+                      disabled={savingNote}
+                      className="rounded-2xl bg-primary px-5 py-2.5 font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
+                    >
+                      {savingNote ? 'جاري الحفظ...' : 'حفظ الملاحظة'}
+                    </button>
+                  </div>
+                </>
+              ) : null}
 
               <div className="space-y-3 pt-2">
                 {selectedSnapshot.notes?.length ? (
