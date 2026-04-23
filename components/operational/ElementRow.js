@@ -24,14 +24,16 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
     try {
       const usersRes = await api.get('/messages/users');
       const users = Array.isArray(usersRes.data) ? usersRes.data : [];
-      const managers = users.filter((user) => Array.isArray(user.roles) && user.roles.includes('MANAGER'));
+      const approvers = users.filter((user) =>
+        Array.isArray(user.roles) && (user.roles.includes('MANAGER') || user.roles.includes('PROJECT_SUPERVISOR'))
+      );
 
-      if (!managers.length) {
-        toast.error('لا يوجد مدير متاح لإرسال التذكير');
+      if (!approvers.length) {
+        toast.error('لا يوجد معتمد متاح لإرسال التذكير');
         return;
       }
 
-      const recipientIds = managers.map((manager) => manager.id);
+      const recipientIds = approvers.map((approver) => approver.id);
 
       const courseName =
         element?.course?.name ||
@@ -49,7 +51,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
         courseId: element?.courseId || undefined,
       });
 
-      toast.success('تم إرسال تذكير للمدير');
+      toast.success('تم إرسال تذكير للمعتمدين');
     } catch (err) {
       toast.error(err.response?.data?.message || 'تعذر إرسال التذكير');
     } finally {
@@ -58,7 +60,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
   };
 
   const isEmployee = activeRole === 'EMPLOYEE';
-  const isManager = activeRole === 'MANAGER';
+  const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -95,7 +97,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
         </>
       )}
 
-      {isManager && element.status === 'PENDING_APPROVAL' && (
+      {isApprover && element.status === 'PENDING_APPROVAL' && (
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => handleAction('APPROVED')}

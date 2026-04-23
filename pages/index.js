@@ -34,6 +34,8 @@ export default function Home() {
   const router = useRouter();
   const { user, activeRole, loading } = useAuth();
   const isAdmin = isAdminRole(activeRole);
+  const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
+  const usesManagerDashboard = isAdmin || isSupervisor;
   const [dashboard, setDashboard] = useState(null);
   const [pageLoading, setPageLoading] = useState(true);
 
@@ -44,17 +46,17 @@ export default function Home() {
   useEffect(() => {
     if (!user || !activeRole) return;
     setPageLoading(true);
-    const endpoint = isAdmin ? '/analytics/manager' : '/analytics/employee';
+    const endpoint = usesManagerDashboard ? '/analytics/manager' : '/analytics/employee';
     api
       .get(endpoint)
       .then((res) => setDashboard(res.data || null))
       .catch(() => setDashboard({ totalCourses: 0, openCourses: 0, closedCourses: 0, pendingApprovalCourses: 0, latestCourses: [], kpi: null }))
       .finally(() => setPageLoading(false));
-  }, [user, activeRole, isAdmin]);
+  }, [user, activeRole, usesManagerDashboard]);
 
   const quickCards = useMemo(() => {
     if (!dashboard) return [];
-    if (isAdmin) {
+    if (usesManagerDashboard) {
       return [
         { title: 'إجمالي الدورات', value: dashboard.totalCourses || 0, href: '/courses', color: 'primary' },
         { title: 'بانتظار الإغلاق', value: dashboard.awaitingClosureCourses || 0, href: '/courses?status=AWAITING_CLOSURE', color: 'yellow' },
@@ -68,7 +70,7 @@ export default function Home() {
       { title: 'الدورات المنتهية', value: dashboard.closedCourses || 0, href: '/archive', color: 'primary' },
       { title: 'بانتظار الاعتماد', value: dashboard.pendingApprovalCourses || 0, href: '/courses', color: 'red' },
     ];
-  }, [dashboard, isAdmin]);
+  }, [dashboard, usesManagerDashboard]);
 
   if (loading || pageLoading) return <div className="p-10 font-cairo text-text-main">جاري التحميل...</div>;
   if (!user || !dashboard) return null;
@@ -104,7 +106,7 @@ export default function Home() {
           ))}
         </div>
 
-        {isAdmin ? (
+        {usesManagerDashboard ? (
           <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-3">
             <InfoPanel title="ملخص المستخدمين">
               <InfoRow label="الموظفون" value={dashboard.employeesCount || 0} />

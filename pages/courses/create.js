@@ -27,6 +27,10 @@ const locationTypeOptions = [
   { value: 'REMOTE', label: 'عن بُعد' },
 ];
 
+function inferCourseType(locationType) {
+  return locationType === 'INTERNAL' ? 'internal' : 'external';
+}
+
 function formatDateForApi(date) {
   if (!date) return '';
   const year = date.getFullYear();
@@ -196,7 +200,7 @@ export default function CreateCoursePage() {
       operationalProjectId: form.operationalProjectId,
       primaryEmployeeId: user?.id,
       supportingEmployeeIds: [],
-      courseType: form.locationType,
+      courseType: inferCourseType(form.locationType),
       requiresAdvance: form.requiresAdvance,
       requiresRevenue: false,
       materialsIssued: form.requiresMaterialReturn,

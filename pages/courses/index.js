@@ -28,7 +28,7 @@ function employeeName(user) {
 
 export default function CoursesPage() {
   const router = useRouter();
-  const { activeRole } = useAuth();
+  const { activeRole, user } = useAuth();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -94,7 +94,7 @@ export default function CoursesPage() {
     }
   };
 
-  const canManageCourse = (course) => role === 'MANAGER' || role === 'PROJECT_SUPERVISOR' || course?.primaryEmployeeId === JSON.parse(localStorage.getItem('cachedUser') || '{}')?.id;
+  const canManageCourse = (course) => role === 'MANAGER' || role === 'PROJECT_SUPERVISOR' || course?.primaryEmployeeId === user?.id;
   const canDeleteCourse = (course) => role === 'MANAGER' || role === 'PROJECT_SUPERVISOR' || (role === 'EMPLOYEE' && course?.status === 'PREPARATION');
 
   return (
