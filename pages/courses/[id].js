@@ -32,6 +32,23 @@ export default function CourseDetail() {
     }
   };
 
+  const handleReportEmlDownload = async (elementId) => {
+    try {
+      const res = await api.get(`/closure/${elementId}/export-eml`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'message/rfc822' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `report-${elementId}.eml`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert('تعذر تنزيل مسودة البريد');
+    }
+  };
+
   const handleReportDownload = async (elementId) => {
     try {
       const res = await api.get(`/closure/${elementId}/export`, {
@@ -150,12 +167,20 @@ export default function CourseDetail() {
       (el.status === 'PENDING_APPROVAL' || el.status === 'APPROVED')
     ) {
       return (
-        <button
-          onClick={() => handleReportDownload(el.id)}
-          className="text-sm font-bold text-primary hover:text-primary-dark"
-        >
-          طباعة التقرير
-        </button>
+        <>
+          <button
+            onClick={() => handleReportDownload(el.id)}
+            className="text-sm font-bold text-primary hover:text-primary-dark"
+          >
+            طباعة التقرير
+          </button>
+          <button
+            onClick={() => handleReportEmlDownload(el.id)}
+            className="rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition hover:bg-primary-dark"
+          >
+            تنزيل EML
+          </button>
+        </>
       );
     }
 
