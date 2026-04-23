@@ -10,13 +10,33 @@ const ratings = [
   { value: 'requires_development', label: 'يحتاج تطوير' },
 ];
 
-const ratingValuesRequiringComment = [
-  'needs_improvement',
-  'weak',
-  'requires_development',
-];
+const ratingValuesRequiringComment = ['needs_improvement', 'weak', 'requires_development'];
 
-const sectionGuides = {
+const openingGuides = {
+  training_environment: [
+    'جاهزية القاعة أو مقر التنفيذ',
+    'النظافة والترتيب والانضباط العام',
+    'سلامة التكييف والإنارة والتهوية',
+    'سلامة المقاعد والطاولات وتجهيزات المتدربين',
+    'مدى مناسبة البيئة التدريبية لبداية التنفيذ',
+  ],
+  initial_readiness: [
+    'جاهزية الفريق التشغيلي واستلام المهام',
+    'اكتمال الترتيبات الميدانية قبل البداية',
+    'وضوح توزيع الأدوار أثناء الافتتاح',
+    'سلامة التجهيزات التقنية والمواد المساندة',
+    'جاهزية التواصل والتنسيق مع الجهة المستفيدة',
+  ],
+  trainee_attendance: [
+    'انتظام الحضور في اليوم الأول',
+    'سلامة التسجيل ودخول المشاركين',
+    'التزام المتدربين بالتعليمات الأولية',
+    'وضوح الاستقبال والتنظيم عند البداية',
+    'انطباع أولي عن انضباط المجموعة',
+  ],
+};
+
+const closingGuides = {
   training_environment: [
     'جاهزية القاعة أو مقر التنفيذ',
     'النظافة والترتيب والانضباط العام',
@@ -54,9 +74,46 @@ const sectionGuides = {
   ],
 };
 
+function emptySection() {
+  return { rating: '', comment: '' };
+}
+
+function getInitialForm(reportType) {
+  if (reportType === 'opening_report') {
+    return {
+      training_environment: emptySection(),
+      initial_readiness: emptySection(),
+      trainee_attendance: emptySection(),
+      registered_trainees_count: '',
+      initial_attendance_count: '',
+      trainers_count: '',
+      translators_count: '',
+      readiness_notes: '',
+      declarationConfirmed: false,
+      attachments: [],
+    };
+  }
+
+  return {
+    training_environment: emptySection(),
+    trainer_evaluation: emptySection(),
+    lms_content_evaluation: emptySection(),
+    trainee_evaluation: emptySection(),
+    program_evaluation: emptySection(),
+    registered_trainees_count: '',
+    actual_attendance_count: '',
+    trainers_count: '',
+    translators_count: '',
+    passed_count: '',
+    failed_count: '',
+    recommendations: '',
+    declarationConfirmed: false,
+    attachments: [],
+  };
+}
+
 function RatingBadgePreview({ value }) {
   if (!value) return null;
-
   const map = {
     excellent: 'bg-emerald-50 text-success border-emerald-200',
     good: 'bg-primary-light text-primary border-primary/20',
@@ -64,41 +121,25 @@ function RatingBadgePreview({ value }) {
     weak: 'bg-red-50 text-danger border-danger/20',
     requires_development: 'bg-[#f7f1e7] text-[#8c6b2a] border-[#e6d4ad]',
   };
-
   const label = ratings.find((r) => r.value === value)?.label || value;
-
-  return (
-    <span
-      className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${map[value] || 'bg-background text-text-soft border-border'}`}
-    >
-      {label}
-    </span>
-  );
+  return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${map[value] || 'bg-background text-text-soft border-border'}`}>{label}</span>;
 }
 
 function Section({ title, name, data, onChange, required = false, helperItems = [] }) {
   const needsComment = ratingValuesRequiringComment.includes(data?.rating || '');
-
   return (
     <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
       <div className="mb-4 flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-base font-extrabold text-text-main">
-            {title}
-            {required ? <span className="mr-1 text-danger">*</span> : null}
-          </h4>
+          <h4 className="text-base font-extrabold text-text-main">{title}{required ? <span className="mr-1 text-danger">*</span> : null}</h4>
           <RatingBadgePreview value={data?.rating} />
         </div>
-
         {helperItems.length > 0 && (
           <div className="rounded-2xl border border-border bg-background p-4">
             <div className="mb-2 text-xs font-bold text-text-main">محاور التقييم المقترحة</div>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {helperItems.map((item, index) => (
-                <div
-                  key={`${name}-guide-${index}`}
-                  className="flex items-start gap-2 text-xs text-text-soft"
-                >
+                <div key={`${name}-guide-${index}`} className="flex items-start gap-2 text-xs text-text-soft">
                   <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-primary" />
                   <span>{item}</span>
                 </div>
@@ -107,45 +148,18 @@ function Section({ title, name, data, onChange, required = false, helperItems = 
           </div>
         )}
       </div>
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-1">
-          <label className="mb-1.5 block text-xs font-bold text-text-soft">
-            التقييم العام
-            {required ? <span className="mr-1 text-danger">*</span> : null}
-          </label>
-          <select
-            name={`${name}.rating`}
-            value={data?.rating || ''}
-            onChange={onChange}
-            className="w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-            required={required}
-          >
+          <label className="mb-1.5 block text-xs font-bold text-text-soft">التقييم العام{required ? <span className="mr-1 text-danger">*</span> : null}</label>
+          <select name={`${name}.rating`} value={data?.rating || ''} onChange={onChange} className="w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" required={required}>
             <option value="">اختر التقييم</option>
-            {ratings.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
+            {ratings.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
         </div>
-
         <div className="lg:col-span-2">
-          <label className="mb-1.5 block text-xs font-bold text-text-soft">
-            الوصف التفصيلي والملاحظات
-            {needsComment ? <span className="mr-1 text-danger">*</span> : null}
-          </label>
-          <textarea
-            name={`${name}.comment`}
-            value={data?.comment || ''}
-            onChange={onChange}
-            className="min-h-[120px] w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-            placeholder="اكتب وصفًا واضحًا لما تم رصده في هذا المحور، مع ذكر الملاحظات أو جوانب القوة أو جوانب التحسين"
-            required={needsComment}
-          />
-          <div className="mt-2 text-[11px] text-text-soft">
-            عند اختيار: يحتاج تحسين / ضعيف / يحتاج تطوير، تصبح الملاحظة إلزامية.
-          </div>
+          <label className="mb-1.5 block text-xs font-bold text-text-soft">الوصف التفصيلي والملاحظات{needsComment ? <span className="mr-1 text-danger">*</span> : null}</label>
+          <textarea name={`${name}.comment`} value={data?.comment || ''} onChange={onChange} className="min-h-[120px] w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" placeholder="اكتب وصفًا واضحًا لما تم رصده في هذا المحور، مع ذكر الملاحظات أو جوانب القوة أو جوانب التحسين" required={needsComment} />
+          <div className="mt-2 text-[11px] text-text-soft">عند اختيار: يحتاج تحسين / ضعيف / يحتاج تطوير، تصبح الملاحظة إلزامية.</div>
         </div>
       </div>
     </div>
@@ -153,54 +167,25 @@ function Section({ title, name, data, onChange, required = false, helperItems = 
 }
 
 function ReadOnlyField({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-border bg-white p-3">
-      <div className="mb-1 text-[11px] font-bold text-text-soft">{label}</div>
-      <div className="break-words text-sm font-bold text-text-main">{value || '-'}</div>
-    </div>
-  );
+  return <div className="rounded-2xl border border-border bg-white p-3"><div className="mb-1 text-[11px] font-bold text-text-soft">{label}</div><div className="break-words text-sm font-bold text-text-main">{value || '-'}</div></div>;
 }
 
 function AttachmentCard({ file, index, onRemove }) {
   return (
     <div className="rounded-2xl border border-border bg-background p-2">
-      <img
-        src={file.content}
-        alt={file.name}
-        className="mb-2 h-28 w-full rounded-xl object-cover"
-      />
+      <img src={file.content} alt={file.name} className="mb-2 h-28 w-full rounded-xl object-cover" />
       <div className="mb-1 truncate text-xs font-medium text-text-main">{file.name}</div>
-      <div className="mb-2 text-[11px] text-text-soft">
-        {file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : ''}
-      </div>
-      <button
-        type="button"
-        onClick={() => onRemove(index)}
-        className="text-xs font-bold text-danger hover:underline"
-      >
-        حذف
-      </button>
+      <div className="mb-2 text-[11px] text-text-soft">{file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : ''}</div>
+      <button type="button" onClick={() => onRemove(index)} className="text-xs font-bold text-danger hover:underline">حذف</button>
     </div>
   );
 }
 
-function TextField({ label, name, value, onChange, placeholder, required = false, type = 'text', min }) {
+function TextField({ label, name, value, onChange, placeholder, required = false, type = 'text', min, disabled = false }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-bold text-text-soft">
-        {label}
-        {required ? <span className="mr-1 text-danger">*</span> : null}
-      </label>
-      <input
-        type={type}
-        min={min}
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className="w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-        required={required}
-      />
+      <label className="mb-1.5 block text-xs font-bold text-text-soft">{label}{required ? <span className="mr-1 text-danger">*</span> : null}</label>
+      <input type={type} min={min} name={name} value={value} onChange={onChange} placeholder={placeholder} disabled={disabled} className="w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:bg-background" required={required} />
     </div>
   );
 }
@@ -208,52 +193,24 @@ function TextField({ label, name, value, onChange, placeholder, required = false
 function TextAreaField({ label, name, value, onChange, placeholder, required = false, minHeight = '120px' }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-bold text-text-soft">
-        {label}
-        {required ? <span className="mr-1 text-danger">*</span> : null}
-      </label>
-      <textarea
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className="w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-        style={{ minHeight }}
-        required={required}
-      />
+      <label className="mb-1.5 block text-xs font-bold text-text-soft">{label}{required ? <span className="mr-1 text-danger">*</span> : null}</label>
+      <textarea name={name} value={value} onChange={onChange} placeholder={placeholder} className="w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" style={{ minHeight }} required={required} />
     </div>
   );
 }
 
 function formatLocationType(value) {
-  const map = {
-    INTERNAL: 'داخلي',
-    EXTERNAL: 'خارجي',
-    REMOTE: 'عن بُعد',
-  };
+  const map = { INTERNAL: 'داخلي', EXTERNAL: 'خارجي', REMOTE: 'عن بُعد' };
   return map[value] || value || '-';
 }
 
-export default function CourseReportForm({ trackingId, onClose, onSuccess, course }) {
+export default function CourseReportForm({ trackingId, onClose, onSuccess, course, reportType = 'closing_report' }) {
+  const normalizedType = reportType === 'opening_report' ? 'opening_report' : 'closing_report';
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    training_environment: { rating: '', comment: '' },
-    trainer_evaluation: { rating: '', comment: '' },
-    lms_content_evaluation: { rating: '', comment: '' },
-    trainee_evaluation: { rating: '', comment: '' },
-    program_evaluation: { rating: '', comment: '' },
-    registered_trainees_count: '',
-    actual_attendance_count: '',
-    trainers_count: '',
-    translators_count: '',
-    recommendations: '',
-    declarationConfirmed: false,
-    attachments: [],
-  });
+  const [form, setForm] = useState(getInitialForm(normalizedType));
 
   const courseInfo = useMemo(() => {
     if (!course) return null;
-
     return {
       name: course.name || '-',
       code: course.code || '-',
@@ -263,146 +220,102 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
       startDate: course.startDate ? new Date(course.startDate).toLocaleDateString('ar-SA') : '-',
       endDate: course.endDate ? new Date(course.endDate).toLocaleDateString('ar-SA') : '-',
       traineesCount: course.numTrainees ?? '-',
-      supervisor:
-        `${course.primaryEmployee?.firstName || ''} ${course.primaryEmployee?.lastName || ''}`.trim() || '-',
+      supervisor: `${course.primaryEmployee?.firstName || ''} ${course.primaryEmployee?.lastName || ''}`.trim() || '-',
     };
   }, [course]);
 
   const attendanceRate = useMemo(() => {
     const registered = Number(form.registered_trainees_count);
-    const actual = Number(form.actual_attendance_count);
-
+    const actual = Number(normalizedType === 'opening_report' ? form.initial_attendance_count : form.actual_attendance_count);
     if (!registered || Number.isNaN(registered) || registered <= 0) return '';
     if (Number.isNaN(actual) || actual < 0) return '';
     return `${((actual / registered) * 100).toFixed(1)}%`;
-  }, [form.registered_trainees_count, form.actual_attendance_count]);
+  }, [form.registered_trainees_count, form.initial_attendance_count, form.actual_attendance_count, normalizedType]);
+
+  const passingRate = useMemo(() => {
+    if (normalizedType !== 'closing_report') return '';
+    const attendance = Number(form.actual_attendance_count);
+    const passed = Number(form.passed_count);
+    if (!attendance || Number.isNaN(attendance) || attendance <= 0) return '';
+    if (Number.isNaN(passed) || passed < 0) return '';
+    return `${((passed / attendance) * 100).toFixed(1)}%`;
+  }, [form.actual_attendance_count, form.passed_count, normalizedType]);
 
   const completionStats = useMemo(() => {
-    const keys = [
-      'training_environment',
-      'trainer_evaluation',
-      'lms_content_evaluation',
-      'trainee_evaluation',
-      'program_evaluation',
-    ];
-
+    const keys = normalizedType === 'opening_report'
+      ? ['training_environment', 'initial_readiness', 'trainee_attendance']
+      : ['training_environment', 'trainer_evaluation', 'lms_content_evaluation', 'trainee_evaluation', 'program_evaluation'];
     const completed = keys.filter((key) => form[key]?.rating).length;
-    return {
-      completed,
-      total: keys.length,
-      percent: Math.round((completed / keys.length) * 100),
-    };
-  }, [form]);
+    return { completed, total: keys.length, percent: Math.round((completed / keys.length) * 100) };
+  }, [form, normalizedType]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     const parts = name.split('.');
-
     if (parts.length === 2) {
       const [section, field] = parts;
-      setForm((prev) => ({
-        ...prev,
-        [section]: {
-          ...prev[section],
-          [field]: value,
-        },
-      }));
+      setForm((prev) => ({ ...prev, [section]: { ...prev[section], [field]: value } }));
       return;
     }
-
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+    setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const fileToBase64 = (file) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () =>
-        resolve({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          content: reader.result,
-        });
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ name: file.name, type: file.type, size: file.size, content: reader.result });
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
   const handleAttachmentsChange = async (e) => {
     try {
       const files = Array.from(e.target.files || []);
       if (!files.length) return;
-
-      const totalFiles = form.attachments.length + files.length;
-      if (totalFiles > 6) {
+      if (form.attachments.length + files.length > 6) {
         toast.error('الحد الأقصى 6 صور فقط');
         e.target.value = '';
         return;
       }
-
       const invalidFile = files.find((file) => !file.type.startsWith('image/'));
       if (invalidFile) {
         toast.error('يسمح فقط برفع الصور');
         e.target.value = '';
         return;
       }
-
       const oversized = files.find((file) => file.size > 4 * 1024 * 1024);
       if (oversized) {
         toast.error('حجم الصورة الواحدة يجب ألا يتجاوز 4MB');
         e.target.value = '';
         return;
       }
-
       const convertedFiles = await Promise.all(files.map(fileToBase64));
-
-      setForm((prev) => ({
-        ...prev,
-        attachments: [...prev.attachments, ...convertedFiles],
-      }));
-
+      setForm((prev) => ({ ...prev, attachments: [...prev.attachments, ...convertedFiles] }));
       e.target.value = '';
     } catch {
       toast.error('تعذر رفع الصور');
     }
   };
 
-  const handleRemoveAttachment = (index) => {
-    setForm((prev) => ({
-      ...prev,
-      attachments: prev.attachments.filter((_, i) => i !== index),
-    }));
-  };
+  const handleRemoveAttachment = (index) => setForm((prev) => ({ ...prev, attachments: prev.attachments.filter((_, i) => i !== index) }));
 
   const validateForm = () => {
-    const requiredSections = [
-      'training_environment',
-      'trainer_evaluation',
-      'lms_content_evaluation',
-      'trainee_evaluation',
-      'program_evaluation',
-    ];
+    const requiredSections = normalizedType === 'opening_report'
+      ? ['training_environment', 'initial_readiness', 'trainee_attendance']
+      : ['training_environment', 'trainer_evaluation', 'lms_content_evaluation', 'trainee_evaluation', 'program_evaluation'];
 
     for (const key of requiredSections) {
       const section = form[key];
-
       if (!section?.rating?.trim()) {
         toast.error('لا يمكن تقديم التقرير قبل استكمال جميع التقييمات الأساسية');
         return false;
       }
-
-      if (
-        ratingValuesRequiringComment.includes(section.rating) &&
-        !section.comment?.trim()
-      ) {
+      if (ratingValuesRequiringComment.includes(section.rating) && !section.comment?.trim()) {
         toast.error('يوجد تقييم يتطلب ملاحظة تفسيرية');
         return false;
       }
     }
 
-    if (form.registered_trainees_count === '' || form.actual_attendance_count === '') {
+    if (form.registered_trainees_count === '' || (normalizedType === 'opening_report' ? form.initial_attendance_count === '' : form.actual_attendance_count === '')) {
       toast.error('أكمل بيانات المشاركة الأساسية');
       return false;
     }
@@ -411,24 +324,21 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
       toast.error('يجب الإقرار بصحة البيانات قبل التقديم');
       return false;
     }
-
     return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validateForm()) return;
-
     setLoading(true);
-
     try {
-      await api.post(`/closure/${trackingId}/report`, {
+      const endpoint = normalizedType === 'opening_report' ? `/closure/${trackingId}/opening-report` : `/closure/${trackingId}/closing-report`;
+      await api.post(endpoint, {
         ...form,
         attendance_rate: attendanceRate,
+        passing_rate: passingRate,
         generatedCourseInfo: courseInfo,
       });
-
       toast.success('تم تقديم التقرير');
       onSuccess();
       onClose();
@@ -439,31 +349,23 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
     }
   };
 
+  const title = normalizedType === 'opening_report' ? 'تقرير افتتاح الدورة' : 'تقرير اختتام الدورة';
+  const subtitle = normalizedType === 'opening_report'
+    ? 'نموذج تفصيلي لمتابعة الجاهزية التشغيلية والحضور الأولي عند افتتاح البرنامج'
+    : 'نموذج تفصيلي لتقييم التنفيذ التشغيلي وجودة البرنامج والبيئة التدريبية عند الاختتام';
+
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
         <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h3 className="text-base font-extrabold text-primary">تقرير الدورة التدريبية</h3>
-            <p className="mt-1 text-sm text-text-soft">
-              نموذج تفصيلي لتقييم التنفيذ التشغيلي وجودة البرنامج والبيئة التدريبية
-            </p>
+            <h3 className="text-base font-extrabold text-primary">{title}</h3>
+            <p className="mt-1 text-sm text-text-soft">{subtitle}</p>
           </div>
-
           <div className="min-w-[220px] rounded-3xl border border-border bg-background p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-bold text-text-soft">استكمال النموذج</span>
-              <span className="text-sm font-extrabold text-primary">{completionStats.percent}%</span>
-            </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-border">
-              <div
-                className="h-full rounded-full bg-primary transition-all duration-300"
-                style={{ width: `${completionStats.percent}%` }}
-              />
-            </div>
-            <div className="mt-2 text-[11px] text-text-soft">
-              {completionStats.completed} من {completionStats.total} محاور مكتملة
-            </div>
+            <div className="mb-2 flex items-center justify-between"><span className="text-xs font-bold text-text-soft">استكمال النموذج</span><span className="text-sm font-extrabold text-primary">{completionStats.percent}%</span></div>
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-border"><div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${completionStats.percent}%` }} /></div>
+            <div className="mt-2 text-[11px] text-text-soft">{completionStats.completed} من {completionStats.total} محاور مكتملة</div>
           </div>
         </div>
 
@@ -481,185 +383,65 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
       </div>
 
       <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
-        <div className="mb-4">
-          <h4 className="text-base font-extrabold text-text-main">إحصائيات المشاركة</h4>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <TextField
-            label="عدد المشاركين المسجلين"
-            name="registered_trainees_count"
-            value={form.registered_trainees_count}
-            onChange={handleChange}
-            placeholder="مثال: 14"
-            type="number"
-            min="0"
-            required
-          />
-
-          <TextField
-            label="عدد الحضور الفعلي"
-            name="actual_attendance_count"
-            value={form.actual_attendance_count}
-            onChange={handleChange}
-            placeholder="مثال: 14"
-            type="number"
-            min="0"
-            required
-          />
-
-          <TextField
-            label="عدد المدربين"
-            name="trainers_count"
-            value={form.trainers_count}
-            onChange={handleChange}
-            placeholder="مثال: 3"
-            type="number"
-            min="0"
-          />
-
-          <TextField
-            label="عدد المترجمين"
-            name="translators_count"
-            value={form.translators_count}
-            onChange={handleChange}
-            placeholder="مثال: 1"
-            type="number"
-            min="0"
-          />
-        </div>
-
-        <div className="mt-4 rounded-2xl border border-border bg-background p-4">
-          <div className="mb-1 text-xs font-bold text-text-soft">نسبة الحضور المحسوبة تلقائيًا</div>
-          <div className="text-lg font-extrabold text-primary">{attendanceRate || '-'}</div>
+        <div className="mb-4"><h4 className="text-base font-extrabold text-text-main">إحصائيات ${normalizedType === 'opening_report' ? 'الافتتاح والحضور الأولي' : 'المشاركة والنتائج النهائية'}</h4></div>
+        <div className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${normalizedType === 'opening_report' ? 'xl:grid-cols-4' : 'xl:grid-cols-4'}`}>
+          <TextField label="عدد المشاركين المسجلين" name="registered_trainees_count" value={form.registered_trainees_count} onChange={handleChange} placeholder="مثال: 14" type="number" min="0" required />
+          {normalizedType === 'opening_report' ? (
+            <TextField label="عدد الحضور في اليوم الأول" name="initial_attendance_count" value={form.initial_attendance_count} onChange={handleChange} placeholder="مثال: 14" type="number" min="0" required />
+          ) : (
+            <TextField label="عدد الحضور الفعلي" name="actual_attendance_count" value={form.actual_attendance_count} onChange={handleChange} placeholder="مثال: 14" type="number" min="0" required />
+          )}
+          <TextField label="عدد المدربين" name="trainers_count" value={form.trainers_count} onChange={handleChange} placeholder="مثال: 3" type="number" min="0" />
+          <TextField label="عدد المترجمين" name="translators_count" value={form.translators_count} onChange={handleChange} placeholder="مثال: 1" type="number" min="0" />
+          <TextField label={normalizedType === 'opening_report' ? 'نسبة الحضور الأولية' : 'نسبة الحضور'} name="attendance_rate_preview" value={attendanceRate} onChange={() => {}} disabled />
+          {normalizedType === 'closing_report' && (
+            <>
+              <TextField label="عدد المجتازين" name="passed_count" value={form.passed_count} onChange={handleChange} placeholder="مثال: 12" type="number" min="0" />
+              <TextField label="عدد غير المجتازين" name="failed_count" value={form.failed_count} onChange={handleChange} placeholder="مثال: 2" type="number" min="0" />
+              <TextField label="نسبة الاجتياز" name="passing_rate_preview" value={passingRate} onChange={() => {}} disabled />
+            </>
+          )}
         </div>
       </div>
 
-      <Section
-        title="تقييم البيئة التدريبية"
-        name="training_environment"
-        data={form.training_environment}
-        onChange={handleChange}
-        required
-        helperItems={sectionGuides.training_environment}
-      />
-
-      <Section
-        title="تقييم المدرب والتزامه وانضباطه"
-        name="trainer_evaluation"
-        data={form.trainer_evaluation}
-        onChange={handleChange}
-        required
-        helperItems={sectionGuides.trainer_evaluation}
-      />
-
-      <Section
-        title="تقييم المادة العلمية واكتمالها على منصة LMS"
-        name="lms_content_evaluation"
-        data={form.lms_content_evaluation}
-        onChange={handleChange}
-        required
-        helperItems={sectionGuides.lms_content_evaluation}
-      />
-
-      <Section
-        title="تقييم المتدربين وانضباطهم والتزامهم"
-        name="trainee_evaluation"
-        data={form.trainee_evaluation}
-        onChange={handleChange}
-        required
-        helperItems={sectionGuides.trainee_evaluation}
-      />
-
-      <Section
-        title="التقييم العام للبرنامج"
-        name="program_evaluation"
-        data={form.program_evaluation}
-        onChange={handleChange}
-        required
-        helperItems={sectionGuides.program_evaluation}
-      />
+      {normalizedType === 'opening_report' ? (
+        <>
+          <Section title="تقييم البيئة التدريبية" name="training_environment" data={form.training_environment} onChange={handleChange} required helperItems={openingGuides.training_environment} />
+          <Section title="تقييم الجاهزية التشغيلية" name="initial_readiness" data={form.initial_readiness} onChange={handleChange} required helperItems={openingGuides.initial_readiness} />
+          <Section title="تقييم حضور والتزام المتدربين" name="trainee_attendance" data={form.trainee_attendance} onChange={handleChange} required helperItems={openingGuides.trainee_attendance} />
+          <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
+            <TextAreaField label="ملاحظات وتوصيات عند الافتتاح" name="readiness_notes" value={form.readiness_notes} onChange={handleChange} placeholder="اكتب أبرز الملاحظات والتوصيات الميدانية عند افتتاح الدورة" minHeight="140px" />
+          </div>
+        </>
+      ) : (
+        <>
+          <Section title="تقييم البيئة التدريبية" name="training_environment" data={form.training_environment} onChange={handleChange} required helperItems={closingGuides.training_environment} />
+          <Section title="تقييم المدرب والتزامه وانضباطه" name="trainer_evaluation" data={form.trainer_evaluation} onChange={handleChange} required helperItems={closingGuides.trainer_evaluation} />
+          <Section title="تقييم المادة العلمية واكتمالها على منصة LMS" name="lms_content_evaluation" data={form.lms_content_evaluation} onChange={handleChange} required helperItems={closingGuides.lms_content_evaluation} />
+          <Section title="تقييم المتدربين وانضباطهم والتزامهم" name="trainee_evaluation" data={form.trainee_evaluation} onChange={handleChange} required helperItems={closingGuides.trainee_evaluation} />
+          <Section title="التقييم العام للبرنامج" name="program_evaluation" data={form.program_evaluation} onChange={handleChange} required helperItems={closingGuides.program_evaluation} />
+          <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
+            <TextAreaField label="التوصيات والمقترحات" name="recommendations" value={form.recommendations} onChange={handleChange} placeholder="اكتب التوصيات والمقترحات التي خرج بها فريق الإشراف عند اختتام البرنامج" minHeight="140px" />
+          </div>
+        </>
+      )}
 
       <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
-        <div className="mb-3">
-          <label className="mb-1 block text-sm font-extrabold text-text-main">الصور الداعمة</label>
-          <div className="text-xs text-text-soft">
-            لرفع صور القاعة أو البيئة التدريبية أو أي مرفقات توضيحية داعمة للتقرير
-          </div>
-        </div>
-
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handleAttachmentsChange}
-          className="block w-full text-sm text-text-main"
-        />
-
-        <div className="mt-2 text-xs text-text-soft">
-          الحد الأقصى: 6 صور — الحد الأعلى للصورة الواحدة: 4MB
-        </div>
-
-        {form.attachments.length > 0 && (
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
-            {form.attachments.map((file, index) => (
-              <AttachmentCard
-                key={`${file.name}-${index}`}
-                file={file}
-                index={index}
-                onRemove={handleRemoveAttachment}
-              />
-            ))}
-          </div>
-        )}
+        <div className="mb-4 flex items-center justify-between"><h4 className="text-base font-extrabold text-text-main">مرفقات وصور داعمة</h4><span className="text-xs text-text-soft">اختياري — حتى 6 صور</span></div>
+        <div className="mb-4"><input type="file" accept="image/*" multiple onChange={handleAttachmentsChange} className="block w-full text-sm text-text-soft file:ml-4 file:rounded-2xl file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-bold file:text-white hover:file:opacity-90" /></div>
+        {form.attachments.length > 0 ? <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{form.attachments.map((file, index) => <AttachmentCard key={`${file.name}-${index}`} file={file} index={index} onRemove={handleRemoveAttachment} />)}</div> : <div className="rounded-2xl border border-dashed border-border bg-background p-4 text-sm text-text-soft">لم يتم إرفاق أي صور حتى الآن</div>}
       </div>
 
       <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
-        <div className="mb-4">
-          <h4 className="text-base font-extrabold text-text-main">التوصيات والمقترحات</h4>
-        </div>
-        <TextAreaField
-          label="اكتب هنا التوصيات أو المقترحات أو ما ينبغي رفعه للإدارة"
-          name="recommendations"
-          value={form.recommendations}
-          onChange={handleChange}
-          placeholder="اكتب هنا التوصيات والمقترحات"
-          minHeight="130px"
-        />
-      </div>
-
-      <div className="rounded-3xl border border-accent/40 bg-[#fcf8f1] p-4">
-        <label className="flex cursor-pointer items-start gap-3">
-          <input
-            type="checkbox"
-            name="declarationConfirmed"
-            checked={form.declarationConfirmed}
-            onChange={handleChange}
-            className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
-            required
-          />
-          <span className="text-sm leading-7 text-text-main">
-            أقر بصحة ما ورد في هذا التقرير، وأنه يعكس واقع التنفيذ الفعلي للدورة التدريبية، وتمت تعبئته بما يحقق الأمانة المهنية والدقة التشغيلية.
-          </span>
+        <label className="flex items-start gap-3 text-sm text-text-main">
+          <input type="checkbox" name="declarationConfirmed" checked={form.declarationConfirmed} onChange={handleChange} className="mt-1 h-5 w-5 rounded border-border text-primary focus:ring-primary" />
+          <span>أقر بصحة البيانات المدخلة في هذا التقرير، وأنها تعبّر عن الحالة الميدانية الفعلية للدورة لحظة الرفع.</span>
         </label>
       </div>
 
-      <div className="flex justify-end gap-3 pt-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-2xl border border-border bg-white px-5 py-2.5 font-bold text-text-main transition hover:bg-background"
-        >
-          إلغاء
-        </button>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-2xl bg-primary px-6 py-2.5 font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
-        >
-          {loading ? 'جاري الحفظ...' : 'تقديم التقرير للاعتماد'}
-        </button>
+      <div className="flex flex-col-reverse gap-3 pt-2 md:flex-row md:justify-end">
+        <button type="button" onClick={onClose} className="rounded-2xl border border-border bg-white px-5 py-3 text-sm font-bold text-text-main transition hover:bg-background">إغلاق</button>
+        <button type="submit" disabled={loading} className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{loading ? 'جاري الحفظ...' : 'حفظ وتقديم التقرير'}</button>
       </div>
     </form>
   );
