@@ -24,36 +24,36 @@ function formatPercent(value) {
   return `${num.toFixed(2)}%`;
 }
 
+function getDashboardTitle(activeRole, isAdmin) {
+  if (activeRole === 'PROJECT_SUPERVISOR') return 'لوحة المشرف';
+  if (activeRole === 'QUALITY_VIEWER') return 'لوحة الجودة';
+  return isAdmin ? 'لوحة المدير' : 'لوحة الموظف';
+}
+
 export default function Home() {
   const router = useRouter();
   const { user, activeRole, loading } = useAuth();
   const isAdmin = isAdminRole(activeRole);
-
   const [dashboard, setDashboard] = useState(null);
   const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.replace('/login');
-    }
+    if (!loading && !user) router.replace('/login');
   }, [loading, user, router]);
 
   useEffect(() => {
     if (!user || !activeRole) return;
-
     setPageLoading(true);
     const endpoint = isAdmin ? '/analytics/manager' : '/analytics/employee';
-
     api
       .get(endpoint)
       .then((res) => setDashboard(res.data || null))
-      .catch(() => setDashboard(null))
+      .catch(() => setDashboard({ totalCourses: 0, openCourses: 0, closedCourses: 0, pendingApprovalCourses: 0, latestCourses: [], kpi: null }))
       .finally(() => setPageLoading(false));
   }, [user, activeRole, isAdmin]);
 
   const quickCards = useMemo(() => {
     if (!dashboard) return [];
-
     if (isAdmin) {
       return [
         { title: 'إجمالي الدورات', value: dashboard.totalCourses || 0, href: '/courses', color: 'primary' },
@@ -62,7 +62,6 @@ export default function Home() {
         { title: 'المستخدمون المسجلون', value: dashboard.totalUsers || 0, href: '/users', color: 'primary' },
       ];
     }
-
     return [
       { title: 'إجمالي دوراتي', value: dashboard.totalCourses || 0, href: '/courses', color: 'primary' },
       { title: 'الدورات غير المنتهية', value: dashboard.openCourses || 0, href: '/courses', color: 'yellow' },
@@ -71,10 +70,7 @@ export default function Home() {
     ];
   }, [dashboard, isAdmin]);
 
-  if (loading || pageLoading) {
-    return <div className="p-10 font-cairo text-text-main">جاري التحميل...</div>;
-  }
-
+  if (loading || pageLoading) return <div className="p-10 font-cairo text-text-main">جاري التحميل...</div>;
   if (!user || !dashboard) return null;
 
   return (
@@ -87,18 +83,14 @@ export default function Home() {
               <p className="mt-2 text-sm text-text-soft">لوحة متابعة سريعة مختصرة حسب الدور النشط</p>
             </div>
             <div className="inline-flex w-fit items-center rounded-2xl border border-primary/20 bg-primary-light px-4 py-2 text-sm font-bold text-primary">
-              {isAdmin ? 'لوحة المدير' : 'لوحة الموظف'}
+              {getDashboardTitle(activeRole, isAdmin)}
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {quickCards.map((card) => (
-            <Link key={card.title} href={card.href}>
-              <div className="cursor-pointer">
-                <KPICard title={card.title} value={card.value} color={card.color} />
-              </div>
-            </Link>
+            <Link key={card.title} href={card.href}><div className="cursor-pointer"><KPICard title={card.title} value={card.value} color={card.color} /></div></Link>
           ))}
         </div>
 
@@ -113,16 +105,8 @@ export default function Home() {
 
             <InfoPanel title="ملخص الأداء الشهري">
               <InfoRow label="عدد من لديهم لقطة KPI" value={dashboard.kpiUsersCount || 0} />
-              <InfoRow
-                label="الأعلى أداءً"
-                value={dashboard.topPerformer ? `${dashboard.topPerformer.user?.firstName || ''} ${dashboard.topPerformer.user?.lastName || ''}`.trim() || '-' : '-'}
-                compact
-              />
-              <InfoRow
-                label="الأقل أداءً"
-                value={dashboard.lowPerformer ? `${dashboard.lowPerformer.user?.firstName || ''} ${dashboard.lowPerformer.user?.lastName || ''}`.trim() || '-' : '-'}
-                compact
-              />
+              <InfoRow label="الأعلى أداءً" value={dashboard.topPerformer ? `${dashboard.topPerformer.user?.firstName || ''} ${dashboard.topPerformer.user?.lastName || ''}`.trim() || '-' : '-'} compact />
+              <InfoRow label="الأقل أداءً" value={dashboard.lowPerformer ? `${dashboard.lowPerformer.user?.firstName || ''} ${dashboard.lowPerformer.user?.lastName || ''}`.trim() || '-' : '-'} compact />
               <InfoRow label="متوسط الدرجة" value={formatNumber(dashboard.averageScore)} />
             </InfoPanel>
 
@@ -135,30 +119,16 @@ export default function Home() {
           </div>
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <MetricCard
-              title="نسبة سرعة الإنجاز"
-              value={formatPercent(dashboard.kpi?.speedScore)}
-              subtitle="تعكس سرعة تنفيذك وإقفال العناصر خلال الفترة الحالية"
-            />
-            <MetricCard
-              title="نسبة الانضباط"
-              value={formatPercent(dashboard.kpi?.disciplineScore)}
-              subtitle="تعكس انتظامك وتقليل التأخر والعناصر المعلقة"
-            />
-            <MetricCard
-              title="أداء الموظف"
-              value={formatPercent(dashboard.kpi?.finalScore)}
-              subtitle="المحصلة العامة لأدائك بحسب مؤشرات المنصة"
-            />
+            <MetricCard title="نسبة سرعة الإنجاز" value={formatPercent(dashboard.kpi?.speedScore)} subtitle="تعكس سرعة تنفيذك وإقفال العناصر خلال الفترة الحالية" />
+            <MetricCard title="نسبة الانضباط" value={formatPercent(dashboard.kpi?.disciplineScore)} subtitle="تعكس انتظامك وتقليل التأخر والعناصر المعلقة" />
+            <MetricCard title="أداء الموظف" value={formatPercent(dashboard.kpi?.finalScore)} subtitle="المحصلة العامة لأدائك بحسب مؤشرات المنصة" />
           </div>
         )}
 
         <div className="mt-6 rounded-2xl border border-border bg-white p-5 shadow-card">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-lg font-extrabold text-primary">آخر الدورات</h3>
-            <Link href="/courses" className="text-sm font-bold text-primary hover:text-primary-dark">
-              فتح إدارة الدورات
-            </Link>
+            <Link href="/courses" className="text-sm font-bold text-primary hover:text-primary-dark">فتح إدارة الدورات</Link>
           </div>
 
           {!dashboard.latestCourses || dashboard.latestCourses.length === 0 ? (
@@ -183,48 +153,29 @@ export default function Home() {
 }
 
 function InfoPanel({ title, children }) {
-  return (
-    <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
-      <div className="mb-4 text-lg font-extrabold text-primary">{title}</div>
-      <div className="space-y-3">{children}</div>
-    </div>
-  );
+  return <div className="rounded-2xl border border-border bg-white p-5 shadow-card"><div className="mb-4 text-lg font-extrabold text-primary">{title}</div><div className="space-y-3">{children}</div></div>;
 }
 
 function InfoRow({ label, value, compact = false }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-background px-4 py-3">
       <span className="text-sm text-text-soft">{label}</span>
-      <span className={`font-extrabold text-text-main ${compact ? 'max-w-[12rem] text-sm text-left leading-6' : 'text-sm'}`}>
-        {value}
-      </span>
+      <span className={`font-extrabold text-text-main ${compact ? 'max-w-[12rem] text-sm text-left leading-6' : 'text-sm'}`}>{value}</span>
     </div>
   );
 }
 
 function MetricCard({ title, value, subtitle }) {
-  return (
-    <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
-      <div className="mb-2 text-sm font-bold text-text-soft">{title}</div>
-      <div className="mb-2 text-3xl font-extrabold text-primary">{value}</div>
-      <div className="text-sm leading-7 text-text-soft">{subtitle}</div>
-    </div>
-  );
+  return <div className="rounded-2xl border border-border bg-white p-5 shadow-card"><div className="mb-2 text-sm font-bold text-text-soft">{title}</div><div className="mb-2 text-3xl font-extrabold text-primary">{value}</div><div className="text-sm leading-7 text-text-soft">{subtitle}</div></div>;
 }
 
 function translateCourseStatus(status) {
   switch (status) {
-    case 'PREPARATION':
-      return 'قيد الإعداد';
-    case 'EXECUTION':
-      return 'قيد التنفيذ';
-    case 'AWAITING_CLOSURE':
-      return 'بانتظار الإغلاق';
-    case 'CLOSED':
-      return 'مغلقة';
-    case 'ARCHIVED':
-      return 'مؤرشفة';
-    default:
-      return status || '-';
+    case 'PREPARATION': return 'قيد الإعداد';
+    case 'EXECUTION': return 'قيد التنفيذ';
+    case 'AWAITING_CLOSURE': return 'بانتظار الإغلاق';
+    case 'CLOSED': return 'مغلقة';
+    case 'ARCHIVED': return 'مؤرشفة';
+    default: return status || '-';
   }
 }
