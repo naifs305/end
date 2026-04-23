@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import MainLayout from '../../components/layout/MainLayout';
 import axios from '../../lib/axios';
-import { canCreateCourse, getDefaultRole, normalizeRole } from '../../lib/roles';
+import { useAuth } from '../../context/AuthContext';
+import { canCreateCourse } from '../../lib/roles';
 
 function normalizeCourses(payload) {
   if (Array.isArray(payload)) return payload;
@@ -17,32 +18,31 @@ function getCourseTitle(course) {
 }
 
 function getCourseStatus(course) {
-  return course?.statusLabel || course?.status || course?.phase || 'غير محدد';
+  const raw = course?.statusLabel || course?.status || course?.phase || 'غير محدد';
+  const map = {
+    PREPARATION: 'قيد الإعداد',
+    EXECUTION: 'قيد التنفيذ',
+    CLOSED: 'مقفلة',
+    ARCHIVED: 'مؤرشفة',
+    DRAFT: 'مسودة',
+    IN_PROGRESS: 'قيد التنفيذ',
+  };
+  return map[raw] || raw;
 }
 
 export default function CoursesPage() {
   const router = useRouter();
+  const { activeRole } = useAuth();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [activeRole, setActiveRole] = useState('EMPLOYEE');
-
-  useEffect(() => {
-    try {
-      const currentRole = localStorage.getItem('activeRole');
-      const cachedUser = JSON.parse(localStorage.getItem('cachedUser') || 'null');
-      setActiveRole(normalizeRole(currentRole) || getDefaultRole(cachedUser));
-    } catch (e) {
-      setActiveRole('EMPLOYEE');
-    }
-  }, []);
 
   useEffect(() => {
     let mounted = true;
     async function loadCourses() {
       setLoading(true);
       try {
-        const response = await axios.get('/api/courses');
+        const response = await axios.get('/courses');
         if (!mounted) return;
         setCourses(normalizeCourses(response.data));
       } catch (error) {
@@ -56,7 +56,7 @@ export default function CoursesPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [activeRole]);
 
   const filteredCourses = useMemo(() => {
     if (statusFilter === 'ALL') return courses;
@@ -98,8 +98,18 @@ export default function CoursesPage() {
         <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
-              <button type="button" className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white">بطاقات</button>
-              <button type="button" className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700">جدول</button>
+              <button
+                type="button"
+                className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
+              >
+                بطاقات
+              </button>
+              <button
+                type="button"
+                className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700"
+              >
+                جدول
+              </button>
             </div>
 
             <select
@@ -108,17 +118,21 @@ export default function CoursesPage() {
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-right text-sm font-medium text-slate-700 md:w-56"
             >
               <option value="ALL">كل الحالات</option>
-              <option value="DRAFT">مسودة</option>
-              <option value="IN_PROGRESS">قيد التنفيذ</option>
+              <option value="PREPARATION">قيد الإعداد</option>
+              <option value="EXECUTION">قيد التنفيذ</option>
               <option value="CLOSED">مقفلة</option>
               <option value="ARCHIVED">مؤرشفة</option>
             </select>
           </div>
 
           {loading ? (
-            <div className="rounded-[24px] border border-slate-200 p-16 text-center text-lg text-slate-400">جاري التحميل...</div>
+            <div className="rounded-[24px] border border-slate-200 p-16 text-center text-lg text-slate-400">
+              جاري التحميل...
+            </div>
           ) : filteredCourses.length === 0 ? (
-            <div className="rounded-[24px] border border-slate-200 p-16 text-center text-lg text-slate-400">لا توجد دورات حاليًا</div>
+            <div className="rounded-[24px] border border-slate-200 p-16 text-center text-lg text-slate-400">
+              لا توجد دورات حاليًا
+            </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {filteredCourses.map((course) => (
@@ -129,8 +143,10 @@ export default function CoursesPage() {
                   className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 text-right transition hover:border-teal-600 hover:bg-white"
                 >
                   <div className="text-lg font-bold text-slate-800">{getCourseTitle(course)}</div>
-                  <div className="mt-2 text-sm text-slate-500">{course?.location || course?.venue || 'غير محدد'}</div>
-                  <div className="mt-4 inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-700">{getCourseStatus(course)}</div>
+                  <div className="mt-2 text-sm text-slate-500">{course?.city || course?.location || course?.venue || 'غير محدد'}</div>
+                  <div className="mt-4 inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-700">
+                    {getCourseStatus(course)}
+                  </div>
                 </button>
               ))}
             </div>

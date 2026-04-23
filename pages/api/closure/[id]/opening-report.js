@@ -14,3 +14,12 @@ async function handler(req, res) {
 
 module.exports = withMethods(['POST'], withAuth(handler));
 module.exports.default = module.exports;
+
+
+module.exports.config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '12mb',
+    },
+  },
+};

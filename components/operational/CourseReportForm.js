@@ -20,19 +20,33 @@ const openingGuides = {
     'سلامة المقاعد والطاولات وتجهيزات المتدربين',
     'مدى مناسبة البيئة التدريبية لبداية التنفيذ',
   ],
-  initial_readiness: [
-    'جاهزية الفريق التشغيلي واستلام المهام',
-    'اكتمال الترتيبات الميدانية قبل البداية',
-    'وضوح توزيع الأدوار أثناء الافتتاح',
-    'سلامة التجهيزات التقنية والمواد المساندة',
-    'جاهزية التواصل والتنسيق مع الجهة المستفيدة',
+  trainer_evaluation: [
+    'جاهزية المدرب في بداية الدورة',
+    'الالتزام بالوقت والتعليمات التنظيمية',
+    'وضوح أسلوب العرض والتقديم',
+    'التعاون مع فريق التشغيل',
+    'الاستعداد لبداية التنفيذ',
   ],
-  trainee_attendance: [
+  trainee_evaluation: [
     'انتظام الحضور في اليوم الأول',
     'سلامة التسجيل ودخول المشاركين',
     'التزام المتدربين بالتعليمات الأولية',
     'وضوح الاستقبال والتنظيم عند البداية',
     'انطباع أولي عن انضباط المجموعة',
+  ],
+  content_evaluation: [
+    'وضوح المحتوى العلمي منذ البداية',
+    'مدى ارتباط المحتوى بالبرنامج',
+    'سلامة المادة العلمية والمرفقات',
+    'تسلسل العناصر العلمية',
+    'ملاءمة المحتوى للفئة المستهدفة',
+  ],
+  lms_evaluation: [
+    'جاهزية منصة LMS وبنود البرنامج',
+    'وضوح التعليمات داخل المنصة',
+    'توفر الملفات والروابط الأساسية',
+    'سلامة الوصول للمحتوى والاختبارات',
+    'تطابق المحتوى على المنصة مع التنفيذ',
   ],
 };
 
@@ -51,13 +65,6 @@ const closingGuides = {
     'الالتزام بالجدول الزمني',
     'التعاون مع فريق التشغيل',
   ],
-  lms_content_evaluation: [
-    'اكتمال المحتوى على منصة LMS',
-    'وضوح التعليمات داخل المنصة',
-    'توفر الاختبارات أو الأنشطة المطلوبة',
-    'سلامة الملفات والروابط والمرفقات',
-    'مدى توافق المحتوى مع البرنامج المنفذ',
-  ],
   trainee_evaluation: [
     'الانضباط بالحضور والالتزام',
     'التفاعل والمشاركة أثناء التنفيذ',
@@ -65,12 +72,19 @@ const closingGuides = {
     'الجدية في الأنشطة والاختبارات',
     'السلوك العام داخل البيئة التدريبية',
   ],
-  program_evaluation: [
-    'سلامة تنفيذ البرنامج تشغيليًا',
-    'تحقق الهدف العام من التنفيذ',
-    'مدى رضا المستفيد بشكل عام',
-    'كفاءة التنسيق بين الجهات ذات العلاقة',
-    'نجاح البرنامج مقارنة بالخطة المعتمدة',
+  content_evaluation: [
+    'جودة المادة العلمية وتكاملها',
+    'سلامة تسلسل المحتوى أثناء التنفيذ',
+    'مناسبة المحتوى للأهداف التدريبية',
+    'وضوح الحقائب والمرفقات العلمية',
+    'مدى تحقيق المحتوى لقيمة تعليمية فعلية',
+  ],
+  lms_evaluation: [
+    'اكتمال المحتوى على منصة LMS',
+    'وضوح التعليمات داخل المنصة',
+    'توفر الاختبارات أو الأنشطة المطلوبة',
+    'سلامة الملفات والروابط والمرفقات',
+    'مدى توافق المنصة مع البرنامج المنفذ',
   ],
 };
 
@@ -82,8 +96,10 @@ function getInitialForm(reportType) {
   if (reportType === 'opening_report') {
     return {
       training_environment: emptySection(),
-      initial_readiness: emptySection(),
-      trainee_attendance: emptySection(),
+      trainer_evaluation: emptySection(),
+      trainee_evaluation: emptySection(),
+      content_evaluation: emptySection(),
+      lms_evaluation: emptySection(),
       registered_trainees_count: '',
       initial_attendance_count: '',
       trainers_count: '',
@@ -97,9 +113,9 @@ function getInitialForm(reportType) {
   return {
     training_environment: emptySection(),
     trainer_evaluation: emptySection(),
-    lms_content_evaluation: emptySection(),
     trainee_evaluation: emptySection(),
-    program_evaluation: emptySection(),
+    content_evaluation: emptySection(),
+    lms_evaluation: emptySection(),
     registered_trainees_count: '',
     actual_attendance_count: '',
     trainers_count: '',
@@ -243,8 +259,8 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
 
   const completionStats = useMemo(() => {
     const keys = normalizedType === 'opening_report'
-      ? ['training_environment', 'initial_readiness', 'trainee_attendance']
-      : ['training_environment', 'trainer_evaluation', 'lms_content_evaluation', 'trainee_evaluation', 'program_evaluation'];
+      ? ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation']
+      : ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation'];
     const completed = keys.filter((key) => form[key]?.rating).length;
     return { completed, total: keys.length, percent: Math.round((completed / keys.length) * 100) };
   }, [form, normalizedType]);
@@ -260,9 +276,29 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
     setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+  const compressImage = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve({ name: file.name, type: file.type, size: file.size, content: reader.result });
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxWidth = 1600;
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const content = canvas.toDataURL('image/jpeg', 0.72);
+        resolve({
+          name: file.name.replace(/\.[^.]+$/, '.jpg'),
+          type: 'image/jpeg',
+          size: Math.round((content.length * 3) / 4),
+          content,
+        });
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -288,7 +324,7 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
         e.target.value = '';
         return;
       }
-      const convertedFiles = await Promise.all(files.map(fileToBase64));
+      const convertedFiles = await Promise.all(files.map(compressImage));
       setForm((prev) => ({ ...prev, attachments: [...prev.attachments, ...convertedFiles] }));
       e.target.value = '';
     } catch {
@@ -300,8 +336,8 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
 
   const validateForm = () => {
     const requiredSections = normalizedType === 'opening_report'
-      ? ['training_environment', 'initial_readiness', 'trainee_attendance']
-      : ['training_environment', 'trainer_evaluation', 'lms_content_evaluation', 'trainee_evaluation', 'program_evaluation'];
+      ? ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation']
+      : ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation'];
 
     for (const key of requiredSections) {
       const section = form[key];
@@ -407,8 +443,10 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
       {normalizedType === 'opening_report' ? (
         <>
           <Section title="تقييم البيئة التدريبية" name="training_environment" data={form.training_environment} onChange={handleChange} required helperItems={openingGuides.training_environment} />
-          <Section title="تقييم الجاهزية التشغيلية" name="initial_readiness" data={form.initial_readiness} onChange={handleChange} required helperItems={openingGuides.initial_readiness} />
-          <Section title="تقييم حضور والتزام المتدربين" name="trainee_attendance" data={form.trainee_attendance} onChange={handleChange} required helperItems={openingGuides.trainee_attendance} />
+          <Section title="تقييم المدرب" name="trainer_evaluation" data={form.trainer_evaluation} onChange={handleChange} required helperItems={openingGuides.trainer_evaluation} />
+          <Section title="تقييم المتدرب" name="trainee_evaluation" data={form.trainee_evaluation} onChange={handleChange} required helperItems={openingGuides.trainee_evaluation} />
+          <Section title="تقييم المحتوى" name="content_evaluation" data={form.content_evaluation} onChange={handleChange} required helperItems={openingGuides.content_evaluation} />
+          <Section title="تقييم منصة LMS" name="lms_evaluation" data={form.lms_evaluation} onChange={handleChange} required helperItems={openingGuides.lms_evaluation} />
           <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
             <TextAreaField label="ملاحظات وتوصيات عند الافتتاح" name="readiness_notes" value={form.readiness_notes} onChange={handleChange} placeholder="اكتب أبرز الملاحظات والتوصيات الميدانية عند افتتاح الدورة" minHeight="140px" />
           </div>
@@ -416,10 +454,10 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
       ) : (
         <>
           <Section title="تقييم البيئة التدريبية" name="training_environment" data={form.training_environment} onChange={handleChange} required helperItems={closingGuides.training_environment} />
-          <Section title="تقييم المدرب والتزامه وانضباطه" name="trainer_evaluation" data={form.trainer_evaluation} onChange={handleChange} required helperItems={closingGuides.trainer_evaluation} />
-          <Section title="تقييم المادة العلمية واكتمالها على منصة LMS" name="lms_content_evaluation" data={form.lms_content_evaluation} onChange={handleChange} required helperItems={closingGuides.lms_content_evaluation} />
-          <Section title="تقييم المتدربين وانضباطهم والتزامهم" name="trainee_evaluation" data={form.trainee_evaluation} onChange={handleChange} required helperItems={closingGuides.trainee_evaluation} />
-          <Section title="التقييم العام للبرنامج" name="program_evaluation" data={form.program_evaluation} onChange={handleChange} required helperItems={closingGuides.program_evaluation} />
+          <Section title="تقييم المدرب" name="trainer_evaluation" data={form.trainer_evaluation} onChange={handleChange} required helperItems={closingGuides.trainer_evaluation} />
+          <Section title="تقييم المتدرب" name="trainee_evaluation" data={form.trainee_evaluation} onChange={handleChange} required helperItems={closingGuides.trainee_evaluation} />
+          <Section title="تقييم المحتوى" name="content_evaluation" data={form.content_evaluation} onChange={handleChange} required helperItems={closingGuides.content_evaluation} />
+          <Section title="تقييم منصة LMS" name="lms_evaluation" data={form.lms_evaluation} onChange={handleChange} required helperItems={closingGuides.lms_evaluation} />
           <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
             <TextAreaField label="التوصيات والمقترحات" name="recommendations" value={form.recommendations} onChange={handleChange} placeholder="اكتب التوصيات والمقترحات التي خرج بها فريق الإشراف عند اختتام البرنامج" minHeight="140px" />
           </div>
