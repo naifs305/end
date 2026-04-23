@@ -93,9 +93,10 @@ export default function MessagesPage() {
 
   const filteredConversations = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const base = conversations.length
-      ? conversations
-      : users.map((user) => ({ user, unreadCount: 0, lastMessage: null, updatedAt: null }));
+    const map = new Map();
+    for (const item of users.map((user) => ({ user, unreadCount: 0, lastMessage: null, updatedAt: null }))) map.set(item.user.id, item);
+    for (const item of conversations) map.set(item.user.id, { ...(map.get(item.user.id) || {}), ...item });
+    const base = Array.from(map.values()).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
 
     if (!q) return base;
 

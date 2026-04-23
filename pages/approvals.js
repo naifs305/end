@@ -5,9 +5,15 @@ import Link from 'next/link';
 
 export default function ApprovalsQueue() {
   const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/analytics/approvals-queue').then(res => setItems(res.data));
+    let mounted = true;
+    api.get('/analytics/approvals-queue')
+      .then(res => { if (mounted) setItems(Array.isArray(res.data) ? res.data : []); })
+      .catch(() => { if (mounted) setItems([]); })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
   }, []);
 
   return (
@@ -22,16 +28,19 @@ export default function ApprovalsQueue() {
                 <tr>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">الدورة</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">العنصر</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">المشروع</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">الموظف</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">تاريخ التقديم</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">إجراء</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
+                {loading && (<tr><td colSpan="6" className="text-center py-10 text-gray-400">جاري التحميل...</td></tr>)}
                 {items.map(item => (
                   <tr key={item.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.courseName}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.elementName}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.projectName || '-'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.employeeName}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(item.submittedAt).toLocaleString('ar-SA')}
@@ -45,7 +54,7 @@ export default function ApprovalsQueue() {
                 ))}
                 {items.length === 0 && (
                   <tr>
-                    <td colSpan="5" className="text-center py-10 text-gray-400">لا توجد عناصر بانتظار الاعتماد حالياً</td>
+                    <td colSpan="6" className="text-center py-10 text-gray-400">لا توجد عناصر بانتظار الاعتماد حالياً</td>
                   </tr>
                 )}
               </tbody>
