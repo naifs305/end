@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import MainLayout from '../../components/layout/MainLayout';
 import axios from '../../lib/axios';
-import { canCreateCourse, getDefaultRole } from '../../lib/roles';
+import { canCreateCourse, getDefaultRole, normalizeRole } from '../../lib/roles';
 
 function normalizeCourses(payload) {
   if (Array.isArray(payload)) return payload;
@@ -13,13 +13,7 @@ function normalizeCourses(payload) {
 }
 
 function getCourseTitle(course) {
-  return (
-    course?.title ||
-    course?.name ||
-    course?.courseTitle ||
-    course?.courseName ||
-    'دورة بدون عنوان'
-  );
+  return course?.title || course?.name || course?.courseTitle || course?.courseName || 'دورة بدون عنوان';
 }
 
 function getCourseStatus(course) {
@@ -37,7 +31,7 @@ export default function CoursesPage() {
     try {
       const currentRole = localStorage.getItem('activeRole');
       const cachedUser = JSON.parse(localStorage.getItem('cachedUser') || 'null');
-      setActiveRole(currentRole || getDefaultRole(cachedUser));
+      setActiveRole(normalizeRole(currentRole) || getDefaultRole(cachedUser));
     } catch (e) {
       setActiveRole('EMPLOYEE');
     }
@@ -104,18 +98,8 @@ export default function CoursesPage() {
         <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
-              >
-                بطاقات
-              </button>
-              <button
-                type="button"
-                className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700"
-              >
-                جدول
-              </button>
+              <button type="button" className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white">بطاقات</button>
+              <button type="button" className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700">جدول</button>
             </div>
 
             <select
@@ -132,13 +116,9 @@ export default function CoursesPage() {
           </div>
 
           {loading ? (
-            <div className="rounded-[24px] border border-slate-200 p-16 text-center text-lg text-slate-400">
-              جاري التحميل...
-            </div>
+            <div className="rounded-[24px] border border-slate-200 p-16 text-center text-lg text-slate-400">جاري التحميل...</div>
           ) : filteredCourses.length === 0 ? (
-            <div className="rounded-[24px] border border-slate-200 p-16 text-center text-lg text-slate-400">
-              لا توجد دورات حاليًا
-            </div>
+            <div className="rounded-[24px] border border-slate-200 p-16 text-center text-lg text-slate-400">لا توجد دورات حاليًا</div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {filteredCourses.map((course) => (
@@ -150,9 +130,7 @@ export default function CoursesPage() {
                 >
                   <div className="text-lg font-bold text-slate-800">{getCourseTitle(course)}</div>
                   <div className="mt-2 text-sm text-slate-500">{course?.location || course?.venue || 'غير محدد'}</div>
-                  <div className="mt-4 inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-700">
-                    {getCourseStatus(course)}
-                  </div>
+                  <div className="mt-4 inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-700">{getCourseStatus(course)}</div>
                 </button>
               ))}
             </div>
