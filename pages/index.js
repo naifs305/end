@@ -1,4 +1,4 @@
-import { isAdminRole } from '../lib/roles';
+import { canCreateCourse, isAdminRole } from '../lib/roles';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import useAuth from '../context/AuthContext';
@@ -126,13 +126,38 @@ export default function Home() {
         )}
 
         <div className="mt-6 rounded-2xl border border-border bg-white p-5 shadow-card">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <h3 className="text-lg font-extrabold text-primary">آخر الدورات</h3>
-            <Link href="/courses" className="text-sm font-bold text-primary hover:text-primary-dark">فتح إدارة الدورات</Link>
+            <div className="flex flex-wrap items-center gap-3">
+              {canCreateCourse(activeRole) && (
+                <Link
+                  href="/courses/create"
+                  className="inline-flex items-center justify-center rounded-2xl bg-primary px-4 py-2.5 text-sm font-extrabold text-white hover:bg-primary-dark"
+                >
+                  إضافة دورة جديدة
+                </Link>
+              )}
+              <Link
+                href="/courses"
+                className="inline-flex items-center justify-center rounded-2xl border border-border px-4 py-2.5 text-sm font-bold text-primary hover:bg-primary-light"
+              >
+                فتح إدارة الدورات
+              </Link>
+            </div>
           </div>
 
           {!dashboard.latestCourses || dashboard.latestCourses.length === 0 ? (
-            <div className="text-sm text-text-soft">لا توجد بيانات حديثة لعرضها.</div>
+            <div className="rounded-2xl border border-dashed border-border bg-background p-5">
+              <div className="mb-3 text-sm text-text-soft">لا توجد بيانات حديثة لعرضها.</div>
+              {canCreateCourse(activeRole) && (
+                <Link
+                  href="/courses/create"
+                  className="inline-flex items-center justify-center rounded-2xl bg-primary px-4 py-2.5 text-sm font-extrabold text-white hover:bg-primary-dark"
+                >
+                  إضافة دورة جديدة
+                </Link>
+              )}
+            </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               {dashboard.latestCourses.map((course) => (
