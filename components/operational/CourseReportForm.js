@@ -48,6 +48,13 @@ const openingGuides = {
     'سلامة الوصول للمحتوى والاختبارات',
     'تطابق المحتوى على المنصة مع التنفيذ',
   ],
+  support_services_evaluation: [
+    'إدارة السفر في الحجوزات اللازمة للطيران والسكن وغيرها',
+    'إدارة تطوير الأعمال في تسليم الأسماء مبكرًا والتعامل مع القضايا الطارئة',
+    'إدارة تصميم البرامج التدريبية في التفاعل السريع مع محتوى البرنامج على منصة LMS',
+    'إدارة شؤون المدربين في تعديل الأدلة والتوقيتات وأسماء المدربين عند الحاجة',
+    'تعاون الإدارات المساندة الأخرى مثل الخدمات المساندة والضيافة والإسكان والمراسم والعيادة الطبية',
+  ],
 };
 
 const closingGuides = {
@@ -86,6 +93,13 @@ const closingGuides = {
     'سلامة الملفات والروابط والمرفقات',
     'مدى توافق المنصة مع البرنامج المنفذ',
   ],
+  support_services_evaluation: [
+    'إدارة السفر في الحجوزات اللازمة للطيران والسكن وغيرها',
+    'إدارة تطوير الأعمال في تسليم الأسماء مبكرًا والتعامل مع القضايا الطارئة',
+    'إدارة تصميم البرامج التدريبية في التفاعل السريع مع محتوى البرنامج على منصة LMS',
+    'إدارة شؤون المدربين في تعديل الأدلة والتوقيتات وأسماء المدربين عند الحاجة',
+    'تعاون الإدارات المساندة الأخرى مثل الخدمات المساندة والضيافة والإسكان والمراسم والعيادة الطبية',
+  ],
 };
 
 function emptySection() {
@@ -100,6 +114,7 @@ function getInitialForm(reportType) {
       trainee_evaluation: emptySection(),
       content_evaluation: emptySection(),
       lms_evaluation: emptySection(),
+      support_services_evaluation: emptySection(),
       registered_trainees_count: '',
       initial_attendance_count: '',
       trainers_count: '',
@@ -116,6 +131,7 @@ function getInitialForm(reportType) {
     trainee_evaluation: emptySection(),
     content_evaluation: emptySection(),
     lms_evaluation: emptySection(),
+    support_services_evaluation: emptySection(),
     registered_trainees_count: '',
     actual_attendance_count: '',
     trainers_count: '',
@@ -259,8 +275,8 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
 
   const completionStats = useMemo(() => {
     const keys = normalizedType === 'opening_report'
-      ? ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation']
-      : ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation'];
+      ? ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation', 'support_services_evaluation']
+      : ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation', 'support_services_evaluation'];
     const completed = keys.filter((key) => form[key]?.rating).length;
     return { completed, total: keys.length, percent: Math.round((completed / keys.length) * 100) };
   }, [form, normalizedType]);
@@ -336,8 +352,8 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
 
   const validateForm = () => {
     const requiredSections = normalizedType === 'opening_report'
-      ? ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation']
-      : ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation'];
+      ? ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation', 'support_services_evaluation']
+      : ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation', 'support_services_evaluation'];
 
     for (const key of requiredSections) {
       const section = form[key];
@@ -447,6 +463,7 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
           <Section title="تقييم المتدرب" name="trainee_evaluation" data={form.trainee_evaluation} onChange={handleChange} required helperItems={openingGuides.trainee_evaluation} />
           <Section title="تقييم المحتوى" name="content_evaluation" data={form.content_evaluation} onChange={handleChange} required helperItems={openingGuides.content_evaluation} />
           <Section title="تقييم منصة LMS" name="lms_evaluation" data={form.lms_evaluation} onChange={handleChange} required helperItems={openingGuides.lms_evaluation} />
+          <Section title="تقييم الإدارات المساندة" name="support_services_evaluation" data={form.support_services_evaluation} onChange={handleChange} required helperItems={openingGuides.support_services_evaluation} />
           <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
             <TextAreaField label="ملاحظات وتوصيات عند الافتتاح" name="readiness_notes" value={form.readiness_notes} onChange={handleChange} placeholder="اكتب أبرز الملاحظات والتوصيات الميدانية عند افتتاح الدورة" minHeight="140px" />
           </div>
@@ -458,6 +475,7 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
           <Section title="تقييم المتدرب" name="trainee_evaluation" data={form.trainee_evaluation} onChange={handleChange} required helperItems={closingGuides.trainee_evaluation} />
           <Section title="تقييم المحتوى" name="content_evaluation" data={form.content_evaluation} onChange={handleChange} required helperItems={closingGuides.content_evaluation} />
           <Section title="تقييم منصة LMS" name="lms_evaluation" data={form.lms_evaluation} onChange={handleChange} required helperItems={closingGuides.lms_evaluation} />
+          <Section title="تقييم الإدارات المساندة" name="support_services_evaluation" data={form.support_services_evaluation} onChange={handleChange} required helperItems={closingGuides.support_services_evaluation} />
           <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
             <TextAreaField label="التوصيات والمقترحات" name="recommendations" value={form.recommendations} onChange={handleChange} placeholder="اكتب التوصيات والمقترحات التي خرج بها فريق الإشراف عند اختتام البرنامج" minHeight="140px" />
           </div>

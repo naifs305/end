@@ -4,15 +4,12 @@ import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 
-const PAGE_SIZE = 10;
-
 export default function ReportsPage() {
   const { activeRole } = useAuth();
   const isAdmin = isAdminRole(activeRole);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ search: '', presenter: '', locationType: '', startDateFrom: '', startDateTo: '' });
 
   useEffect(() => {
@@ -45,23 +42,32 @@ export default function ReportsPage() {
       alert('تعذر فتح التقرير');
     }
   };
+  const downloadBlob = (blob, filename) => {
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  };
 
-  const handleDownloadEml = async (trackingId) => {
+  const handleEmlDownload = async (trackingId, reportKey) => {
     try {
-      const res = await api.get(`/closure/${trackingId}/export-eml`, { responseType: 'blob' });
-      const blob = new Blob([res.data], { type: 'message/rfc822' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `report-${trackingId}.eml`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const res = await api.get(`/closure/${trackingId}/export-eml`, {
+        responseType: 'blob',
+        headers: { Accept: 'message/rfc822' },
+      });
+      const fallback = reportKey === 'opening_report' ? 'opening-report.eml' : 'closing-report.eml';
+      const disposition = res.headers['content-disposition'] || '';
+      const match = disposition.match(/filename="?([^";]+)"?/i);
+      downloadBlob(res.data, match?.[1] || fallback);
     } catch (error) {
       alert('تعذر تنزيل ملف EML');
     }
   };
+
 
   const handleChange = (e) => setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   const resetFilters = () => setFilters({ search: '', presenter: '', locationType: '', startDateFrom: '', startDateTo: '' });
@@ -79,17 +85,7 @@ export default function ReportsPage() {
   }), [rows, filters]);
 
   const stats = useMemo(() => ({ total: filteredRows.length, approved: filteredRows.filter((row) => row.status === 'APPROVED').length, pending: filteredRows.filter((row) => row.status === 'PENDING_APPROVAL').length }), [filteredRows]);
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-  const visibleRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const inputClass = 'w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10';
-
-  useEffect(() => {
-    setPage(1);
-  }, [filters]);
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
 
   if (!canViewReports(activeRole)) {
     return <MainLayout><div className="rounded-3xl border border-danger/20 bg-white p-6 text-danger shadow-card">غير مصرح لك بالدخول إلى هذه الصفحة.</div></MainLayout>;
@@ -100,16 +96,16 @@ export default function ReportsPage() {
       <div className="space-y-6">
         <div className="rounded-3xl border border-border bg-white p-6 shadow-card">
           <h1 className="text-2xl font-extrabold text-primary">التقارير الميدانية</h1>
-          <p className="mt-1 text-sm text-text-soft">عرض تقارير الافتتاح والاختتام مع تقسيم صفحات أوضح وأخف</p>
+          <p className="mt-1 text-sm text-text-soft">عرض تقارير الافتتاح والاختتام فقط مع إمكانية الطباعة</p>
         </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatCard title="إجمالي التقارير" value={stats.total} />
           <StatCard title="تقارير معتمدة" value={stats.approved} />
           <StatCard title="تقارير بانتظار الاعتماد" value={stats.pending} />
         </div>
         <div className="rounded-3xl border border-border bg-white p-4 md:p-6 shadow-card">
-          <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-extrabold text-primary">الفلاتر</h2><button onClick={resetFilters} className="rounded-2xl border border-border bg-white px-3 py-2 text-sm font-bold text-text-main transition hover:bg-background">إعادة تعيين</button></div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+          <div className="flex items-center justify-between mb-4"><h2 className="text-lg font-extrabold text-primary">الفلاتر</h2><button onClick={resetFilters} className="rounded-2xl border border-border bg-white px-3 py-2 text-sm font-bold text-text-main transition hover:bg-background">إعادة تعيين</button></div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <input type="text" name="search" value={filters.search} onChange={handleChange} placeholder="بحث باسم الدورة" className={inputClass} />
             <select name="locationType" value={filters.locationType} onChange={handleChange} className={inputClass}><option value="">كل مقرات التنفيذ</option><option value="INTERNAL">داخلي</option><option value="EXTERNAL">خارجي</option><option value="REMOTE">عن بُعد</option></select>
             {isAdmin ? <select name="presenter" value={filters.presenter} onChange={handleChange} className={inputClass}><option value="">كل مقدمي التقارير</option>{presenterOptions.map((name) => <option key={name} value={name}>{name}</option>)}</select> : <input type="text" value="التقارير المسموح بها فقط" className={`${inputClass} bg-background`} disabled />}
@@ -118,18 +114,8 @@ export default function ReportsPage() {
           </div>
         </div>
         <div className="rounded-3xl border border-border bg-white shadow-card overflow-hidden">
-          <div className="border-b border-border p-4"><h2 className="text-lg font-extrabold text-primary">سجل التقارير الميدانية</h2></div>
-          {loading ? <div className="p-6 text-text-soft">جاري التحميل...</div> : <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-background"><tr className="text-right text-text-soft"><th className="px-4 py-3 font-bold">م</th><th className="px-4 py-3 font-bold">اسم الدورة</th><th className="px-4 py-3 font-bold">نوع التقرير</th><th className="px-4 py-3 font-bold">تاريخ البداية</th><th className="px-4 py-3 font-bold">تاريخ النهاية</th><th className="px-4 py-3 font-bold">مقر التنفيذ</th><th className="px-4 py-3 font-bold">اسم مقدم التقرير</th><th className="px-4 py-3 font-bold">طباعة التقرير</th><th className="px-4 py-3 font-bold">تنزيل EML</th></tr></thead><tbody>{visibleRows.length === 0 ? <tr><td colSpan="9" className="px-4 py-8 text-center text-text-soft">لا توجد تقارير</td></tr> : visibleRows.map((row, index) => <tr key={row.id} className="border-t border-border hover:bg-background transition"><td className="px-4 py-3 text-text-soft">{(page - 1) * PAGE_SIZE + index + 1}</td><td className="px-4 py-3 font-bold text-text-main">{row.courseName}</td><td className="px-4 py-3 text-text-soft">{row.reportType}</td><td className="px-4 py-3 text-text-soft">{formatDate(row.startDate)}</td><td className="px-4 py-3 text-text-soft">{formatDate(row.endDate)}</td><td className="px-4 py-3 text-text-soft">{formatLocationType(row.locationType)}</td><td className="px-4 py-3 text-text-soft">{row.presenterName}</td><td className="px-4 py-3"><button onClick={() => handlePrint(row.id)} className="rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-text-main transition hover:bg-background">طباعة التقرير</button></td><td className="px-4 py-3"><button onClick={() => handleDownloadEml(row.id)} className="rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition hover:bg-primary-dark">تنزيل EML</button></td></tr>)}</tbody></table></div>}
-          {filteredRows.length > 0 ? (
-            <div className="flex flex-col gap-3 border-t border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
-              <div className="text-sm text-text-soft">عرض {Math.min((page - 1) * PAGE_SIZE + 1, filteredRows.length)} إلى {Math.min(page * PAGE_SIZE, filteredRows.length)} من {filteredRows.length}</div>
-              <div className="flex items-center gap-2">
-                <button type="button" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))} className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background disabled:opacity-50">السابق</button>
-                <div className="rounded-xl bg-background px-4 py-2 text-sm font-bold text-text-main">{page} / {totalPages}</div>
-                <button type="button" disabled={page >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))} className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background disabled:opacity-50">التالي</button>
-              </div>
-            </div>
-          ) : null}
+          <div className="p-4 border-b border-border"><h2 className="text-lg font-extrabold text-primary">سجل التقارير الميدانية</h2></div>
+          {loading ? <div className="p-6 text-text-soft">جاري التحميل...</div> : <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-background"><tr className="text-right text-text-soft"><th className="px-4 py-3 font-bold">م</th><th className="px-4 py-3 font-bold">اسم الدورة</th><th className="px-4 py-3 font-bold">نوع التقرير</th><th className="px-4 py-3 font-bold">تاريخ البداية</th><th className="px-4 py-3 font-bold">تاريخ النهاية</th><th className="px-4 py-3 font-bold">مقر التنفيذ</th><th className="px-4 py-3 font-bold">اسم مقدم التقرير</th><th className="px-4 py-3 font-bold">التنزيل</th></tr></thead><tbody>{filteredRows.length === 0 ? <tr><td colSpan="8" className="px-4 py-8 text-center text-text-soft">لا توجد تقارير</td></tr> : filteredRows.map((row, index) => <tr key={row.id} className="border-t border-border hover:bg-background transition"><td className="px-4 py-3 text-text-soft">{index + 1}</td><td className="px-4 py-3 font-bold text-text-main">{row.courseName}</td><td className="px-4 py-3 text-text-soft">{row.reportType}</td><td className="px-4 py-3 text-text-soft">{formatDate(row.startDate)}</td><td className="px-4 py-3 text-text-soft">{formatDate(row.endDate)}</td><td className="px-4 py-3 text-text-soft">{formatLocationType(row.locationType)}</td><td className="px-4 py-3 text-text-soft">{row.presenterName}</td><td className="px-4 py-3"><div className="flex flex-wrap items-center gap-2"><button onClick={() => handlePrint(row.id)} className="rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-text-main transition hover:bg-background">طباعة التقرير</button><button onClick={() => handleEmlDownload(row.id, row.reportKey)} className="rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition hover:opacity-90">تنزيل EML</button></div></td></tr>)}</tbody></table></div>}
         </div>
       </div>
     </MainLayout>

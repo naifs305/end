@@ -56,24 +56,34 @@ export default function CourseDetail() {
     }
   };
 
+  const downloadBlob = (blob, filename) => {
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  };
 
-  const handleReportEmlDownload = async (elementId) => {
+  const handleReportEmlDownload = async (elementId, elementKey) => {
     try {
-      const res = await api.get(`/closure/${elementId}/export-eml`, { responseType: 'blob' });
-      const blob = new Blob([res.data], { type: 'message/rfc822' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `report-${elementId}.eml`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const res = await api.get(`/closure/${elementId}/export-eml`, {
+        responseType: 'blob',
+        headers: { Accept: 'message/rfc822' },
+      });
+      const fallback = elementKey === 'opening_report' ? 'opening-report.eml' : 'closing-report.eml';
+      const disposition = res.headers['content-disposition'] || '';
+      const match = disposition.match(/filename="?([^";]+)"?/i);
+      downloadBlob(res.data, match?.[1] || fallback);
     } catch (err) {
       console.error(err);
       alert('تعذر تنزيل ملف EML');
     }
   };
+
+
   const elementOrder = {
     trainee_registration: 1,
     registration_message: 2,
@@ -165,7 +175,7 @@ export default function CourseDetail() {
   const renderAction = (el) => {
     if (
       isReportKey(el.element.key) &&
-      ['PENDING_APPROVAL', 'APPROVED', 'RETURNED', 'REJECTED'].includes(el.status)
+      (el.status === 'PENDING_APPROVAL' || el.status === 'APPROVED')
     ) {
       return (
         <div className="flex flex-wrap items-center gap-2">
@@ -176,8 +186,8 @@ export default function CourseDetail() {
             طباعة التقرير
           </button>
           <button
-            onClick={() => handleReportEmlDownload(el.id)}
-            className="rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition hover:bg-primary-dark"
+            onClick={() => handleReportEmlDownload(el.id, el.element.key)}
+            className="rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition hover:opacity-90"
           >
             تنزيل EML
           </button>
