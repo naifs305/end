@@ -41,8 +41,9 @@ export default function CoursesPage() {
   const loadCourses = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/courses');
-      setCourses(Array.isArray(res.data) ? res.data : []);
+      const res = await api.get('/courses', { params: { limit: 200 } });
+      const d = res.data;
+      setCourses(Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : []);
     } catch {
       setCourses([]);
     } finally {

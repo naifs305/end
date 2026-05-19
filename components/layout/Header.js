@@ -36,8 +36,9 @@ export default function Header() {
           }
         }
 
-        const res = await api.get('/notifications');
-        const unread = (res.data || []).filter((n) => !n.isRead).length;
+        const res = await api.get('/notifications', { params: { unread: 'true', limit: 1 } });
+        const d = res.data;
+        const unread = d?.pagination?.total ?? (Array.isArray(d) ? d.length : 0);
         sessionStorage.setItem(cacheKey, JSON.stringify({ count: unread, timestamp: Date.now() }));
         if (mounted) setNotifCount(unread);
       } catch (error) {

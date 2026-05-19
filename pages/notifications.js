@@ -6,7 +6,7 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
-    api.get('/notifications').then((res) => setNotifications(res.data));
+    api.get('/notifications').then((res) => { const d = res.data; setNotifications(d?.data || d || []); });
   }, []);
 
   const handleRead = async (id) => {

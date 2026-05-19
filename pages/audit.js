@@ -6,7 +6,7 @@ export default function AuditLog() {
   const [logs, setLogs] = useState([]);
 
   useEffect(() => {
-    api.get('/audit').then((res) => setLogs(res.data));
+    api.get('/audit').then((res) => { const d = res.data; setLogs(d?.data || d || []); });
   }, []);
 
   return (

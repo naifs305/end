@@ -91,13 +91,8 @@ function AlertItem({ icon, text, tone = 'amber' }) {
 
 function CourseCard({ course }) {
   const s = STATUS_MAP[course.status] || { label: course.status, cls: 'bg-slate-100 text-slate-600' };
-  const progress = useMemo(() => {
-    const els = course.closureElements || [];
-    const rel = els.filter((e) => e.status !== 'NOT_APPLICABLE');
-    if (!rel.length) return 0;
-    const done = rel.filter((e) => e.status === 'APPROVED' || e.status === 'PENDING_APPROVAL').length;
-    return Math.round((done / rel.length) * 100);
-  }, [course]);
+  // عدد العناصر من _count (لا نحمّل العناصر في القائمة لتحسين الأداء)
+  const elementCount = course._count?.closureElements || 0;
 
   return (
     <Link href={`/courses/${course.id}`}>
@@ -107,15 +102,9 @@ function CourseCard({ course }) {
           <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${s.cls}`}>{s.label}</span>
         </div>
         <p className="mb-3 text-xs text-text-soft">{fmtDate(course.startDate)} — {fmtDate(course.endDate)}</p>
-        {progress > 0 && (
-          <div className="mt-auto">
-            <div className="mb-1 flex justify-between text-[10px] text-text-soft">
-              <span>إنجاز الإقفال</span>
-              <span className="font-bold text-primary">{progress}%</span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
-            </div>
+        {elementCount > 0 && (
+          <div className="mt-auto text-xs text-text-soft">
+            {elementCount} عنصر إقفال
           </div>
         )}
       </div>

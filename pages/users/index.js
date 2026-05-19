@@ -25,7 +25,7 @@ export default function UserManagement() {
   const [users, setUsers] = useState([]);
 
   useEffect(() => {
-    api.get('/users').then((res) => setUsers(res.data || []));
+    api.get('/users').then((res) => { const d = res.data; setUsers(Array.isArray(d) ? d : d?.data || []); });
   }, []);
 
   return (
