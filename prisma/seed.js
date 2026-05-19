@@ -5,6 +5,30 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
+  // --- تطبيق تغييرات المخطط مباشرة (مرنة وآمنة — IF NOT EXISTS) ---
+  const schemaMigrations = [
+    `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "deadlineRefPoint"      TEXT`,
+    `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "deadlineIdealHours"    INTEGER`,
+    `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "deadlineMaxHours"      INTEGER`,
+    `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "isDeadlineWorkingDays" BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "requiresPreTest"  BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "requiresPostTest" BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "delayReason"          TEXT`,
+    `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "extensionGrantedAt"   TIMESTAMP(3)`,
+    `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "extensionGrantedById" TEXT`,
+    `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "extensionHours"       INTEGER`,
+    `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "extensionReason"      TEXT`,
+  ];
+
+  for (const sql of schemaMigrations) {
+    try {
+      await prisma.$executeRawUnsafe(sql);
+    } catch (e) {
+      console.log('Schema migration skipped (already exists):', e.message.slice(0, 60));
+    }
+  }
+  console.log('Schema columns ensured.');
+
   // --- المشاريع الافتراضية ---
   const projects = [
     { id: 'proj_1', name: 'مشروع القيادة الأمنية' },
