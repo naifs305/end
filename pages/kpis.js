@@ -73,12 +73,46 @@ function Badge({ children, tone = 'gray' }) {
   );
 }
 
+// Tooltip بسيط
+function Tip({ text }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span className="relative inline-block">
+      <button
+        type="button"
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        onFocus={() => setShow(true)}
+        onBlur={() => setShow(false)}
+        className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-600 hover:bg-primary hover:text-white transition"
+      >?</button>
+      {show && (
+        <span className="absolute bottom-full right-0 z-50 mb-1 w-56 rounded-xl border border-border bg-white p-2.5 text-xs leading-relaxed text-text-main shadow-soft">
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+const INDICATOR_TIPS = {
+  'الإنتاجية والإتمام':   'نسبة إتمام عناصر الإقفال من المطلوبة. كلما ارتفعت زادت الإنتاجية.',
+  'الالتزام بالمواعيد':   'هل قُدِّمت العناصر قبل الموعد المثالي والأقصى؟ يقيس مدى الالتزام الزمني.',
+  'جودة التقديم':         'نسبة القبول من أول مرة. كلما انخفضت الإعادة والرفض ارتفعت الجودة.',
+  'العناصر الحرجة':       'أداء العناصر ذات الأولوية القصوى: تقريرَي الافتتاح والاختتام، المستحقات، وتسوية السلفة.',
+  'سرعة الاستجابة':       'مدى سرعة الموظف في إعادة تقديم العنصر بعد الإعادة. كلما كانت أسرع كانت الاستجابة أفضل.',
+  'الانضباط العام':       'غياب العناصر الراكدة والدورات المتأخرة. يعكس النظامية والمتابعة المستمرة.',
+};
+
 function ScoreBar({ label, score, weight, color }) {
   const pct = Math.min(100, Math.max(0, Number(score) || 0));
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-sm font-bold text-text-main">{label}</span>
+        <span className="flex items-center text-sm font-bold text-text-main">
+          {label}
+          {INDICATOR_TIPS[label] && <Tip text={INDICATOR_TIPS[label]} />}
+        </span>
         <div className="flex items-center gap-2">
           <span className="text-xs text-text-soft">وزن {weight}%</span>
           <span className={`text-sm font-extrabold ${scoreTone(pct)}`}>{fmt(pct)}%</span>
@@ -326,24 +360,21 @@ function SnapshotDetails({ snapshot, isManager, onNoteAdded }) {
         </div>
       )}
 
-      {/* المؤشرات التفصيلية الأرقام */}
+      {/* الأرقام التفصيلية */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="rounded-2xl border border-border p-4">
-          <h4 className="mb-3 font-extrabold text-text-main">الأرقام التفصيلية — العناصر</h4>
+          <h4 className="mb-3 font-extrabold text-text-main">تفاصيل العناصر</h4>
           <div className="space-y-1.5 text-sm">
             {[
-              ['المطلوبة', s.requiredElementsCount],
-              ['المكتملة', s.completedElementsCount],
-              ['المقدمة', s.submittedElementsCount],
-              ['المعتمدة', s.approvedElementsCount],
-              ['المعادة', s.returnedElementsCount],
-              ['المرفوضة', s.rejectedElementsCount],
-              ['معدل الإعادة', `${fmt(s.returnRate)}%`],
-              ['معدل الرفض', `${fmt(s.rejectRate)}%`],
-              ['قبول من أول مرة', `${fmt(s.firstPassApprovalRate)}%`],
-            ].map(([k, v]) => (
+              ['العناصر المطلوبة',   s.requiredElementsCount,   'إجمالي عناصر الإقفال بعد استثناء غير المنطبقة'],
+              ['المكتملة أو مرفوعة', s.completedElementsCount,  'معتمدة + قيد انتظار الاعتماد'],
+              ['المعتمدة نهائياً',   s.approvedElementsCount,   'حصلت على قرار الاعتماد من المشرف'],
+              ['المُعادة',            s.returnedElementsCount,   'طُلب تصحيحها وإعادة تقديمها'],
+              ['القبول من أول مرة',  `${fmt(s.firstPassApprovalRate)}%`, 'نسبة العناصر التي قُبلت دون إعادة — كلما ارتفعت كانت الجودة أعلى'],
+              ['معدل الإعادة',       `${fmt(s.returnRate)}%`,   'نسبة الإعادة من إجمالي ما قُدِّم'],
+            ].map(([k, v, tip]) => (
               <div key={k} className="flex justify-between border-b border-border pb-1">
-                <span className="text-text-soft">{k}</span>
+                <span className="flex items-center text-text-soft">{k}{tip && <Tip text={tip} />}</span>
                 <span className="font-bold text-text-main">{v ?? '-'}</span>
               </div>
             ))}
@@ -351,18 +382,17 @@ function SnapshotDetails({ snapshot, isManager, onNoteAdded }) {
         </div>
 
         <div className="rounded-2xl border border-border p-4">
-          <h4 className="mb-3 font-extrabold text-text-main">الأرقام التفصيلية — السرعة والانضباط</h4>
+          <h4 className="mb-3 font-extrabold text-text-main">الانضباط والمتابعة</h4>
           <div className="space-y-1.5 text-sm">
             {[
-              ['متوسط تقديم العنصر', `${fmt(s.avgElementSubmissionHours)} ساعة`],
-              ['متوسط إعادة التقديم', `${fmt(s.avgResubmissionHours)} ساعة`],
-              ['متوسط تأخر إقفال الدورة', `${fmt(s.avgCourseClosureDelayDays)} يوم`],
-              ['عناصر متأخرة', `${s.overdueElementsCount} (${fmt(s.overdueElementsRate)}%)`],
-              ['عناصر راكدة', `${s.stalePendingElementsCount} (${fmt(s.stalePendingElementsRate)}%)`],
-              ['دورات متأخرة', `${s.overdueCoursesCount} (${fmt(s.overdueCoursesRate)}%)`],
-            ].map(([k, v]) => (
+              ['عناصر تجاوزت الموعد',  `${s.overdueElementsCount} (${fmt(s.overdueElementsRate)}%)`, 'عناصر على دورات انتهت ولم تُقدَّم بعد'],
+              ['عناصر راكدة +3 أيام',  `${s.stalePendingElementsCount} (${fmt(s.stalePendingElementsRate)}%)`, 'عناصر لم يُحرَّك فيها منذ أكثر من 72 ساعة'],
+              ['دورات متأخرة الإقفال',  `${s.overdueCoursesCount}`, 'دورات انتهت ولم تُقفل بعد'],
+              ['متوسط تأخر الإقفال',    `${fmt(s.avgCourseClosureDelayDays)} يوم`, 'من تاريخ نهاية الدورة حتى إقفالها — كلما قل كان أفضل'],
+              ['سرعة إعادة التقديم',   `${fmt(s.avgResubmissionHours)} ساعة`, 'متوسط الوقت بين إعادة المشرف للعنصر وإعادة تقديمه — كلما قل كان أسرع استجابةً'],
+            ].map(([k, v, tip]) => (
               <div key={k} className="flex justify-between border-b border-border pb-1">
-                <span className="text-text-soft">{k}</span>
+                <span className="flex items-center text-text-soft">{k}{tip && <Tip text={tip} />}</span>
                 <span className="font-bold text-text-main">{v ?? '-'}</span>
               </div>
             ))}

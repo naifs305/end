@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/router';
 import MainLayout from '../components/layout/MainLayout';
@@ -6,158 +6,269 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
 import { canManageProjects } from '../lib/roles';
 
+// ======================================================================
+// الهيكل التنظيمي للمشاريع
+// ======================================================================
+// كل مشروع تشغيلي يضم:
+//   • مشرف مشروع  — يعتمد عناصر الإقفال لدورات مشروعه
+//   • منسقون       — ينفّذون الدورات ويرفعون العناصر
+//
+// ملاحظة: المنسق يمكن أن يعمل في دورات مشروع آخر (تغطية)
+// في هذه الحالة يعتمد عناصره مشرف المشروع الذي تنتمي إليه الدورة
+// (مشرف الدورة = مشرف مشروع الدورة — وليس مشرف مشروع المنسق)
+
 export default function ProjectsPage() {
   const router = useRouter();
   const { user, activeRole, loading: authLoading } = useAuth();
   const [projects, setProjects] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [projectName, setProjectName] = useState('');
-  const [selectedProjectId, setSelectedProjectId] = useState('');
-  const [selectedUserId, setSelectedUserId] = useState('');
+  const [users,    setUsers]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
+
+  const [newProjectName,   setNewProjectName]   = useState('');
+  const [selectedProject,  setSelectedProject]  = useState('');
+  const [selectedUser,     setSelectedUser]      = useState('');
+  const [expandedProject,  setExpandedProject]  = useState(null);
 
   useEffect(() => {
-    if (!authLoading && (!user || !canManageProjects(activeRole))) {
-      router.replace('/');
-    }
+    if (!authLoading && (!user || !canManageProjects(activeRole))) router.replace('/');
   }, [authLoading, user, activeRole, router]);
 
   useEffect(() => {
-    if (user && canManageProjects(activeRole)) loadData();
+    if (user && canManageProjects(activeRole)) load();
   }, [user, activeRole]);
 
-  const loadData = async () => {
+  const load = async () => {
     setLoading(true);
     try {
-      const [projectsRes, usersRes] = await Promise.all([
-        api.get('/projects'),
-        api.get('/users'),
-      ]);
-      setProjects(projectsRes.data || []);
-      setUsers(usersRes.data || []);
-    } catch (error) {
-      toast.error('تعذر تحميل البيانات');
-    } finally {
-      setLoading(false);
-    }
+      const [pr, ur] = await Promise.all([api.get('/projects'), api.get('/users')]);
+      setProjects(pr.data || []);
+      const d = ur.data;
+      setUsers(Array.isArray(d) ? d : d?.data || []);
+    } catch { toast.error('تعذر تحميل البيانات'); }
+    finally { setLoading(false); }
   };
 
   const createProject = async () => {
-    if (!projectName.trim()) return toast.error('اسم المشروع مطلوب');
+    if (!newProjectName.trim()) return toast.error('اسم المشروع مطلوب');
     try {
-      await api.post('/projects', { name: projectName });
-      setProjectName('');
+      await api.post('/projects', { name: newProjectName.trim() });
+      setNewProjectName('');
       toast.success('تم إنشاء المشروع');
-      loadData();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'تعذر إنشاء المشروع');
-    }
+      load();
+    } catch (e) { toast.error(e.response?.data?.message || 'تعذر الإنشاء'); }
   };
 
   const assignSupervisor = async () => {
-    if (!selectedProjectId || !selectedUserId) return toast.error('اختر المشروع والمستخدم');
+    if (!selectedProject || !selectedUser) return toast.error('اختر المشروع والمستخدم');
     try {
-      await api.post('/supervisors/assign', {
-        userId: selectedUserId,
-        operationalProjectId: selectedProjectId,
-      });
-      setSelectedProjectId('');
-      setSelectedUserId('');
+      await api.post('/supervisors/assign', { userId: selectedUser, operationalProjectId: selectedProject });
+      setSelectedProject(''); setSelectedUser('');
       toast.success('تم تعيين المشرف');
-      loadData();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'تعذر تعيين المشرف');
-    }
+      load();
+    } catch (e) { toast.error(e.response?.data?.message || 'تعذر التعيين'); }
   };
 
   const removeSupervisor = async (userId) => {
     try {
       await api.delete(`/supervisors/${userId}`);
       toast.success('تمت إزالة الإشراف');
-      loadData();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'تعذر إزالة الإشراف');
-    }
+      load();
+    } catch (e) { toast.error(e.response?.data?.message || 'تعذر الإزالة'); }
   };
 
-  const deleteProject = async (id) => {
+  const deleteProject = async (id, name) => {
+    if (!confirm(`حذف مشروع "${name}"؟ يجب ألا يحتوي على موظفين أو دورات.`)) return;
     try {
       await api.delete(`/projects/${id}`);
       toast.success('تم حذف المشروع');
-      loadData();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'تعذر حذف المشروع');
-    }
+      load();
+    } catch (e) { toast.error(e.response?.data?.message || 'تعذر الحذف'); }
   };
 
+  // الموظفون المنتمون لكل مشروع
+  const employeesByProject = useMemo(() => {
+    const map = {};
+    for (const u of users) {
+      const pid = u.operationalProjectId;
+      if (!pid) continue;
+      if (!map[pid]) map[pid] = [];
+      map[pid].push(u);
+    }
+    return map;
+  }, [users]);
+
+  // قائمة المستخدمين لاختيار مشرف
+  const eligibleUsers = users.filter(u => u.isActive);
+
   return (
-    <MainLayout title="المشاريع التشغيلية">
-      <div className="space-y-6 p-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-primary">المشاريع التشغيلية</h1>
-          <p className="mt-1 text-sm text-text-soft">إدارة المشاريع وتعيين مشرف مشروع واحد لكل مشروع</p>
+    <MainLayout>
+      <div className="space-y-4">
+
+        {/* رأس */}
+        <div className="rounded-2xl border border-border bg-white px-5 py-4 shadow-card">
+          <h1 className="text-xl font-extrabold text-primary">المشاريع التشغيلية</h1>
+          <p className="mt-0.5 text-xs text-text-soft">
+            ضبط العلاقات بين المشرفين والمنسقين — كل مشروع يضم مشرفاً مسؤولاً وفريقاً من المنسقين
+          </p>
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <strong>ملاحظة مهمة:</strong> عند تغطية منسق لدورة في مشروع آخر — يعتمد عناصره <strong>مشرف مشروع الدورة</strong> (وليس مشرف مشروع المنسق الأصلي). KPI المنسق يحتسب جميع دوراته بغض النظر عن المشروع.
+          </div>
         </div>
 
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
-          <h2 className="mb-3 text-sm font-extrabold text-text-main">إنشاء مشروع</h2>
-          <div className="flex gap-3">
-            <input
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              className="flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-sm"
-              placeholder="اسم المشروع"
-            />
-            <button onClick={createProject} className="rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white">إنشاء</button>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
-          <h2 className="mb-3 text-sm font-extrabold text-text-main">تعيين مشرف مشروع</h2>
-          <div className="grid gap-3 md:grid-cols-3">
-            <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm">
-              <option value="">اختر المشروع</option>
-              {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-            </select>
-            <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm">
-              <option value="">اختر المستخدم</option>
-              {users.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.firstName} {item.lastName} - {item.email}</option>)}
-            </select>
-            <button onClick={assignSupervisor} className="rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white">تعيين</button>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
-          <h2 className="mb-3 text-sm font-extrabold text-text-main">المشاريع الحالية</h2>
-          {loading ? (
-            <div className="py-8 text-center text-text-soft">جاري التحميل...</div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {projects.map((project) => (
-                <div key={project.id} className="rounded-xl border border-border bg-background p-4">
-                  <div className="font-extrabold text-text-main">{project.name}</div>
-                  <div className="mt-2 space-y-1 text-xs text-text-soft">
-                    <div>المستخدمون: {project._count?.users || 0}</div>
-                    <div>الدورات: {project._count?.courses || 0}</div>
-                  </div>
-                  <div className="mt-3 border-t border-border pt-3">
-                    <div className="mb-2 text-xs font-bold text-text-soft">المشرفون</div>
-                    {!project.supervisors?.length ? (
-                      <div className="text-xs text-text-soft">لا يوجد</div>
-                    ) : project.supervisors.map((item) => (
-                      <div key={item.id} className="mb-2 flex items-center justify-between gap-2 text-xs">
-                        <span>{item.user.firstName} {item.user.lastName}</span>
-                        <button onClick={() => removeSupervisor(item.user.id)} className="text-red-600 hover:underline">إزالة</button>
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={() => deleteProject(project.id)} className="mt-3 w-full rounded-xl border border-red-200 px-3 py-2 text-xs font-bold text-red-600">
-                    حذف المشروع
-                  </button>
-                </div>
-              ))}
+        {/* إجراءات سريعة */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {/* إنشاء مشروع */}
+          <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
+            <h3 className="mb-3 text-sm font-extrabold text-text-main">➕ إنشاء مشروع جديد</h3>
+            <div className="flex gap-2">
+              <input value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder="اسم المشروع التشغيلي"
+                onKeyDown={(e) => e.key === 'Enter' && createProject()}
+                className="flex-1 rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-primary" />
+              <button onClick={createProject}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary-dark">إنشاء</button>
             </div>
-          )}
-        </section>
+          </div>
+
+          {/* تعيين مشرف */}
+          <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
+            <h3 className="mb-3 text-sm font-extrabold text-text-main">👤 تعيين مشرف مشروع</h3>
+            <div className="flex flex-wrap gap-2">
+              <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)}
+                className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary">
+                <option value="">اختر المشروع</option>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)}
+                className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary">
+                <option value="">اختر المستخدم</option>
+                {eligibleUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+                ))}
+              </select>
+              <button onClick={assignSupervisor}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary-dark">تعيين</button>
+            </div>
+          </div>
+        </div>
+
+        {/* قائمة المشاريع */}
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-10 text-text-soft shadow-card">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span className="text-sm">جاري التحميل...</span>
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-white py-10 text-center text-sm text-text-soft shadow-card">
+            لا توجد مشاريع — أنشئ مشروعاً أولاً
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {projects.map((project) => {
+              const supervisor  = project.supervisors?.[0];
+              const members     = employeesByProject[project.id] || [];
+              const supervisorUser = supervisor?.user;
+              const isExpanded  = expandedProject === project.id;
+
+              return (
+                <div key={project.id} className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
+                  {/* رأس المشروع */}
+                  <div
+                    className="flex cursor-pointer items-center justify-between px-5 py-4 hover:bg-slate-50/50 transition"
+                    onClick={() => setExpandedProject(isExpanded ? null : project.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg font-extrabold text-primary">
+                        {project.name?.[0]}
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-text-main">{project.name}</h3>
+                        <p className="text-xs text-text-soft">
+                          {project._count?.courses || 0} دورة • {members.length} منسق
+                          {supervisorUser ? ` • مشرف: ${supervisorUser.firstName} ${supervisorUser.lastName}` : ' • لا يوجد مشرف'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!supervisorUser && (
+                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-500">بدون مشرف</span>
+                      )}
+                      <span className="text-xs text-text-soft">{isExpanded ? '▲' : '▼'}</span>
+                    </div>
+                  </div>
+
+                  {/* تفاصيل المشروع */}
+                  {isExpanded && (
+                    <div className="border-t border-border px-5 pb-4 pt-3">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+                        {/* المشرف */}
+                        <div>
+                          <h4 className="mb-2 text-xs font-extrabold uppercase text-text-soft">مشرف المشروع</h4>
+                          {supervisorUser ? (
+                            <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-3 py-2">
+                              <div>
+                                <p className="font-bold text-sm text-blue-800">{supervisorUser.firstName} {supervisorUser.lastName}</p>
+                                <p className="text-xs text-blue-600">{supervisorUser.email}</p>
+                                {supervisorUser.roles?.includes('EMPLOYEE') && (
+                                  <p className="text-[10px] text-amber-600">يعمل أيضاً كمنسق</p>
+                                )}
+                              </div>
+                              <button onClick={() => removeSupervisor(supervisorUser.id)}
+                                className="rounded-lg border border-red-200 px-2 py-1 text-[10px] font-bold text-red-500 hover:bg-red-50">
+                                إزالة
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="rounded-xl border border-dashed border-red-200 bg-red-50 py-3 text-center text-xs text-red-500">
+                              ⚠️ لا يوجد مشرف — العناصر لن تُعتمد تلقائياً
+                            </p>
+                          )}
+                        </div>
+
+                        {/* المنسقون */}
+                        <div>
+                          <h4 className="mb-2 text-xs font-extrabold uppercase text-text-soft">
+                            المنسقون ({members.length})
+                          </h4>
+                          {members.length === 0 ? (
+                            <p className="text-xs text-text-soft">لا يوجد منسقون مسجلون في هذا المشروع</p>
+                          ) : (
+                            <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                              {members.map((m) => (
+                                <div key={m.id} className="flex items-center gap-2 rounded-lg bg-background px-2.5 py-1.5">
+                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
+                                    {m.firstName?.[0]}{m.lastName?.[0]}
+                                  </div>
+                                  <span className="text-xs text-text-main flex-1">{m.firstName} {m.lastName}</span>
+                                  {m.roles?.includes('PROJECT_SUPERVISOR') && (
+                                    <span className="text-[9px] rounded-full bg-blue-100 text-blue-700 px-1.5 py-0.5 font-bold">مشرف</span>
+                                  )}
+                                  {!m.isActive && (
+                                    <span className="text-[9px] rounded-full bg-red-100 text-red-600 px-1.5 py-0.5 font-bold">معطل</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* حذف المشروع */}
+                      <div className="mt-3 border-t border-border pt-3">
+                        <button onClick={() => deleteProject(project.id, project.name)}
+                          className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-50">
+                          🗑️ حذف المشروع
+                        </button>
+                        <span className="mr-2 text-[10px] text-text-soft">يُحذف فقط إذا لم تكن هناك موظفون أو دورات</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </MainLayout>
   );
