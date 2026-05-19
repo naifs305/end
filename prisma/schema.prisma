@@ -88,6 +88,7 @@ model User {
   managerKpiNotes      EmployeeKpiNote[]       @relation("KpiNoteManager")
 
   courseAssignments    CourseAssignmentRegister[] @relation("AssignmentUser")
+  grantedExtensions    CourseClosureTracking[]    @relation("ExtensionGranter")
 
   // ----- علاقة الإشراف على مشاريع تشغيلية -----
   // مشرف المشروع مرتبط بمشروع واحد أو أكثر عبر هذا الجدول
@@ -132,6 +133,8 @@ model Course {
   requiresAdvanceSettlement      Boolean      @default(false)
   requiresSupervisorCompensation Boolean      @default(false)
   requiresTrainerCompensation    Boolean      @default(false)
+  requiresPreTest                Boolean      @default(false)
+  requiresPostTest               Boolean      @default(false)
   status                         CourseStatus @default(PREPARATION)
 
   operationalProjectId           String
@@ -160,10 +163,14 @@ model CourseSupport {
 }
 
 model ClosureElement {
-  id                     String @id @default(uuid())
-  key                    String @unique
+  id                     String   @id @default(uuid())
+  key                    String   @unique
   name                   String
-  isFormBased            Boolean @default(false)
+  isFormBased            Boolean  @default(false)
+  deadlineRefPoint       String?  // 'START' | 'END'
+  deadlineIdealHours     Int?
+  deadlineMaxHours       Int?
+  isDeadlineWorkingDays  Boolean  @default(false)
   courseClosureTrackings CourseClosureTracking[]
 }
 
@@ -181,11 +188,18 @@ model CourseClosureTracking {
   decidedById     String?
   decider         User? @relation("Decider", fields: [decidedById], references: [id])
 
-  rejectionReason String?
-  notes           String?
-  formData        Json?
+  rejectionReason      String?
+  notes                String?
+  formData             Json?
+  delayReason          String?
 
-  course          Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  extensionGrantedAt   DateTime?
+  extensionGrantedById String?
+  extensionGrantedBy   User?     @relation("ExtensionGranter", fields: [extensionGrantedById], references: [id], onDelete: SetNull)
+  extensionHours       Int?
+  extensionReason      String?
+
+  course          Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   element         ClosureElement @relation(fields: [elementId], references: [id])
 
   @@unique([courseId, elementId])

@@ -48,21 +48,66 @@ async function main() {
     },
   });
 
+  // المواعيد: deadlineRefPoint='START' = من بداية الدورة، 'END' = من نهايتها
+  // الأرقام السالبة = قبل نقطة المرجع (أي قبل بداية الدورة)
+  // isDeadlineWorkingDays = true عند العناصر التي تُحسب بأيام عمل
   const elements = [
-    { key: 'trainee_registration', name: 'تسجيل المتدربين في المنصة', isFormBased: false },
-    { key: 'registration_message', name: 'إرسال رسالة للمتدربين', isFormBased: false },
-    { key: 'advance_req', name: 'طلب السلفة المؤقتة', isFormBased: true },
-    { key: 'pre_test', name: 'تقديم الاختبار القبلي', isFormBased: false },
-    { key: 'opening_report', name: 'تقرير افتتاح الدورة', isFormBased: true },
-    { key: 'reaction_evaluation', name: 'تقديم تقييم الدورة', isFormBased: false },
-    { key: 'post_test', name: 'تقديم الاختبار البعدي', isFormBased: false },
-    { key: 'certificates', name: 'إصدار الشهادات', isFormBased: false },
-    { key: 'closing_report', name: 'تقرير اختتام الدورة', isFormBased: true },
-    { key: 'supervisor_compensation', name: 'رفع مستحقات المشرف', isFormBased: false },
-    { key: 'trainer_compensation', name: 'رفع مستحقات المدرب', isFormBased: false },
-    { key: 'revenues', name: 'رفع الإيرادات المالية', isFormBased: false },
-    { key: 'materials', name: 'إعادة المواد التدريبية المعارة', isFormBased: false },
-    { key: 'settlement', name: 'تسوية السلفة المؤقتة', isFormBased: true },
+    {
+      key: 'trainee_registration', name: 'تسجيل المتدربين في المنصة', isFormBased: false,
+      deadlineRefPoint: 'START', deadlineIdealHours: -72, deadlineMaxHours: -24, isDeadlineWorkingDays: false,
+    },
+    {
+      key: 'registration_message', name: 'إرسال رسالة للمتدربين', isFormBased: false,
+      deadlineRefPoint: 'START', deadlineIdealHours: -48, deadlineMaxHours: 0, isDeadlineWorkingDays: false,
+    },
+    {
+      key: 'advance_req', name: 'طلب السلفة المؤقتة', isFormBased: true,
+      deadlineRefPoint: 'START', deadlineIdealHours: -120, deadlineMaxHours: -72, isDeadlineWorkingDays: true,
+    },
+    {
+      key: 'pre_test', name: 'تقديم الاختبار القبلي', isFormBased: false,
+      deadlineRefPoint: 'START', deadlineIdealHours: 0, deadlineMaxHours: 24, isDeadlineWorkingDays: false,
+    },
+    {
+      key: 'opening_report', name: 'تقرير افتتاح الدورة', isFormBased: true,
+      deadlineRefPoint: 'START', deadlineIdealHours: 0, deadlineMaxHours: 24, isDeadlineWorkingDays: false,
+    },
+    {
+      key: 'reaction_evaluation', name: 'تقديم تقييم الدورة', isFormBased: false,
+      deadlineRefPoint: 'END', deadlineIdealHours: 0, deadlineMaxHours: 24, isDeadlineWorkingDays: false,
+    },
+    {
+      key: 'post_test', name: 'تقديم الاختبار البعدي', isFormBased: false,
+      deadlineRefPoint: 'END', deadlineIdealHours: 0, deadlineMaxHours: 24, isDeadlineWorkingDays: false,
+    },
+    {
+      key: 'certificates', name: 'إصدار الشهادات', isFormBased: false,
+      deadlineRefPoint: 'END', deadlineIdealHours: 72, deadlineMaxHours: 120, isDeadlineWorkingDays: true,
+    },
+    {
+      key: 'closing_report', name: 'تقرير اختتام الدورة', isFormBased: true,
+      deadlineRefPoint: 'END', deadlineIdealHours: 24, deadlineMaxHours: 72, isDeadlineWorkingDays: false,
+    },
+    {
+      key: 'supervisor_compensation', name: 'رفع مستحقات المشرف', isFormBased: false,
+      deadlineRefPoint: 'END', deadlineIdealHours: 72, deadlineMaxHours: 120, isDeadlineWorkingDays: true,
+    },
+    {
+      key: 'trainer_compensation', name: 'رفع مستحقات المدرب', isFormBased: false,
+      deadlineRefPoint: 'END', deadlineIdealHours: 72, deadlineMaxHours: 120, isDeadlineWorkingDays: true,
+    },
+    {
+      key: 'revenues', name: 'رفع الإيرادات المالية', isFormBased: false,
+      deadlineRefPoint: 'END', deadlineIdealHours: 72, deadlineMaxHours: 120, isDeadlineWorkingDays: false,
+    },
+    {
+      key: 'materials', name: 'إعادة المواد التدريبية المعارة', isFormBased: false,
+      deadlineRefPoint: 'END', deadlineIdealHours: 24, deadlineMaxHours: 72, isDeadlineWorkingDays: false,
+    },
+    {
+      key: 'settlement', name: 'تسوية السلفة المؤقتة', isFormBased: true,
+      deadlineRefPoint: 'END', deadlineIdealHours: 120, deadlineMaxHours: 240, isDeadlineWorkingDays: true,
+    },
   ];
 
   for (const el of elements) {
@@ -71,6 +116,10 @@ async function main() {
       update: {
         name: el.name,
         isFormBased: el.isFormBased,
+        deadlineRefPoint: el.deadlineRefPoint,
+        deadlineIdealHours: el.deadlineIdealHours,
+        deadlineMaxHours: el.deadlineMaxHours,
+        isDeadlineWorkingDays: el.isDeadlineWorkingDays,
       },
       create: el,
     });
