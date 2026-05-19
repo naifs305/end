@@ -95,11 +95,19 @@ async function main() {
       name: 'فحص الدورات المتأخرة يومياً',
       type: 'COURSE_DELAY_CHECK' as const,
       intervalHours: 24,
+      payload: null,
     },
     {
       name: 'فحص العناصر الراكدة كل 6 ساعات',
       type: 'ELEMENT_STALE_CHECK' as const,
       intervalHours: 6,
+      payload: null,
+    },
+    {
+      name: 'تذكير العناصر المُعادة كل 4 ساعات',
+      type: 'CUSTOM' as const,
+      intervalHours: 4,
+      payload: { handler: 'RETURNED_ELEMENT_REMINDER' },
     },
   ];
 
@@ -114,6 +122,7 @@ async function main() {
           name: job.name,
           type: job.type,
           intervalHours: job.intervalHours,
+          payload: job.payload ?? null,
           nextRunAt: new Date(),
           status: 'ACTIVE',
         },
