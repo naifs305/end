@@ -2,6 +2,7 @@ const prisma = require('../../../lib/db/prisma');
 const { getUserFromRequest } = require('../../../lib/auth/jwt');
 const { withMethods, withManager } = require('../../../lib/middleware/auth');
 const projectsService = require('../../../lib/services/projects');
+const { validateProject } = require('../../../lib/middleware/validate');
 
 async function handler(req, res) {
   try {
@@ -33,6 +34,8 @@ async function handler(req, res) {
     }
 
     return withManager(async (r, s) => {
+      const v = validateProject({ name: r.body?.name });
+      if (!v.valid) return s.status(400).json({ message: v.message });
       const project = await projectsService.createProject(r.body?.name, r.user.id);
       return s.status(201).json(project);
     })(req, res);

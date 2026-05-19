@@ -4,8 +4,9 @@ const service = require('../../../lib/services/notifications');
 
 async function handler(req, res) {
   const onlyUnread = req.query.unread === 'true';
-  const notifs = await service.getNotifications(req.user.id, onlyUnread);
-  return res.status(200).json(notifs);
+  const { page, limit } = req.query;
+  const result = await service.getNotifications(req.user.id, onlyUnread, page, limit);
+  return res.status(200).json(result);
 }
 
 module.exports = withMethods(['GET'], withAuth(handler));

@@ -1,5 +1,6 @@
 const { withAuth, withMethods } = require('../../../lib/middleware/auth');
 const coursesService = require('../../../lib/services/courses');
+const { validateCourse } = require('../../../lib/middleware/validate');
 
 async function handler(req, res) {
   const { id } = req.query;
@@ -10,6 +11,8 @@ async function handler(req, res) {
     }
 
     if (req.method === 'PUT') {
+      const v = validateCourse(req.body || {}, true);
+      if (!v.valid) return res.status(400).json({ message: v.message });
       return res.status(200).json(await coursesService.updateCourse(id, req.body || {}, req.user, req.activeRole));
     }
 

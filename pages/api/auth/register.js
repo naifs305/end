@@ -7,6 +7,8 @@
 const prisma = require('../../../lib/db/prisma');
 const { hashPassword, signToken } = require('../../../lib/auth/jwt');
 const { withMethods } = require('../../../lib/middleware/auth');
+const { withRateLimit } = require('../../../lib/middleware/rateLimit');
+const { validateRegister } = require('../../../lib/middleware/validate');
 
 async function handler(req, res) {
   const {
@@ -20,14 +22,8 @@ async function handler(req, res) {
     acceptTerms,
   } = req.body || {};
 
-  // --- التحقق من المدخلات ---
-  if (!acceptTerms) {
-    return res.status(400).json({ message: 'يجب الموافقة على شروط الاستخدام' });
-  }
-
-  if (!email || !password || !firstName || !lastName || !mobileNumber || !operationalProjectId) {
-    return res.status(400).json({ message: 'جميع الحقول الأساسية مطلوبة' });
-  }
+  const v = validateRegister({ firstName, lastName, email, mobileNumber, password, operationalProjectId, acceptTerms });
+  if (!v.valid) return res.status(400).json({ message: v.message });
 
   const normalizedEmail = String(email).trim().toLowerCase();
 
@@ -76,5 +72,6 @@ async function handler(req, res) {
   });
 }
 
-module.exports = withMethods(['POST'], handler);
+// 5 تسجيلات كل دقيقة لكل IP
+module.exports = withMethods(['POST'], withRateLimit({ maxAttempts: 5, windowMs: 60_000 })(handler));
 module.exports.default = module.exports;

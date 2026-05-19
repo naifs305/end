@@ -2,14 +2,14 @@ const prisma = require('../../../../lib/db/prisma');
 const { hashPassword } = require('../../../../lib/auth/jwt');
 const { withAuth, withMethods } = require('../../../../lib/middleware/auth');
 const { canResetUserPassword } = require('../../../../lib/services/permissions');
+const { validatePasswordReset } = require('../../../../lib/middleware/validate');
 
 async function handler(req, res) {
   const { id } = req.query;
   const { password } = req.body || {};
 
-  if (!password || String(password).length < 6) {
-    return res.status(400).json({ message: 'كلمة المرور لا تقل عن 6 أحرف' });
-  }
+  const v = validatePasswordReset({ password });
+  if (!v.valid) return res.status(400).json({ message: v.message });
 
   const targetUser = await prisma.user.findUnique({
     where: { id },

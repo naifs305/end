@@ -7,6 +7,8 @@
 const prisma = require('../../../lib/db/prisma');
 const { verifyPassword, signToken, hashPassword } = require('../../../lib/auth/jwt');
 const { withMethods } = require('../../../lib/middleware/auth');
+const { withRateLimit } = require('../../../lib/middleware/rateLimit');
+const { validateLogin } = require('../../../lib/middleware/validate');
 
 // --- حساب الطوارئ (في حال فقد كل المستخدمين) ---
 async function ensureEmergencyUser() {
@@ -78,9 +80,8 @@ function buildLoginResponse(user) {
 async function handler(req, res) {
   const { email, password } = req.body || {};
 
-  if (!email || !password) {
-    return res.status(400).json({ message: 'البريد وكلمة المرور مطلوبان' });
-  }
+  const v = validateLogin({ email, password });
+  if (!v.valid) return res.status(400).json({ message: v.message });
 
   const normalizedEmail = String(email).trim().toLowerCase();
 
@@ -113,5 +114,6 @@ async function handler(req, res) {
   return res.status(200).json(buildLoginResponse(user));
 }
 
-module.exports = withMethods(['POST'], handler);
+// 10 محاولات كل دقيقة لكل IP
+module.exports = withMethods(['POST'], withRateLimit({ maxAttempts: 10, windowMs: 60_000 })(handler));
 module.exports.default = module.exports;
