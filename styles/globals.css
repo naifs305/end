@@ -69,3 +69,25 @@ a {
   background: var(--color-primary);
   color: #ffffff;
 }
+
+/* ── Scrollbar مخصص ── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: #F7F7F5; }
+::-webkit-scrollbar-thumb  { background: #D8DDDA; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #006C6D; }
+
+/* ── أنيميشن ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn .25s ease both; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin { animation: spin 1s linear infinite; }
+
+/* ── Recharts RTL ── */
+.recharts-wrapper { direction: ltr; }
+.recharts-legend-wrapper { direction: rtl; }

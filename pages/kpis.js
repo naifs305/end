@@ -1,8 +1,12 @@
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
+
+const RadarKPI      = dynamic(() => import('../components/charts/RadarKPI'),      { ssr: false });
+const TeamBarChart  = dynamic(() => import('../components/charts/TeamBarChart'),  { ssr: false });
 
 // ======================================================================
 // ثوابت وأدوات
@@ -186,9 +190,19 @@ function SnapshotDetails({ snapshot, isManager, onNoteAdded }) {
         <SummaryCard title="الدرجة النهائية"  value={`${fmt(finalScore)}%`} tone={finalScore >= 80 ? 'green' : finalScore >= 60 ? 'amber' : 'red'} />
       </div>
 
-      {/* المؤشرات الست */}
+      {/* المؤشرات الست — رادار + أشرطة */}
       <div className="rounded-2xl border border-border bg-slate-50 p-4">
         <h4 className="mb-4 font-extrabold text-text-main">المؤشرات الست التفصيلية</h4>
+
+        {/* Radar Chart */}
+        <div className="mb-4 overflow-hidden rounded-xl border border-border bg-white">
+          <RadarKPI data={indicators.map((ind) => ({
+            subject: ind.label.split(' ')[0],
+            score: Number(ind.score) || 0,
+            fullMark: 100,
+          }))} />
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {indicators.map((ind) => (
             <ScoreBar key={ind.label} label={ind.label} score={ind.score} weight={ind.weight} />
@@ -676,6 +690,24 @@ export default function KpisPage() {
             <SummaryCard title="يحتاج متابعة" tone={Number(lowSnap?.finalScore) < 60 ? 'red' : 'amber'}
               value={`${lowSnap?.user?.firstName || ''} ${lowSnap?.user?.lastName || ''}`}
               sub={`الدرجة: ${fmt(lowSnap?.finalScore)}% — ${lowSnap?.performanceLevelLabel || ''}`} />
+          </div>
+        )}
+
+        {/* رسم مقارنة الفريق */}
+        {snapshots.length > 0 && (
+          <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
+            <div className="border-b border-border px-5 py-4">
+              <h3 className="font-extrabold text-text-main">مقارنة أداء الفريق</h3>
+              <p className="mt-0.5 text-xs text-text-soft">الدرجة الكلية لكل موظف — أخضر ≥ 80% / أصفر ≥ 60% / أحمر &lt; 60%</p>
+            </div>
+            <div className="p-4">
+              <TeamBarChart data={snapshots
+                .filter((s) => s.isSubjectToEvaluation && s.finalScoreDisplay != null)
+                .map((s) => ({
+                  name: `${s.user?.firstName || ''} ${s.user?.lastName || ''}`.trim(),
+                  score: Number(s.finalScoreDisplay || s.finalScore || 0),
+                }))} />
+            </div>
           </div>
         )}
 

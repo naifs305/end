@@ -4,89 +4,114 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import { isAdminRole, canAccessKpis, canViewReportsOnly } from '../../lib/roles';
 
+// ── أيقونات SVG مدمجة ──────────────────────────────────────────
+function Icon({ d, size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+      <path d={d} />
+    </svg>
+  );
+}
+
+const ICONS = {
+  home:     'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z M9 22V12h6v10',
+  courses:  'M4 19.5A2.5 2.5 0 016.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z',
+  check:    'M9 11l3 3L22 4 M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11',
+  archive:  'M21 8l-1-1H4L3 8v2h18V8z M5 10v9a1 1 0 001 1h12a1 1 0 001-1v-9 M9 14h6',
+  chart:    'M18 20V10 M12 20V4 M6 20v-6',
+  kpi:      'M22 12h-4l-3 9L9 3l-3 9H2',
+  search:   'M11 19a8 8 0 100-16 8 8 0 000 16z M21 21l-4.35-4.35',
+  message:  'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z',
+  users:    'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2 M23 21v-2a4 4 0 00-3-3.87 M16 3.13a4 4 0 010 7.75 M9 7a4 4 0 100 8 4 4 0 000-8z',
+  project:  'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z',
+  settings: 'M12 15a3 3 0 100-6 3 3 0 000 6z M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z',
+  bell:     'M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9 M13.73 21a2 2 0 01-3.46 0',
+};
+
 export default function Sidebar() {
   const router = useRouter();
   const { activeRole } = useAuth();
 
-  const isAdmin = isAdminRole(activeRole);
-  const isManager = activeRole === 'MANAGER';
+  const isAdmin      = isAdminRole(activeRole);
+  const isManager    = activeRole === 'MANAGER';
   const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
-  const canViewKpis = canAccessKpis(activeRole);
-  const isQualityViewer = canViewReportsOnly(activeRole);
+  const canViewKpis  = canAccessKpis(activeRole);
+  const isQuality    = canViewReportsOnly(activeRole);
 
-  const isActive = (href) => router.pathname === href;
+  const active = (href) =>
+    router.pathname === href || (href !== '/' && router.pathname.startsWith(href));
 
-  const getLinkClass = (href) =>
-    `flex items-center rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
-      isActive(href)
-        ? 'bg-primary text-white shadow-soft'
-        : 'text-text-main hover:bg-primary-light hover:text-primary'
-    }`;
+  const link = (href, icon, label) => (
+    <Link key={href} href={href}
+      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
+        ${active(href)
+          ? 'bg-primary text-white shadow-soft'
+          : 'text-text-main hover:bg-primary-light hover:text-primary'}`}>
+      <Icon d={ICONS[icon]} size={16} />
+      <span>{label}</span>
+    </Link>
+  );
 
-  const sectionTitleClass = 'px-4 mt-6 mb-2 text-[11px] font-bold tracking-wide text-text-soft';
-  const itemWrapperClass = 'space-y-1';
+  const section = (title) => (
+    <p className="px-3 pt-5 pb-1.5 text-[10px] font-extrabold uppercase tracking-widest text-text-soft/70">
+      {title}
+    </p>
+  );
 
   return (
-    <aside className="hidden w-72 flex-col border-l border-primary-dark/20 bg-white shadow-card md:flex">
-      <div className="flex min-h-[82px] items-center justify-center border-b border-border px-5">
-        <div className="relative h-10 w-32 max-w-full">
-          <Image src="/nauss-logo.png" alt="شعار جامعة نايف" fill className="object-contain" priority />
+    <aside className="hidden w-64 flex-col bg-white md:flex" style={{ borderInlineEnd: '1px solid #D8DDDA', boxShadow: '2px 0 8px rgba(0,0,0,0.04)' }}>
+
+      {/* الشعار */}
+      <div className="flex h-16 items-center justify-center border-b border-border px-4">
+        <div className="relative h-9 w-28">
+          <Image src="/nauss-logo.png" alt="جامعة نايف" fill className="object-contain" priority />
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {!isQualityViewer ? (
-          <>
-            <div className={itemWrapperClass}>
-              <div className={sectionTitleClass}>الرئيسية</div>
-              <Link href="/" className={getLinkClass('/')}><span className="mx-2">لوحة التحكم</span></Link>
-            </div>
+      {/* القائمة */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
 
-            <div className={itemWrapperClass}>
-              <div className={sectionTitleClass}>العمليات</div>
-              <Link href="/courses" className={getLinkClass('/courses')}><span className="mx-2">إدارة الدورات</span></Link>
-              {(isAdmin || isSupervisor) && (
-                <>
-                  <Link href="/approvals" className={getLinkClass('/approvals')}><span className="mx-2">الاعتمادات</span></Link>
-                  <Link href="/archive" className={getLinkClass('/archive')}><span className="mx-2">أرشيف الإقفالات</span></Link>
-                </>
-              )}
-              {activeRole === 'EMPLOYEE' && (
-                <Link href="/archive" className={getLinkClass('/archive')}><span className="mx-2">أرشيفي</span></Link>
-              )}
-            </div>
+        {!isQuality && (
+          <>
+            {section('الرئيسية')}
+            {link('/', 'home', 'لوحة التحكم')}
+
+            {section('العمليات')}
+            {link('/courses', 'courses', 'إدارة الدورات')}
+            {(isAdmin || isSupervisor) && link('/approvals', 'check', 'الاعتمادات')}
+            {(isAdmin || isSupervisor) && link('/archive', 'archive', 'أرشيف الإقفالات')}
+            {activeRole === 'EMPLOYEE' && link('/archive', 'archive', 'أرشيفي')}
           </>
-        ) : null}
+        )}
 
-        <div className={itemWrapperClass}>
-          <div className={sectionTitleClass}>التقارير والمتابعة</div>
-          <Link href="/reports" className={getLinkClass('/reports')}><span className="mx-2">التقارير الميدانية</span></Link>
-          {!isQualityViewer && canViewKpis && (
-            <Link href="/kpis" className={getLinkClass('/kpis')}><span className="mx-2">مؤشرات الأداء</span></Link>
-          )}
-          {!isQualityViewer && isAdmin && (
-            <Link href="/audit" className={getLinkClass('/audit')}><span className="mx-2">سجل المراجعة</span></Link>
-          )}
-        </div>
+        {section('التقارير والمتابعة')}
+        {link('/reports', 'chart', 'التقارير الميدانية')}
+        {!isQuality && canViewKpis && link('/kpis', 'kpi', 'مؤشرات الأداء')}
+        {!isQuality && isAdmin && link('/audit', 'search', 'سجل المراجعة')}
 
-        {!isQualityViewer && (
+        {!isQuality && (
           <>
-            <div className={itemWrapperClass}>
-              <div className={sectionTitleClass}>الاتصال</div>
-              <Link href="/messages" className={getLinkClass('/messages')}><span className="mx-2">المراسلات</span></Link>
-            </div>
+            {section('الاتصال')}
+            {link('/messages', 'message', 'المراسلات')}
+            {link('/notifications', 'bell', 'الإشعارات')}
+          </>
+        )}
 
-            {isAdmin && (
-              <div className={itemWrapperClass}>
-                <div className={sectionTitleClass}>الإدارة</div>
-                <Link href="/users" className={getLinkClass('/users')}><span className="mx-2">المستخدمين</span></Link>
-                {isManager && <Link href="/projects" className={getLinkClass('/projects')}><span className="mx-2">المشاريع التشغيلية</span></Link>}
-                {isManager && <Link href="/jobs" className={getLinkClass('/jobs')}><span className="mx-2">المهام المجدولة</span></Link>}
-              </div>
-            )}
+        {!isQuality && isAdmin && (
+          <>
+            {section('الإدارة')}
+            {link('/users', 'users', 'المستخدمين')}
+            {isManager && link('/projects', 'project', 'المشاريع التشغيلية')}
+            {isManager && link('/jobs', 'settings', 'المهام المجدولة')}
           </>
         )}
       </nav>
+
+      {/* الإصدار */}
+      <div className="border-t border-border px-4 py-3 text-center text-[10px] text-text-soft/60">
+        منصة إقفال الدورات التدريبية
+      </div>
     </aside>
   );
 }
