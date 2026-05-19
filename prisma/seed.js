@@ -90,12 +90,26 @@ async function main() {
     { key: 'settlement',           name: 'تسوية السلفة المؤقتة',        isFormBased: true,  deadlineRefPoint: 'END',   deadlineIdealHours: 120,  deadlineMaxHours: 240, isDeadlineWorkingDays: true  },
   ];
 
+  // الخطوة 1: upsert الحقول الأساسية فقط (آمنة دائماً)
   for (const el of elements) {
     await prisma.closureElement.upsert({
       where: { key: el.key },
-      update: { name: el.name, isFormBased: el.isFormBased, deadlineRefPoint: el.deadlineRefPoint, deadlineIdealHours: el.deadlineIdealHours, deadlineMaxHours: el.deadlineMaxHours, isDeadlineWorkingDays: el.isDeadlineWorkingDays },
-      create: el,
+      update: { name: el.name, isFormBased: el.isFormBased },
+      create: { key: el.key, name: el.name, isFormBased: el.isFormBased },
     });
+  }
+
+  // الخطوة 2: تحديث حقول المواعيد بعد التأكد من وجود الأعمدة
+  try {
+    for (const el of elements) {
+      await directPrisma.$executeRawUnsafe(
+        `UPDATE "ClosureElement" SET "deadlineRefPoint"=$1, "deadlineIdealHours"=$2, "deadlineMaxHours"=$3, "isDeadlineWorkingDays"=$4 WHERE key=$5`,
+        el.deadlineRefPoint, el.deadlineIdealHours, el.deadlineMaxHours, el.isDeadlineWorkingDays, el.key
+      );
+    }
+    console.log('Deadline data populated for', elements.length, 'elements.');
+  } catch (e) {
+    console.log('Deadline update skipped:', e.message.slice(0, 80));
   }
 
   // --- هجرة ناعمة: العنصر القديم "report" → "closing_report" ---
