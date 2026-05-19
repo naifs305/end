@@ -429,6 +429,7 @@ export default function KpisPage() {
   const [loadingSnap, setLoadingSnap]         = useState(false);
   const [loadingAssign, setLoadingAssign]     = useState(false);
   const [savingAssign, setSavingAssign]       = useState({});
+  const [showAssignReg, setShowAssignReg]     = useState(false);
 
   const [snapshots, setSnapshots]             = useState([]);
   const [assignRows, setAssignRows]           = useState([]);
@@ -617,16 +618,34 @@ export default function KpisPage() {
             tone={Number(avgScore) >= 80 ? 'green' : Number(avgScore) >= 60 ? 'amber' : 'red'} />
         </div>
 
-        {/* سجل الإسناد */}
+        {/* سجل الإسناد — مخفي بالافتراض */}
         {isManager && (
-          <div className="overflow-hidden rounded-3xl border border-border bg-white shadow-card">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <div>
-                <h2 className="text-lg font-extrabold text-primary">سجل إسناد الدورات</h2>
-                <p className="mt-1 text-sm text-text-soft">أدخل عدد الدورات المسندة — يقارن النظام بالفعلي تلقائياً</p>
+          <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
+            <button
+              onClick={() => setShowAssignReg(v => !v)}
+              className="flex w-full items-center justify-between px-5 py-4 hover:bg-background transition">
+              <div className="flex items-center gap-3 text-right">
+                <span className="text-base">📋</span>
+                <div>
+                  <h2 className="font-extrabold text-text-main">سجل الإسناد التخطيطي</h2>
+                  <p className="text-xs text-text-soft">
+                    {showAssignReg ? 'لتحديد العدد المخطط للدورات لكل موظف (اختياري — لا يؤثر على KPI إذا لم يُعبأ)' : 'اضغط لإدارة العدد المخطط للدورات لكل موظف'}
+                  </p>
+                </div>
               </div>
-              <Badge tone="gray">{periodLabel}</Badge>
-            </div>
+              <div className="flex items-center gap-2">
+                <Badge tone="gray">{periodLabel}</Badge>
+                <span className="text-xs text-text-soft">{showAssignReg ? '▲ إخفاء' : '▼ إظهار'}</span>
+              </div>
+            </button>
+
+            {!showAssignReg && (
+              <div className="border-t border-border bg-amber-50/30 px-5 py-3 text-xs text-amber-700">
+                💡 <strong>ملاحظة:</strong> هذا السجل مخصص للتخطيط المسبق فقط. إذا لم تكن لديك خطة مسندة رسمية قبل الدورات، يمكن تجاهله — مؤشرات KPI تعمل بالكامل على الدورات الفعلية في النظام.
+              </div>
+            )}
+
+            {showAssignReg && <div className="border-t border-border">
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-background text-text-soft">
@@ -677,6 +696,7 @@ export default function KpisPage() {
                 </tbody>
               </table>
             </div>
+            </div>}  {/* نهاية showAssignReg */}
           </div>
         )}
 

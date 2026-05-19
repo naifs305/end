@@ -1,245 +1,280 @@
 import { useEffect, useMemo, useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import api from '../lib/axios';
+import toast from 'react-hot-toast';
 
-const PAGE_SIZE = 10;
-
-function formatDateTime(value) {
-  if (!value) return '-';
-  try {
-    return new Date(value).toLocaleString('ar-SA');
-  } catch {
-    return '-';
-  }
+function fmtDT(v) {
+  if (!v) return '-';
+  return new Date(v).toLocaleString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function ApprovalsQueue() {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [busyId, setBusyId] = useState('');
-  const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState({ search: '', project: '', employee: '' });
+function waitHours(submittedAt) {
+  if (!submittedAt) return 0;
+  return (Date.now() - new Date(submittedAt).getTime()) / 3600000;
+}
 
-  const loadQueue = async () => {
+function WaitBadge({ submittedAt }) {
+  const h = waitHours(submittedAt);
+  if (h < 6)  return <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{Math.round(h)}س</span>;
+  if (h < 24) return <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">{Math.round(h)}س</span>;
+  return <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">{Math.round(h/24)}ي {Math.round(h%24)}س</span>;
+}
+
+const ELEMENT_ICON = {
+  opening_report:        '📋',
+  closing_report:        '📝',
+  advance_req:           '💰',
+  settlement:            '🧾',
+  supervisor_compensation: '👤',
+  trainer_compensation:  '🎓',
+  revenues:              '📊',
+  materials:             '📦',
+  certificates:          '🏆',
+  pre_test:              '✏️',
+  post_test:             '✅',
+  trainee_registration:  '👥',
+  registration_message:  '📨',
+  reaction_evaluation:   '⭐',
+};
+
+export default function ApprovalsQueue() {
+  const [items, setItems]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [busyId, setBusyId]       = useState('');
+  const [filters, setFilters]     = useState({ search: '', project: '', employee: '' });
+  const [page, setPage]           = useState(1);
+  const [decision, setDecision]   = useState({});  // { [id]: { mode: 'RETURNED'|'REJECTED', reason: '' } }
+  const PAGE_SIZE = 15;
+
+  const load = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError('');
       const res = await api.get('/analytics/approvals-queue');
       setItems(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      setItems([]);
-      setError(err?.response?.data?.message || 'تعذر تحميل طابور الاعتمادات');
-    } finally {
-      setLoading(false);
-    }
+    } catch { setItems([]); }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    loadQueue();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  const filteredItems = useMemo(() => {
+  const filtered = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
-    return items.filter((item) => {
-      const matchesSearch = !q || [item.courseName, item.elementName, item.projectName, item.employeeName, item.ownerName]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(q));
-      const matchesProject = !filters.project || item.projectName === filters.project;
-      const matchesEmployee = !filters.employee || item.employeeName === filters.employee;
-      return matchesSearch && matchesProject && matchesEmployee;
-    });
+    return [...items]
+      .sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt))
+      .filter((item) => {
+        const matchQ = !q || [item.courseName, item.elementName, item.projectName, item.employeeName]
+          .some((v) => v?.toLowerCase().includes(q));
+        const matchP = !filters.project  || item.projectName  === filters.project;
+        const matchE = !filters.employee || item.employeeName === filters.employee;
+        return matchQ && matchP && matchE;
+      });
   }, [items, filters]);
 
-  const projects = useMemo(() => [...new Set(items.map((item) => item.projectName).filter(Boolean))], [items]);
-  const employees = useMemo(() => [...new Set(items.map((item) => item.employeeName).filter(Boolean))], [items]);
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
-  const currentItems = filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const projects  = useMemo(() => [...new Set(items.map((i) => i.projectName).filter(Boolean))], [items]);
+  const employees = useMemo(() => [...new Set(items.map((i) => i.employeeName).filter(Boolean))], [items]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const current   = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+  const urgent    = items.filter((i) => waitHours(i.submittedAt) > 24).length;
 
-  useEffect(() => {
-    setPage(1);
-  }, [filters.search, filters.project, filters.employee]);
+  useEffect(() => { setPage(1); }, [filters]);
 
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  const openDecision = (id, mode) =>
+    setDecision((prev) => prev[id]?.mode === mode ? {} : { [id]: { mode, reason: '' } });
 
-  const decideItem = async (itemId, decision) => {
-    let notes = '';
-    if (decision === 'RETURNED') {
-      notes = window.prompt('اكتب سبب إعادة العنصر للموظف', '') || '';
-      if (!notes.trim()) return;
+  const confirmDecision = async (id) => {
+    const d = decision[id];
+    if (!d) return;
+    if ((d.mode === 'RETURNED' || d.mode === 'REJECTED') && !d.reason.trim()) {
+      toast.error('السبب مطلوب'); return;
     }
-    if (decision === 'REJECTED') {
-      notes = window.prompt('اكتب سبب رفض العنصر', '') || '';
-      if (!notes.trim()) return;
-    }
-
+    setBusyId(id);
     try {
-      setBusyId(itemId);
-      setError('');
-      await api.put(`/closure/${itemId}`, { status: decision, notes });
-      await loadQueue();
+      await api.put(`/closure/${id}`, { status: d.mode, notes: d.reason });
+      toast.success(d.mode === 'APPROVED' ? 'تم الاعتماد' : d.mode === 'RETURNED' ? 'أُعيد للموظف' : 'رُفض');
+      setDecision({});
+      await load();
     } catch (err) {
-      setError(err?.response?.data?.message || 'تعذر تنفيذ الإجراء على العنصر');
-    } finally {
-      setBusyId('');
-    }
+      toast.error(err?.response?.data?.message || 'تعذر تنفيذ الإجراء');
+    } finally { setBusyId(''); }
+  };
+
+  const approve = async (id) => {
+    setBusyId(id);
+    try {
+      await api.put(`/closure/${id}`, { status: 'APPROVED' });
+      toast.success('تم الاعتماد ✓');
+      await load();
+    } catch (err) { toast.error(err?.response?.data?.message || 'تعذر الاعتماد'); }
+    finally { setBusyId(''); }
   };
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <section className="rounded-3xl border border-border bg-white p-6 shadow-card">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-3xl font-extrabold text-primary">طابور الاعتمادات</h1>
-              <p className="mt-2 text-sm text-text-soft">يعرض جميع العناصر التي تحتاج اعتمادًا مباشرًا من الأقدم إلى الأحدث</p>
+      <div className="space-y-4">
+
+        {/* رأس + إحصائيات سريعة */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-white px-5 py-4 shadow-card">
+          <div>
+            <h1 className="text-xl font-extrabold text-primary">طابور الاعتمادات</h1>
+            <p className="mt-0.5 text-xs text-text-soft">مرتب من الأقدم — جميع العناصر المرفوعة بانتظار قرارك</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-sm font-bold text-text-main">
+              الإجمالي <span className="rounded-full bg-primary px-2 py-0.5 text-white">{filtered.length}</span>
+            </span>
+            {urgent > 0 && (
+              <span className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-600">
+                ⚠️ متأخرة +24 ساعة <span className="rounded-full bg-red-500 px-2 py-0.5 text-white">{urgent}</span>
+              </span>
+            )}
+            <button onClick={load} className="rounded-xl border border-border bg-white px-3 py-2 text-sm font-bold text-text-main hover:bg-background">↻ تحديث</button>
+          </div>
+        </div>
+
+        {/* فلاتر مدمجة */}
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-border bg-white px-4 py-3 shadow-card">
+          <input value={filters.search}
+            onChange={(e) => setFilters(p => ({...p, search: e.target.value}))}
+            placeholder="🔍 بحث..."
+            className="min-w-[160px] flex-1 rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-primary" />
+          <select value={filters.project} onChange={(e) => setFilters(p => ({...p, project: e.target.value}))}
+            className="rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary">
+            <option value="">كل المشاريع</option>
+            {projects.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <select value={filters.employee} onChange={(e) => setFilters(p => ({...p, employee: e.target.value}))}
+            className="rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary">
+            <option value="">كل الموظفين</option>
+            {employees.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+          {(filters.search || filters.project || filters.employee) && (
+            <button onClick={() => setFilters({ search:'', project:'', employee:'' })}
+              className="rounded-xl border border-border px-3 py-2 text-sm text-text-soft hover:bg-background">✕</button>
+          )}
+        </div>
+
+        {/* الجدول */}
+        <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
+          {loading ? (
+            <div className="flex items-center justify-center py-16 text-text-soft">
+              <div className="flex items-center gap-2"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /><span>جاري التحميل...</span></div>
             </div>
-            <div className="rounded-2xl border border-border bg-background px-4 py-3 text-sm font-bold text-text-main">
-              إجمالي العناصر: {filteredItems.length}
+          ) : current.length === 0 ? (
+            <div className="py-16 text-center">
+              <div className="text-3xl">✅</div>
+              <p className="mt-2 font-bold text-text-main">لا توجد عناصر بانتظار الاعتماد</p>
+              <p className="text-sm text-text-soft">الصفحة محدّثة وجميع العناصر تمت معالجتها</p>
             </div>
-          </div>
-        </section>
+          ) : (
+            <div className="divide-y divide-border">
+              {current.map((item) => {
+                const h = waitHours(item.submittedAt);
+                const isUrgent = h > 24;
+                const dec = decision[item.id];
+                const icon = ELEMENT_ICON[item.elementKey] || '📄';
 
-        <section className="rounded-3xl border border-border bg-white p-4 md:p-6 shadow-card">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-extrabold text-primary">الفلاتر</h2>
-            <button
-              type="button"
-              onClick={() => setFilters({ search: '', project: '', employee: '' })}
-              className="rounded-2xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background"
-            >
-              إعادة تعيين
-            </button>
-          </div>
+                return (
+                  <div key={item.id}
+                    className={`p-4 transition hover:bg-slate-50/50 ${isUrgent ? 'border-r-4 border-r-red-400' : ''}`}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <input
-              value={filters.search}
-              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-              placeholder="بحث باسم الدورة أو العنصر أو الموظف"
-              className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-            />
-            <select
-              value={filters.project}
-              onChange={(e) => setFilters((prev) => ({ ...prev, project: e.target.value }))}
-              className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-            >
-              <option value="">كل المشاريع</option>
-              {projects.map((name) => <option key={name} value={name}>{name}</option>)}
-            </select>
-            <select
-              value={filters.employee}
-              onChange={(e) => setFilters((prev) => ({ ...prev, employee: e.target.value }))}
-              className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-            >
-              <option value="">كل الموظفين</option>
-              {employees.map((name) => <option key={name} value={name}>{name}</option>)}
-            </select>
-          </div>
-        </section>
+                      {/* معلومات العنصر */}
+                      <div className="flex items-start gap-3 min-w-0">
+                        <span className="mt-0.5 text-xl">{icon}</span>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-extrabold text-text-main">{item.elementName}</span>
+                            <WaitBadge submittedAt={item.submittedAt} />
+                            {isUrgent && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">تأخر!</span>}
+                          </div>
+                          <div className="mt-1 flex flex-wrap gap-3 text-xs text-text-soft">
+                            <span className="font-bold text-primary">{item.courseName}</span>
+                            <span>•</span>
+                            <span>{item.projectName || '-'}</span>
+                            <span>•</span>
+                            <span>{item.employeeName || '-'}</span>
+                            <span>•</span>
+                            <span>{fmtDT(item.submittedAt)}</span>
+                          </div>
+                          {item.delayReason && (
+                            <div className="mt-1.5 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                              <span className="font-bold">مبرر الموظف: </span>{item.delayReason}
+                            </div>
+                          )}
+                        </div>
+                      </div>
 
-        {error ? (
-          <div className="rounded-2xl border border-danger/20 bg-white p-4 text-sm font-bold text-danger shadow-card">
-            {error}
-          </div>
-        ) : null}
-
-        <section className="rounded-3xl border border-border bg-white shadow-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-background">
-                <tr className="text-right text-text-soft">
-                  <th className="px-4 py-3 font-bold">الدورة</th>
-                  <th className="px-4 py-3 font-bold">العنصر</th>
-                  <th className="px-4 py-3 font-bold">المشروع</th>
-                  <th className="px-4 py-3 font-bold">الموظف</th>
-                  <th className="px-4 py-3 font-bold">المعتمد</th>
-                  <th className="px-4 py-3 font-bold">تاريخ ووقت التقديم</th>
-                  <th className="px-4 py-3 font-bold">الإجراء</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan="7" className="px-4 py-12 text-center text-text-soft">جاري تحميل الاعتمادات...</td>
-                  </tr>
-                ) : currentItems.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="px-4 py-12 text-center text-text-soft">لا توجد عناصر بانتظار الاعتماد حاليًا</td>
-                  </tr>
-                ) : currentItems.map((item) => (
-                  <tr key={item.id} className="border-t border-border hover:bg-background transition">
-                    <td className="px-4 py-3 font-bold text-text-main">{item.courseName}</td>
-                    <td className="px-4 py-3 text-text-soft">{item.elementName}</td>
-                    <td className="px-4 py-3 text-text-soft">{item.projectName || '-'}</td>
-                    <td className="px-4 py-3 text-text-soft">{item.employeeName || '-'}</td>
-                    <td className="px-4 py-3 text-text-soft">{item.approverName || '-'}</td>
-                    <td className="px-4 py-3 text-text-soft">{formatDateTime(item.submittedAt)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
+                      {/* أزرار الإجراء */}
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
                         <button
-                          type="button"
+                          onClick={() => approve(item.id)}
                           disabled={busyId === item.id}
-                          onClick={() => decideItem(item.id, 'APPROVED')}
-                          className="rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition hover:bg-primary-dark disabled:opacity-50"
-                        >
-                          اعتماد
+                          className="rounded-xl bg-success px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50">
+                          ✓ اعتماد
                         </button>
                         <button
-                          type="button"
+                          onClick={() => openDecision(item.id, 'RETURNED')}
                           disabled={busyId === item.id}
-                          onClick={() => decideItem(item.id, 'RETURNED')}
-                          className="rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-text-main transition hover:bg-background disabled:opacity-50"
-                        >
-                          إعادة للموظف
+                          className={`rounded-xl px-3 py-2 text-xs font-bold transition ${dec?.mode === 'RETURNED' ? 'bg-warning text-white' : 'border border-warning/40 bg-amber-50 text-warning hover:bg-amber-100'}`}>
+                          ↩ إعادة
                         </button>
                         <button
-                          type="button"
+                          onClick={() => openDecision(item.id, 'REJECTED')}
                           disabled={busyId === item.id}
-                          onClick={() => decideItem(item.id, 'REJECTED')}
-                          className="rounded-xl border border-danger/20 bg-white px-3 py-2 text-xs font-bold text-danger transition hover:bg-red-50 disabled:opacity-50"
-                        >
-                          رفض
+                          className={`rounded-xl px-3 py-2 text-xs font-bold transition ${dec?.mode === 'REJECTED' ? 'bg-danger text-white' : 'border border-danger/30 bg-red-50 text-danger hover:bg-red-100'}`}>
+                          ✕ رفض
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
 
-          {!loading && filteredItems.length > 0 ? (
-            <div className="flex flex-col gap-3 border-t border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
-              <div className="text-sm text-text-soft">
-                عرض {Math.min((page - 1) * PAGE_SIZE + 1, filteredItems.length)} إلى {Math.min(page * PAGE_SIZE, filteredItems.length)} من {filteredItems.length}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                  className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background disabled:opacity-50"
-                >
-                  السابق
-                </button>
-                <div className="rounded-xl bg-background px-4 py-2 text-sm font-bold text-text-main">
-                  {page} / {totalPages}
-                </div>
-                <button
-                  type="button"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                  className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background disabled:opacity-50"
-                >
-                  التالي
-                </button>
+                    {/* نموذج السبب */}
+                    {dec && (
+                      <div className={`mt-3 rounded-xl border p-3 ${dec.mode === 'RETURNED' ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'}`}>
+                        <label className={`mb-1.5 block text-xs font-bold ${dec.mode === 'RETURNED' ? 'text-amber-700' : 'text-red-600'}`}>
+                          {dec.mode === 'RETURNED' ? 'سبب الإعادة (مطلوب)' : 'سبب الرفض (مطلوب)'}
+                        </label>
+                        <textarea
+                          value={dec.reason}
+                          onChange={(e) => setDecision(prev => ({ ...prev, [item.id]: { ...prev[item.id], reason: e.target.value } }))}
+                          rows={2}
+                          maxLength={400}
+                          placeholder="وضّح للموظف..."
+                          className="w-full resize-none rounded-lg border border-white/50 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-current"
+                          autoFocus
+                        />
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            onClick={() => confirmDecision(item.id)}
+                            disabled={busyId === item.id}
+                            className={`rounded-lg px-4 py-1.5 text-xs font-bold text-white disabled:opacity-50 ${dec.mode === 'RETURNED' ? 'bg-warning' : 'bg-danger'}`}>
+                            {busyId === item.id ? '...' : 'تأكيد'}
+                          </button>
+                          <button onClick={() => setDecision({})}
+                            className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-text-soft">
+                            إلغاء
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ترقيم الصفحات */}
+          {!loading && filtered.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between border-t border-border px-4 py-3">
+              <span className="text-xs text-text-soft">{filtered.length} عنصر — صفحة {page} من {totalPages}</span>
+              <div className="flex gap-2">
+                <button disabled={page <= 1} onClick={() => setPage(p => p-1)}
+                  className="rounded-xl border border-border px-3 py-1.5 text-xs font-bold disabled:opacity-40 hover:bg-background">السابق</button>
+                <button disabled={page >= totalPages} onClick={() => setPage(p => p+1)}
+                  className="rounded-xl border border-border px-3 py-1.5 text-xs font-bold disabled:opacity-40 hover:bg-background">التالي</button>
               </div>
             </div>
-          ) : null}
-        </section>
+          )}
+        </div>
       </div>
     </MainLayout>
   );
