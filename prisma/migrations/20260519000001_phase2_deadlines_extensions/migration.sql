@@ -28,3 +28,61 @@ DO $$ BEGIN
       FOREIGN KEY ("extensionGrantedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
   END IF;
 END $$;
+
+-- تعبئة مواعيد عناصر الإقفال مباشرة في الترحيل
+-- (موثوق أكثر من الـ seed — يُنفَّذ مرة واحدة تلقائياً)
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='START', "deadlineIdealHours"=-72, "deadlineMaxHours"=-24, "isDeadlineWorkingDays"=false
+WHERE key='trainee_registration';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='START', "deadlineIdealHours"=-48, "deadlineMaxHours"=0, "isDeadlineWorkingDays"=false
+WHERE key='registration_message';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='START', "deadlineIdealHours"=-120, "deadlineMaxHours"=-72, "isDeadlineWorkingDays"=true
+WHERE key='advance_req';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='START', "deadlineIdealHours"=0, "deadlineMaxHours"=24, "isDeadlineWorkingDays"=false
+WHERE key='pre_test';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='START', "deadlineIdealHours"=0, "deadlineMaxHours"=24, "isDeadlineWorkingDays"=false
+WHERE key='opening_report';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='END', "deadlineIdealHours"=0, "deadlineMaxHours"=24, "isDeadlineWorkingDays"=false
+WHERE key='reaction_evaluation';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='END', "deadlineIdealHours"=0, "deadlineMaxHours"=24, "isDeadlineWorkingDays"=false
+WHERE key='post_test';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='END', "deadlineIdealHours"=72, "deadlineMaxHours"=120, "isDeadlineWorkingDays"=true
+WHERE key='certificates';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='END', "deadlineIdealHours"=24, "deadlineMaxHours"=72, "isDeadlineWorkingDays"=false
+WHERE key='closing_report';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='END', "deadlineIdealHours"=72, "deadlineMaxHours"=120, "isDeadlineWorkingDays"=true
+WHERE key='supervisor_compensation';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='END', "deadlineIdealHours"=72, "deadlineMaxHours"=120, "isDeadlineWorkingDays"=true
+WHERE key='trainer_compensation';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='END', "deadlineIdealHours"=72, "deadlineMaxHours"=120, "isDeadlineWorkingDays"=false
+WHERE key='revenues';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='END', "deadlineIdealHours"=24, "deadlineMaxHours"=72, "isDeadlineWorkingDays"=false
+WHERE key='materials';
+
+UPDATE "ClosureElement" SET
+  "deadlineRefPoint"='END', "deadlineIdealHours"=120, "deadlineMaxHours"=240, "isDeadlineWorkingDays"=true
+WHERE key='settlement';
