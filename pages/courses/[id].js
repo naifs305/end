@@ -169,6 +169,37 @@ export default function CourseDetail() {
     return new Date(date).toLocaleString('ar-SA');
   };
 
+  // ---- حساب الموعد النهائي للعنصر ----
+  const calcDeadline = (el) => {
+    const e = el.element;
+    if (!e?.deadlineRefPoint || e.deadlineMaxHours == null || !course) return null;
+    const refDate = e.deadlineRefPoint === 'START'
+      ? new Date(course.startDate)
+      : new Date(course.endDate);
+    const extraHours = el.extensionHours || 0;
+    return new Date(refDate.getTime() + (e.deadlineMaxHours + extraHours) * 3600000);
+  };
+
+  const calcIdealDeadline = (el) => {
+    const e = el.element;
+    if (!e?.deadlineRefPoint || e.deadlineIdealHours == null || !course) return null;
+    const refDate = e.deadlineRefPoint === 'START'
+      ? new Date(course.startDate)
+      : new Date(course.endDate);
+    return new Date(refDate.getTime() + e.deadlineIdealHours * 3600000);
+  };
+
+  const isOverdue = (el) => {
+    if (['APPROVED', 'NOT_APPLICABLE', 'PENDING_APPROVAL'].includes(el.status)) return false;
+    const dl = calcDeadline(el);
+    return dl && new Date() > dl;
+  };
+
+  const supervisorWaitHours = (el) => {
+    if (el.status !== 'PENDING_APPROVAL' || !el.executionAt) return null;
+    return Math.round((Date.now() - new Date(el.executionAt).getTime()) / 3600000);
+  };
+
   const isEmployee = activeRole === 'EMPLOYEE';
   const isReportKey = (key) => key === 'opening_report' || key === 'closing_report' || key === 'report';
 
@@ -215,72 +246,129 @@ export default function CourseDetail() {
     return null;
   };
 
-  const renderElementCard = (el) => (
-    <div
-      key={el.id}
-      className="mb-4 rounded-3xl border border-border bg-white p-4 shadow-card transition hover:shadow-soft"
-    >
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-extrabold text-text-main">{el.element.name}</h4>
-            <span
-              className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${getStatusBadgeClass(
-                el.status,
-              )}`}
-            >
-              {getStatusLabel(el.status)}
-            </span>
+  const renderElementCard = (el) => {
+    const deadline    = calcDeadline(el);
+    const idealDl     = calcIdealDeadline(el);
+    const overdue     = isOverdue(el);
+    const waitH       = supervisorWaitHours(el);
+    const hasExtension = el.extensionHours > 0;
+
+    return (
+      <div
+        key={el.id}
+        className={`mb-4 rounded-3xl border bg-white p-4 shadow-card transition hover:shadow-soft ${overdue ? 'border-red-200' : 'border-border'}`}
+      >
+        <div className="flex flex-col gap-3">
+
+          {/* رأس العنصر */}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="font-extrabold text-text-main">{el.element.name}</h4>
+              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${getStatusBadgeClass(el.status)}`}>
+                {getStatusLabel(el.status)}
+              </span>
+              {overdue && (
+                <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                  ⚠ تجاوز الموعد
+                </span>
+              )}
+              {hasExtension && (
+                <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                  تمديد +{el.extensionHours}س
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-start gap-2">
+              <ElementRow element={{ ...el, course }} activeRole={activeRole} onUpdate={fetchCourse} />
+              {renderAction(el)}
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <ElementRow
-              element={el}
-              activeRole={activeRole}
-              onUpdate={fetchCourse}
-            />
-            {renderAction(el)}
-          </div>
+          {/* الموعد النهائي */}
+          {deadline && !['APPROVED', 'NOT_APPLICABLE'].includes(el.status) && (
+            <div className="flex flex-wrap gap-3 text-xs">
+              {idealDl && (
+                <span className="text-text-soft">
+                  الموعد المثالي: <span className="font-bold text-primary">{formatDate(idealDl)}</span>
+                </span>
+              )}
+              <span className={`font-bold ${overdue ? 'text-red-500' : 'text-text-main'}`}>
+                آخر موعد: {formatDate(deadline)}
+                {el.element?.isDeadlineWorkingDays ? ' (أيام عمل)' : ''}
+              </span>
+            </div>
+          )}
+
+          {/* انتظار المشرف */}
+          {waitH !== null && (
+            <div className={`flex items-center gap-1 text-xs ${waitH > 48 ? 'text-warning' : 'text-text-soft'}`}>
+              <span>⏳ في انتظار الاعتماد منذ:</span>
+              <span className="font-bold">
+                {waitH < 24 ? `${waitH} ساعة` : `${Math.floor(waitH / 24)} يوم${waitH % 24 > 0 ? ` و${waitH % 24} ساعة` : ''}`}
+              </span>
+              {waitH > 48 && <span className="text-warning font-bold">— يستحق المتابعة</span>}
+            </div>
+          )}
+
+          {/* تاريخ التقديم */}
+          {el.executionAt && (
+            <div className="text-xs font-medium text-primary">
+              تم التقديم: {formatDateTime(el.executionAt)}
+            </div>
+          )}
+
+          {/* مبرر التأخر */}
+          {el.delayReason && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs">
+              <span className="font-bold text-amber-700">مبرر الموظف: </span>
+              <span className="text-amber-800">{el.delayReason}</span>
+            </div>
+          )}
+
+          {/* تفاصيل التمديد */}
+          {hasExtension && el.extensionReason && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50/60 px-3 py-2 text-xs">
+              <span className="font-bold text-blue-700">تمديد ممنوح (+{el.extensionHours} ساعة): </span>
+              <span className="text-blue-800">{el.extensionReason}</span>
+              {el.extensionGrantedAt && (
+                <span className="mr-2 text-blue-500">— {formatDate(el.extensionGrantedAt)}</span>
+              )}
+            </div>
+          )}
+
+          {/* الاعتماد */}
+          {el.status === 'APPROVED' && el.decisionAt && (
+            <div className="text-xs font-medium text-success">
+              ✓ تم الاعتماد: {formatDateTime(el.decisionAt)}
+            </div>
+          )}
+
+          {/* الإعادة */}
+          {el.status === 'RETURNED' && (
+            <div className="rounded-2xl border border-warning/20 bg-amber-50 p-3 text-sm text-warning">
+              <div className="mb-1 font-bold">سبب الإعادة:</div>
+              <div>{el.rejectionReason || el.notes || 'لا يوجد سبب'}</div>
+              {el.decisionAt && (
+                <div className="mt-1 text-xs">تاريخ الإعادة: {formatDateTime(el.decisionAt)}</div>
+              )}
+            </div>
+          )}
+
+          {/* الرفض */}
+          {el.status === 'REJECTED' && (
+            <div className="rounded-2xl border border-danger/20 bg-red-50 p-3 text-sm text-danger">
+              <div className="mb-1 font-bold">سبب الرفض:</div>
+              <div>{el.rejectionReason || el.notes || 'لا يوجد سبب'}</div>
+              {el.decisionAt && (
+                <div className="mt-1 text-xs">تاريخ الرفض: {formatDateTime(el.decisionAt)}</div>
+              )}
+            </div>
+          )}
         </div>
-
-        {el.executionAt && (
-          <div className="text-xs font-medium text-primary">
-            تم التقديم: {formatDateTime(el.executionAt)}
-          </div>
-        )}
-
-        {el.status === 'APPROVED' && el.decisionAt && (
-          <div className="text-xs font-medium text-success">
-            تم الاعتماد: {formatDateTime(el.decisionAt)}
-          </div>
-        )}
-
-        {el.status === 'RETURNED' && (
-          <div className="rounded-2xl border border-warning/20 bg-amber-50 p-3 text-sm text-warning">
-            <div className="mb-1 font-bold">سبب الإعادة:</div>
-            <div>{el.rejectionReason || el.notes || 'لا يوجد سبب مسجل'}</div>
-            {el.decisionAt && (
-              <div className="mt-2 text-xs text-warning">
-                تاريخ الإعادة: {formatDateTime(el.decisionAt)}
-              </div>
-            )}
-          </div>
-        )}
-
-        {el.status === 'REJECTED' && (
-          <div className="rounded-2xl border border-danger/20 bg-red-50 p-3 text-sm text-danger">
-            <div className="mb-1 font-bold">سبب الرفض:</div>
-            <div>{el.rejectionReason || el.notes || 'لا يوجد سبب مسجل'}</div>
-            {el.decisionAt && (
-              <div className="mt-2 text-xs text-danger">
-                تاريخ الرفض: {formatDateTime(el.decisionAt)}
-              </div>
-            )}
-          </div>
-        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
