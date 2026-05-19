@@ -1,8 +1,13 @@
-// seed.js — بيانات أولية (JavaScript순 بدون TypeScript)
+// seed.js — بيانات أولية (JavaScript بدون TypeScript)
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
+
+// اتصال مباشر لتنفيذ DDL — pgbouncer يرفض ALTER TABLE
+const directPrisma = new PrismaClient({
+  datasources: { db: { url: process.env.DIRECT_URL || process.env.DATABASE_URL } },
+});
 
 async function main() {
   // --- تطبيق تغييرات المخطط مباشرة (مرنة وآمنة — IF NOT EXISTS) ---
@@ -22,9 +27,9 @@ async function main() {
 
   for (const sql of schemaMigrations) {
     try {
-      await prisma.$executeRawUnsafe(sql);
+      await directPrisma.$executeRawUnsafe(sql);
     } catch (e) {
-      console.log('Schema migration skipped (already exists):', e.message.slice(0, 60));
+      console.log('Schema step:', e.message.slice(0, 80));
     }
   }
   console.log('Schema columns ensured.');
@@ -124,4 +129,7 @@ async function main() {
 
 main()
   .catch((e) => { console.error('Seed failed:', e); process.exit(1); })
-  .finally(async () => { await prisma.$disconnect(); });
+  .finally(async () => {
+    await prisma.$disconnect();
+    await directPrisma.$disconnect();
+  });
