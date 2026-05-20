@@ -382,12 +382,199 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
   );
 }
 
+// ─── لوحة الموظف الشخصية ─────────────────────────────────────
+
+function EmployeePersonalView({ snap, periodLabel, AR_MONTHS, month, year }) {
+  const [trend,         setTrend]         = useState(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
+  useEffect(() => {
+    if (!snap?.userId) return;
+    api.get(`/kpis/trend/${snap.userId}`, { params: { periodType: snap.periodType, periodsCount: 6 } })
+      .then(r => setTrend(r.data)).catch(() => {});
+  }, [snap?.userId, snap?.periodType]);
+
+  if (!snap) return null;
+
+  const s     = snap;
+  const score = Number(s.finalScoreDisplay ?? s.finalScore ?? 0);
+  const level = s.performanceLevel || 'NEEDS_IMPROVEMENT';
+  const lcfg  = LEVEL_CFG[level] || LEVEL_CFG.NEEDS_IMPROVEMENT;
+
+  const radarData = IND_CFG.map(ind => ({
+    subject: ind.label,
+    score: Math.min(100, Number(s[ind.key]) || 0),
+    fullMark: 100,
+  }));
+
+  return (
+    <div className="space-y-4">
+
+      {/* بطاقة النتيجة الرئيسية */}
+      <div className="overflow-hidden rounded-2xl border border-primary/20 bg-white shadow-card">
+        <div className="bg-gradient-to-l from-primary/5 to-white px-5 py-4 flex flex-wrap items-center gap-4">
+          <CircleGauge score={score} size={96} />
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h2 className="font-extrabold text-xl text-text-main">{s.user?.firstName} {s.user?.lastName}</h2>
+              <span className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${lcfg.bg} ${lcfg.border} ${lcfg.text}`}>
+                {lcfg.label}
+              </span>
+            </div>
+            <p className="text-xs text-text-soft mb-2">{s.user?.operationalProject?.name || 'بدون مشروع'} · {AR_MONTHS[month-1]} {year}</p>
+            <div className="flex flex-wrap gap-3 text-xs">
+              <span className="rounded-xl bg-background border border-border px-3 py-1.5 font-bold text-text-main">
+                🎯 النتيجة: <span className="text-primary">{fmt(score)}%</span>
+              </span>
+              <span className="rounded-xl bg-background border border-border px-3 py-1.5 font-bold text-text-main">
+                📚 الدورات: <span className="text-primary">{s.actualCoursesCount ?? 0}</span>
+              </span>
+              {!s.isSubjectToEvaluation && (
+                <span className="rounded-xl bg-sand/10 border border-sand/30 px-3 py-1.5 text-xs text-warning font-bold">
+                  ⏸ لا توجد دورات في هذه الفترة
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* المؤشرات الست */}
+        <div className="border-t border-border px-5 py-4 space-y-3">
+          <h3 className="text-xs font-extrabold uppercase tracking-wide text-text-soft/60 mb-3">تفصيل المؤشرات الست</h3>
+          {IND_CFG.map(ind => {
+            const val = Math.min(100, Math.max(0, Number(s[ind.key]) || 0));
+            const clr = val >= 80 ? 'bg-accent' : val >= 60 ? 'bg-sand' : 'bg-burgundy';
+            const txt = val >= 80 ? 'text-accent' : val >= 60 ? 'text-warning' : 'text-danger';
+            return (
+              <div key={ind.key}>
+                <div className="mb-1 flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 font-medium text-text-main">
+                    {ind.icon} {ind.label}
+                    <span className="text-text-soft/50">({ind.weight}%)</span>
+                    <Tooltip text={ind.tip} />
+                  </span>
+                  <span className={`font-extrabold ${txt}`}>{fmt(val)}%</span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-forest-50">
+                  <div className={`h-full rounded-full transition-all duration-500 ${clr}`} style={{ width: `${val}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* الرادار + الرسم */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
+          <h4 className="mb-2 text-xs font-extrabold uppercase text-text-soft/60">خريطة المؤشرات</h4>
+          <RadarKPI data={radarData} />
+        </div>
+
+        {/* التوجيهات */}
+        {s.insights?.length > 0 && (
+          <div className="rounded-2xl border border-border bg-white p-4 shadow-card space-y-2">
+            <h4 className="mb-2 text-xs font-extrabold uppercase text-text-soft/60">التوجيهات والملاحظات</h4>
+            {s.insights.map((ins, i) => (
+              <div key={i} className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-xs ${INSIGHT_BG[ins.type] || INSIGHT_BG.info}`}>
+                <span className="shrink-0">{INSIGHT_ICON[ins.type]}</span>
+                <span>{ins.message}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* مسار الأداء */}
+      {trend?.trend?.length > 1 && (
+        <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
+          <div className="mb-2 flex items-center justify-between text-xs">
+            <h4 className="font-extrabold uppercase text-text-soft/60">مسار أدائك — آخر {trend.trend.length} أشهر</h4>
+            <span className={`text-[10px] font-bold ${trend.summary?.direction === 'improving' ? 'text-accent' : trend.summary?.direction === 'declining' ? 'text-danger' : 'text-text-soft'}`}>
+              {trend.summary?.direction === 'improving' ? '▲ تحسن' : trend.summary?.direction === 'declining' ? '▼ تراجع' : '← مستقر'}
+            </span>
+          </div>
+          <div className="flex items-end gap-2 overflow-x-auto rounded-xl border border-border bg-background p-3">
+            {trend.trend.map((t, i) => {
+              const h   = Math.max(6, Math.round((Number(t.finalScore) / 100) * 64));
+              const val = Number(t.finalScore) || 0;
+              const clr = val >= 80 ? 'bg-accent' : val >= 60 ? 'bg-sand' : 'bg-burgundy';
+              return (
+                <div key={t.periodLabel} className="flex min-w-[48px] flex-col items-center gap-0.5">
+                  <span className={`text-[9px] font-bold ${val >= 80 ? 'text-accent' : val >= 60 ? 'text-warning' : 'text-danger'}`}>{Math.round(val)}%</span>
+                  <div className="w-7 overflow-hidden rounded-t-md" style={{ height:64, display:'flex', alignItems:'flex-end' }}>
+                    <div className={`w-full rounded-t-md ${clr} ${i === trend.trend.length-1 ? 'opacity-100' : 'opacity-50'}`} style={{ height: h }} />
+                  </div>
+                  <span className="text-center text-[9px] text-text-soft leading-tight">{t.periodLabel?.slice(-5)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* تفصيل العناصر */}
+      {s.elementBreakdown?.length > 0 && (
+        <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
+          <button onClick={() => setShowBreakdown(v => !v)}
+            className="flex w-full items-center justify-between px-5 py-3.5 hover:bg-background transition">
+            <h4 className="font-extrabold text-sm text-text-main">📋 أداءك حسب نوع العنصر ({s.elementBreakdown.length})</h4>
+            <span className="text-xs text-text-soft">{showBreakdown ? '▲' : '▼'}</span>
+          </button>
+          {showBreakdown && (
+            <div className="overflow-x-auto border-t border-border">
+              <table className="min-w-full text-xs">
+                <thead className="bg-background text-text-soft">
+                  <tr>{['العنصر','المطلوب','قُبل','أُعيد','نسبة القبول','متوسط التقديم'].map(h=>(
+                    <th key={h} className="px-3 py-2 text-right font-bold">{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {s.elementBreakdown.map(el => (
+                    <tr key={el.key} className="border-t border-border hover:bg-background">
+                      <td className="px-3 py-2 font-bold text-text-main">{el.name}</td>
+                      <td className="px-3 py-2 text-center">{el.total}</td>
+                      <td className="px-3 py-2 text-center font-bold text-accent">{el.approved}</td>
+                      <td className="px-3 py-2 text-center text-warning">{el.returned}</td>
+                      <td className="px-3 py-2">
+                        <span className={`rounded-full px-2 py-0.5 font-bold ${el.approvalRate >= 80 ? 'bg-forest-50 text-accent' : el.approvalRate >= 60 ? 'bg-sand/20 text-warning' : 'bg-burgundy/10 text-danger'}`}>
+                          {fmt(el.approvalRate)}%
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-text-soft">{el.avgSubmissionHours > 0 ? `${fmt(el.avgSubmissionHours)} ساعة` : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* الملاحظات من المدير */}
+      {s.notes?.length > 0 && (
+        <div className="rounded-2xl border border-border bg-white p-4 shadow-card space-y-2">
+          <h4 className="text-xs font-extrabold uppercase text-text-soft/60 mb-2">ملاحظات الإدارة</h4>
+          {s.notes.map(n => (
+            <div key={n.id} className="rounded-xl border border-primary/10 bg-primary-light/30 px-3 py-2.5 text-xs">
+              <p className="font-bold text-primary mb-0.5">{n.manager?.firstName} {n.manager?.lastName}</p>
+              <p className="text-text-main">{n.note}</p>
+              <p className="mt-0.5 text-text-soft/60">{new Date(n.createdAt).toLocaleDateString('ar-SA', { day:'numeric', month:'short', year:'numeric' })}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── الصفحة الرئيسية ──────────────────────────────────────────
 
 export default function KpisPage() {
-  const { activeRole } = useAuth();
+  const { activeRole, user } = useAuth();
   const isManager    = activeRole === 'MANAGER';
   const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
+  const isEmployee   = activeRole === 'EMPLOYEE';
 
   const now = new Date();
   const [year,  setYear]  = useState(now.getFullYear());
@@ -512,8 +699,8 @@ export default function KpisPage() {
             </div>
           </div>
 
-          {/* توزيع المستويات */}
-          {!loading && snapshots.length > 0 && (
+          {/* توزيع المستويات — مدير/مشرف فقط */}
+          {!loading && snapshots.length > 0 && !isEmployee && (
             <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
               <div className="flex items-center gap-1 rounded-xl border border-primary/20 bg-primary-light px-3 py-1.5">
                 <span className="text-sm font-extrabold text-primary">{fmt(stats.avg)}%</span>
@@ -534,13 +721,28 @@ export default function KpisPage() {
           )}
         </div>
 
+        {/* ─── لوحة الموظف الشخصية ─── */}
+        {!loading && isEmployee && snapshots.length > 0 && (
+          <EmployeePersonalView
+            snap={snapshots[0]}
+            periodLabel={periodLabel}
+            AR_MONTHS={AR_MONTHS}
+            month={month}
+            year={year}
+          />
+        )}
+
         {/* ─── لا توجد بيانات ─── */}
         {!loading && snapshots.length === 0 && (
           <div className="rounded-2xl border border-dashed border-border bg-white p-12 text-center shadow-card">
             <div className="text-5xl mb-3">📊</div>
             <h3 className="text-lg font-extrabold text-text-main">لا توجد بيانات لـ {AR_MONTHS[month-1]} {year}</h3>
             <p className="mt-1 text-sm text-text-soft mb-4">
-              {isManager ? 'اضغط "احتسب المؤشرات" لبدء احتساب أداء الفريق لهذه الفترة' : 'لم يتم احتساب مؤشرات هذه الفترة بعد'}
+              {isManager
+                ? 'اضغط "احتسب المؤشرات" لبدء احتساب أداء الفريق لهذه الفترة'
+                : isEmployee
+                ? 'لا توجد مؤشرات محتسبة لهذه الفترة — تواصل مع مديرك لطلب الاحتساب'
+                : 'لم يتم احتساب مؤشرات هذه الفترة بعد'}
             </p>
             {isManager && (
               <button onClick={calculate} disabled={calculating}
@@ -561,8 +763,8 @@ export default function KpisPage() {
           </div>
         )}
 
-        {/* ─── مقارنة الفريق (مخطط) ─── */}
-        {!loading && teamBarData.length > 1 && (
+        {/* ─── مقارنة الفريق (مخطط) — مدير/مشرف فقط ─── */}
+        {!loading && teamBarData.length > 1 && !isEmployee && (
           <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
             <div className="border-b border-border px-5 py-3">
               <h3 className="font-extrabold text-text-main">📈 مقارنة أداء الفريق</h3>
@@ -574,8 +776,8 @@ export default function KpisPage() {
           </div>
         )}
 
-        {/* ─── شبكة بطاقات الموظفين النشطين ─── */}
-        {!loading && activeSnaps.length > 0 && (
+        {/* ─── شبكة بطاقات الموظفين النشطين — مدير/مشرف فقط ─── */}
+        {!loading && activeSnaps.length > 0 && !isEmployee && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {activeSnaps.map((snap, idx) => {
               const uid = snap.userId;
@@ -602,8 +804,8 @@ export default function KpisPage() {
           </div>
         )}
 
-        {/* ─── موظفون بدون دورات في هذه الفترة ─── */}
-        {!loading && inactiveSnaps.length > 0 && (
+        {/* ─── موظفون بدون دورات — مدير/مشرف فقط ─── */}
+        {!loading && inactiveSnaps.length > 0 && !isEmployee && (
           <details className="overflow-hidden rounded-2xl border border-dashed border-forest-200 bg-forest-50/30">
             <summary className="cursor-pointer px-5 py-3 text-sm font-bold text-text-soft hover:text-primary list-none flex items-center justify-between">
               <span>⏸ موظفون بدون نشاط في {AR_MONTHS[month-1]} {year} ({inactiveSnaps.length} موظف)</span>
@@ -628,8 +830,8 @@ export default function KpisPage() {
           </details>
         )}
 
-        {/* ─── التفاصيل في الشاشات الكبيرة ─── */}
-        {!loading && (loadingDet || selectedSnap) && (
+        {/* ─── التفاصيل في الشاشات الكبيرة — مدير/مشرف فقط ─── */}
+        {!loading && !isEmployee && (loadingDet || selectedSnap) && (
           <div className="hidden sm:block">
             {loadingDet ? (
               <div className="flex items-center justify-center rounded-2xl border border-border bg-white py-10 shadow-card">
@@ -645,10 +847,10 @@ export default function KpisPage() {
         )}
 
         {/* ─── تقرير أداء المشرفين ─── */}
-        {isManager && <SupervisorReport periodLabel={periodLabel} />}
+        {isManager && !isEmployee && <SupervisorReport periodLabel={periodLabel} />}
 
         {/* ─── سجل الإسناد (مخفي) ─── */}
-        {isManager && <AssignmentSection periodLabel={periodLabel} year={year} month={month} />}
+        {isManager && !isEmployee && <AssignmentSection periodLabel={periodLabel} year={year} month={month} />}
 
       </div>
     </MainLayout>

@@ -64,8 +64,8 @@ export default function Sidebar() {
     <aside className="hidden w-64 flex-col bg-white md:flex" style={{ borderInlineEnd: '1px solid #D8DDDA', boxShadow: '2px 0 8px rgba(0,0,0,0.04)' }}>
 
       {/* الشعار */}
-      <div className="flex h-16 items-center border-b border-border px-4">
-        <div className="relative h-12 w-full max-w-[180px]">
+      <div className="flex h-16 items-center justify-end border-b border-border bg-white px-3">
+        <div className="relative h-11 w-full">
           <Image src="/nauss-logo.png" alt="جامعة نايف العربية للعلوم الأمنية" fill
             className="object-contain object-right" priority />
         </div>
@@ -94,7 +94,6 @@ export default function Sidebar() {
         {isQuality && link('/quality', 'kpi', 'لوحة الجودة')}
         {!isQuality && (isAdmin || isSupervisor) && link('/executive-report', 'report', 'التقرير القيادي')}
         {!isQuality && isAdmin && link('/audit', 'search', 'سجل المراجعة')}
-        {link('/search', 'search', 'بحث شامل')}
 
         {!isQuality && (
           <>
@@ -114,9 +113,10 @@ export default function Sidebar() {
         )}
       </nav>
 
-      {/* الإصدار */}
-      <div className="border-t border-border px-4 py-3 text-center text-[10px] text-text-soft/60">
-        منصة إقفال الدورات التدريبية
+      {/* حقوق النشر */}
+      <div className="border-t border-border bg-background px-4 py-3 text-center">
+        <p className="text-[10px] font-bold text-text-soft/60">إدارة عمليات التدريب</p>
+        <p className="text-[10px] text-text-soft/40">© {new Date().getFullYear()} جميع الحقوق محفوظة</p>
       </div>
     </aside>
   );

@@ -143,7 +143,6 @@ export default function MobileNav({ open, onClose }) {
           {isQuality && link('/quality', 'kpi', 'لوحة الجودة')}
           {!isQuality && (isAdmin || isSupervisor) && link('/executive-report', 'report', 'التقرير القيادي')}
           {!isQuality && isAdmin && link('/audit', 'search', 'سجل المراجعة')}
-          {link('/search', 'search', 'بحث شامل')}
 
           {!isQuality && (
             <>
@@ -163,9 +162,10 @@ export default function MobileNav({ open, onClose }) {
           )}
         </nav>
 
-        {/* إصدار */}
-        <div className="border-t border-border px-4 py-3 text-center text-[10px] text-text-soft/60">
-          منصة إقفال الدورات التدريبية
+        {/* حقوق النشر */}
+        <div className="border-t border-border bg-background px-4 py-3 text-center">
+          <p className="text-[10px] font-bold text-text-soft/60">إدارة عمليات التدريب</p>
+          <p className="text-[10px] text-text-soft/40">© {new Date().getFullYear()} جميع الحقوق محفوظة</p>
         </div>
       </div>
     </>

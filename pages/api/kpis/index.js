@@ -1,16 +1,16 @@
-// GET /api/kpis
-const { withManagerOrSupervisor, withMethods } = require('../../../lib/middleware/auth');
+// GET /api/kpis — مدير: كل الفريق / مشرف: فريقه / موظف: نفسه فقط
+const { withAuth, withMethods } = require('../../../lib/middleware/auth');
 const kpis = require('../../../lib/services/kpis');
 
 async function handler(req, res) {
   const { periodType, periodLabel } = req.query;
   const snapshots = await kpis.getSnapshots(periodType, periodLabel, {
     activeRole: req.activeRole,
-    userId: req.user.id,
+    userId:     req.user.id,
     supervisedProjectIds: req.scope?.supervisedProjectIds || [],
   });
   return res.status(200).json(snapshots);
 }
 
-module.exports = withMethods(['GET'], withManagerOrSupervisor(handler));
+module.exports = withMethods(['GET'], withAuth(handler));
 module.exports.default = module.exports;
