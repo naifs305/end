@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import MainLayout from '../../components/layout/MainLayout';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
+import useAuth from '../../context/AuthContext';
 
 const ROLE_OPTIONS = [
   { key: 'EMPLOYEE', label: 'موظف' },
@@ -14,6 +15,7 @@ const ROLE_OPTIONS = [
 export default function EditUser() {
   const router = useRouter();
   const { id } = router.query;
+  const { user: currentUser, refreshAuth } = useAuth();
   const [user, setUser] = useState(null);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -35,7 +37,24 @@ export default function EditUser() {
         isActive: user.isActive,
         operationalProjectId: user.operationalProjectId,
       });
-      toast.success('تم تحديث بيانات المستخدم');
+      // إذا عُدِّلت أدوار المستخدم الحالي — حدّث الـ token تلقائياً
+      if (currentUser?.id === id) {
+        try {
+          const r = await api.get('/auth/refresh');
+          if (r.data?.access_token) {
+            // حفظ في نفس المخزن الذي استُخدم عند تسجيل الدخول
+            const useLs = !!localStorage.getItem('token');
+            const store = useLs ? localStorage : sessionStorage;
+            store.setItem('token', r.data.access_token);
+            store.setItem('cachedUser', JSON.stringify(r.data.user));
+            // إعادة تحميل الصفحة لتفعيل الأدوار الجديدة في RoleSwitcher
+            toast.success('تم تحديث الأدوار — سيتم تحديث الصفحة...');
+            setTimeout(() => window.location.reload(), 1200);
+          }
+        } catch { /* silent */ }
+      } else {
+        toast.success('تم تحديث بيانات المستخدم');
+      }
     } catch (err) {
       toast.error(err?.response?.data?.message || 'حدث خطأ');
     } finally {

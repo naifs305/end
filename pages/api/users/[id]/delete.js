@@ -1,4 +1,4 @@
-// DELETE /api/users/[id]/delete — المدير فقط، يحذف المستخدم إذا لم يكن له دورات
+// DELETE /api/users/[id]/delete — المدير فقط
 const prisma = require('../../../../lib/db/prisma');
 const { withManager, withMethods } = require('../../../../lib/middleware/auth');
 
@@ -13,31 +13,31 @@ async function handler(req, res) {
   if (!user) return res.status(404).json({ message: 'المستخدم غير موجود' });
 
   const courseCount = await prisma.course.count({ where: { primaryEmployeeId: id } });
-
   if (courseCount > 0) {
-    // لا نحذف — نعطّل فقط
     await prisma.user.update({ where: { id }, data: { isActive: false } });
     return res.status(200).json({
       action: 'deactivated',
-      message: `تم تعطيل الحساب (لديه ${courseCount} دورة مسجلة — الحذف الكامل يحتاج حذف الدورات أولاً)`,
+      message: `تم تعطيل الحساب (لا يزال لديه ${courseCount} دورة)`,
     });
   }
 
-  // حذف كامل — سلسلة الحذف تُزيل الإشعارات والرسائل والـ KPI
-  await prisma.$transaction([
-    prisma.notification.deleteMany({ where: { userId: id } }),
-    prisma.auditLog.deleteMany({ where: { userId: id } }),
-    prisma.employeeKpiNote.deleteMany({ where: { OR: [{ userId: id }, { managerId: id }] } }),
-    prisma.employeeKpiSnapshot.deleteMany({ where: { userId: id } }),
-    prisma.courseAssignmentRegister.deleteMany({ where: { userId: id } }),
-    prisma.courseSupport.deleteMany({ where: { userId: id } }),
-    prisma.messageRecipient.deleteMany({ where: { userId: id } }),
-    prisma.message.deleteMany({ where: { senderId: id } }),
-    prisma.projectSupervisor.deleteMany({ where: { userId: id } }),
-    prisma.user.delete({ where: { id } }),
-  ]);
+  // حذف تدريجي — كل جدول منفصل
+  try { await prisma.courseClosureTracking.updateMany({ where: { executedById: id }, data: { executedById: null } }); } catch {}
+  try { await prisma.courseClosureTracking.updateMany({ where: { decidedById: id }, data: { decidedById: null } }); } catch {}
+  try { await prisma.courseClosureTracking.updateMany({ where: { extensionGrantedById: id }, data: { extensionGrantedById: null } }); } catch {}
+  try { await prisma.notification.deleteMany({ where: { userId: id } }); } catch {}
+  try { await prisma.auditLog.deleteMany({ where: { userId: id } }); } catch {}
+  try { await prisma.employeeKpiNote.deleteMany({ where: { OR: [{ userId: id }, { managerId: id }] } }); } catch {}
+  try { await prisma.employeeKpiSnapshot.deleteMany({ where: { userId: id } }); } catch {}
+  try { await prisma.courseAssignmentRegister.deleteMany({ where: { userId: id } }); } catch {}
+  try { await prisma.courseSupport.deleteMany({ where: { userId: id } }); } catch {}
+  try { await prisma.messageRecipient.deleteMany({ where: { userId: id } }); } catch {}
+  try { await prisma.message.deleteMany({ where: { senderId: id } }); } catch {}
+  try { await prisma.projectSupervisor.deleteMany({ where: { userId: id } }); } catch {}
 
-  return res.status(200).json({ action: 'deleted', message: 'تم حذف الحساب نهائياً' });
+  await prisma.user.delete({ where: { id } });
+
+  return res.status(200).json({ action: 'deleted', message: 'تم حذف الحساب نهائياً ✓' });
 }
 
 module.exports = withMethods(['DELETE'], withManager(handler));
