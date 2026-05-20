@@ -44,8 +44,8 @@ export default function Notifications() {
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-bold ${
                       n.type === 'ESCALATION'
-                        ? 'bg-red-50 text-danger'
-                        : 'bg-[#fcf8f1] text-[#8c6b2a]'
+                        ? 'bg-burgundy/10 border border-burgundy/20 text-danger'
+                        : 'bg-sand/20 border border-sand/40 text-warning'
                     }`}
                   >
                     {n.type === 'ESCALATION' ? 'تصعيد' : 'تنبيه'}

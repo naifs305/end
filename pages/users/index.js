@@ -4,10 +4,10 @@ import api from '../../lib/axios';
 import Link from 'next/link';
 
 const ROLE_CFG = {
-  MANAGER:            { label: 'مدير',            cls: 'bg-purple-100 text-purple-700' },
-  PROJECT_SUPERVISOR: { label: 'مشرف مشروع',      cls: 'bg-blue-100 text-blue-700' },
-  EMPLOYEE:           { label: 'منسق',             cls: 'bg-slate-100 text-slate-700' },
-  QUALITY_VIEWER:     { label: 'جودة',             cls: 'bg-amber-100 text-amber-700' },
+  MANAGER:            { label: 'مدير',            cls: 'bg-primary text-white' },
+  PROJECT_SUPERVISOR: { label: 'مشرف مشروع',      cls: 'bg-primary-light text-primary border border-primary/20' },
+  EMPLOYEE:           { label: 'منسق',             cls: 'bg-background text-text-soft border border-border' },
+  QUALITY_VIEWER:     { label: 'جودة',             cls: 'bg-sand/20 text-warning border border-sand/40' },
 };
 
 export default function UserManagement() {
@@ -99,9 +99,9 @@ export default function UserManagement() {
           ) : (
             <div className="divide-y divide-border">
               {filtered.map((u) => (
-                <div key={u.id} className="flex items-center gap-4 px-4 py-3 hover:bg-slate-50/50 transition">
+                <div key={u.id} className="flex items-center gap-4 px-4 py-3 hover:bg-background transition">
                   {/* أفاتار */}
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white ${u.isActive ? 'bg-primary' : 'bg-slate-300'}`}>
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white ${u.isActive ? 'bg-primary' : 'bg-text-soft'}`}>
                     {u.firstName?.[0]}{u.lastName?.[0]}
                   </div>
 
@@ -110,11 +110,11 @@ export default function UserManagement() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-extrabold text-text-main">{u.firstName} {u.lastName}</span>
                       {(u.roles || []).map(r => (
-                        <span key={r} className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${ROLE_CFG[r]?.cls || 'bg-slate-100 text-slate-600'}`}>
+                        <span key={r} className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${ROLE_CFG[r]?.cls || 'bg-background text-text-soft border border-border'}`}>
                           {ROLE_CFG[r]?.label || r}
                         </span>
                       ))}
-                      {!u.isActive && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-500">معطل</span>}
+                      {!u.isActive && <span className="rounded-full bg-burgundy/10 border border-burgundy/20 px-2 py-0.5 text-[10px] font-bold text-danger">معطل</span>}
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-3 text-xs text-text-soft">
                       <span>{u.email}</span>

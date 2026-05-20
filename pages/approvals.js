@@ -15,9 +15,9 @@ function waitHours(submittedAt) {
 
 function WaitBadge({ submittedAt }) {
   const h = waitHours(submittedAt);
-  if (h < 6)  return <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{Math.round(h)}س</span>;
-  if (h < 24) return <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">{Math.round(h)}س</span>;
-  return <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">{Math.round(h/24)}ي {Math.round(h%24)}س</span>;
+  if (h < 6)  return <span className="rounded-full bg-forest-50 border border-accent/20 px-2 py-0.5 text-[10px] font-bold text-accent">{Math.round(h)}س</span>;
+  if (h < 24) return <span className="rounded-full bg-sand/20 border border-sand/40 px-2 py-0.5 text-[10px] font-bold text-warning">{Math.round(h)}س</span>;
+  return <span className="rounded-full bg-burgundy/10 border border-burgundy/20 px-2 py-0.5 text-[10px] font-bold text-danger">{Math.round(h/24)}ي {Math.round(h%24)}س</span>;
 }
 
 const ELEMENT_ICON = {
@@ -123,8 +123,8 @@ export default function ApprovalsQueue() {
               الإجمالي <span className="rounded-full bg-primary px-2 py-0.5 text-white">{filtered.length}</span>
             </span>
             {urgent > 0 && (
-              <span className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-600">
-                ⚠️ متأخرة +24 ساعة <span className="rounded-full bg-red-500 px-2 py-0.5 text-white">{urgent}</span>
+              <span className="flex items-center gap-1.5 rounded-xl border border-burgundy/20 bg-burgundy/5 px-3 py-2 text-sm font-bold text-danger">
+                ⚠️ متأخرة +24 ساعة <span className="rounded-full bg-danger px-2 py-0.5 text-white">{urgent}</span>
               </span>
             )}
             <button onClick={load} className="rounded-xl border border-border bg-white px-3 py-2 text-sm font-bold text-text-main hover:bg-background">↻ تحديث</button>
@@ -175,7 +175,7 @@ export default function ApprovalsQueue() {
 
                 return (
                   <div key={item.id}
-                    className={`p-4 transition hover:bg-slate-50/50 ${isUrgent ? 'border-r-4 border-r-red-400' : ''}`}>
+                    className={`p-4 transition hover:bg-background ${isUrgent ? 'border-s-4 border-s-danger' : ''}`}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
 
                       {/* معلومات العنصر */}
@@ -185,7 +185,7 @@ export default function ApprovalsQueue() {
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-extrabold text-text-main">{item.elementName}</span>
                             <WaitBadge submittedAt={item.submittedAt} />
-                            {isUrgent && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">تأخر!</span>}
+                            {isUrgent && <span className="rounded-full bg-burgundy/10 border border-burgundy/20 px-2 py-0.5 text-[10px] font-bold text-danger">تأخر!</span>}
                           </div>
                           <div className="mt-1 flex flex-wrap gap-3 text-xs text-text-soft">
                             <span className="font-bold text-primary">{item.courseName}</span>
@@ -197,8 +197,9 @@ export default function ApprovalsQueue() {
                             <span>{fmtDT(item.submittedAt)}</span>
                           </div>
                           {item.delayReason && (
-                            <div className="mt-1.5 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-800">
-                              <span className="font-bold">مبرر الموظف: </span>{item.delayReason}
+                            <div className="mt-1.5 rounded-xl border border-sand/40 bg-sand/10 px-2 py-1 text-xs text-warning">
+                              <span className="font-bold">مبرر الموظف: </span>
+                              <span className="text-text-main">{item.delayReason}</span>
                             </div>
                           )}
                         </div>
@@ -209,19 +210,19 @@ export default function ApprovalsQueue() {
                         <button
                           onClick={() => approve(item.id)}
                           disabled={busyId === item.id}
-                          className="rounded-xl bg-success px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50">
+                          className="rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50 transition">
                           ✓ اعتماد
                         </button>
                         <button
                           onClick={() => openDecision(item.id, 'RETURNED')}
                           disabled={busyId === item.id}
-                          className={`rounded-xl px-3 py-2 text-xs font-bold transition ${dec?.mode === 'RETURNED' ? 'bg-warning text-white' : 'border border-warning/40 bg-amber-50 text-warning hover:bg-amber-100'}`}>
+                          className={`rounded-xl px-3 py-2 text-xs font-bold transition ${dec?.mode === 'RETURNED' ? 'bg-warning text-white' : 'border border-sand/40 bg-sand/10 text-warning hover:bg-sand/20'}`}>
                           ↩ إعادة
                         </button>
                         <button
                           onClick={() => openDecision(item.id, 'REJECTED')}
                           disabled={busyId === item.id}
-                          className={`rounded-xl px-3 py-2 text-xs font-bold transition ${dec?.mode === 'REJECTED' ? 'bg-danger text-white' : 'border border-danger/30 bg-red-50 text-danger hover:bg-red-100'}`}>
+                          className={`rounded-xl px-3 py-2 text-xs font-bold transition ${dec?.mode === 'REJECTED' ? 'bg-danger text-white' : 'border border-burgundy/20 bg-burgundy/5 text-danger hover:bg-burgundy/10'}`}>
                           ✕ رفض
                         </button>
                       </div>
@@ -229,8 +230,8 @@ export default function ApprovalsQueue() {
 
                     {/* نموذج السبب */}
                     {dec && (
-                      <div className={`mt-3 rounded-xl border p-3 ${dec.mode === 'RETURNED' ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'}`}>
-                        <label className={`mb-1.5 block text-xs font-bold ${dec.mode === 'RETURNED' ? 'text-amber-700' : 'text-red-600'}`}>
+                      <div className={`mt-3 rounded-xl border p-3 ${dec.mode === 'RETURNED' ? 'border-sand/40 bg-sand/10' : 'border-burgundy/20 bg-burgundy/5'}`}>
+                        <label className={`mb-1.5 block text-xs font-bold ${dec.mode === 'RETURNED' ? 'text-warning' : 'text-danger'}`}>
                           {dec.mode === 'RETURNED' ? 'سبب الإعادة (مطلوب)' : 'سبب الرفض (مطلوب)'}
                         </label>
                         <textarea
@@ -246,7 +247,7 @@ export default function ApprovalsQueue() {
                           <button
                             onClick={() => confirmDecision(item.id)}
                             disabled={busyId === item.id}
-                            className={`rounded-lg px-4 py-1.5 text-xs font-bold text-white disabled:opacity-50 ${dec.mode === 'RETURNED' ? 'bg-warning' : 'bg-danger'}`}>
+                            className={`rounded-xl px-4 py-1.5 text-xs font-bold text-white disabled:opacity-50 ${dec.mode === 'RETURNED' ? 'bg-warning' : 'bg-danger'}`}>
                             {busyId === item.id ? '...' : 'تأكيد'}
                           </button>
                           <button onClick={() => setDecision({})}

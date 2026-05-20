@@ -5,14 +5,14 @@ import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 
 const REPORT_TYPE = {
-  opening_report: { label: 'افتتاح',   cls: 'bg-primary-light text-primary',   icon: '📋' },
-  closing_report: { label: 'اختتام',   cls: 'bg-emerald-50 text-success',      icon: '📝' },
-  report:         { label: 'تقرير',    cls: 'bg-blue-50 text-blue-700',        icon: '📄' },
+  opening_report: { label: 'افتتاح',   cls: 'bg-primary-light text-primary border-primary/20',   icon: '📋' },
+  closing_report: { label: 'اختتام',   cls: 'bg-forest-50 text-accent border-accent/20',         icon: '📝' },
+  report:         { label: 'تقرير',    cls: 'bg-background text-text-soft border-border',         icon: '📄' },
 };
 
 const STATUS_CLS = {
-  APPROVED:         'bg-emerald-50 text-success border-emerald-200',
-  PENDING_APPROVAL: 'bg-amber-50 text-warning border-amber-200',
+  APPROVED:         'bg-forest-50 text-accent border-accent/20',
+  PENDING_APPROVAL: 'bg-sand/20 text-warning border-sand/40',
 };
 const STATUS_LABEL = { APPROVED: 'معتمد', PENDING_APPROVAL: 'بانتظار الاعتماد' };
 
@@ -94,11 +94,11 @@ export default function ReportsPage() {
                 <div className="text-lg font-extrabold text-primary">{stats.total}</div>
                 <div className="text-[10px] text-text-soft">إجمالي</div>
               </div>
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-center">
-                <div className="text-lg font-extrabold text-success">{stats.approved}</div>
+              <div className="rounded-xl border border-accent/20 bg-forest-50 px-4 py-2 text-center">
+                <div className="text-lg font-extrabold text-accent">{stats.approved}</div>
                 <div className="text-[10px] text-text-soft">معتمدة</div>
               </div>
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-center">
+              <div className="rounded-xl border border-sand/40 bg-sand/10 px-4 py-2 text-center">
                 <div className="text-lg font-extrabold text-warning">{stats.pending}</div>
                 <div className="text-[10px] text-text-soft">انتظار</div>
               </div>
@@ -150,10 +150,10 @@ export default function ReportsPage() {
             <div className="divide-y divide-border">
               {filtered.map((row, i) => {
                 const rt  = REPORT_TYPE[row.reportKey] || REPORT_TYPE.report;
-                const sc  = STATUS_CLS[row.status]    || 'bg-slate-100 text-slate-600 border-slate-200';
+                const sc  = STATUS_CLS[row.status]    || 'bg-background text-text-soft border-border';
                 const sl  = STATUS_LABEL[row.status]  || row.status;
                 return (
-                  <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50/50 transition">
+                  <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-background transition">
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="text-xl">{rt.icon}</span>
                       <div className="min-w-0">

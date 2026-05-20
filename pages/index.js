@@ -26,11 +26,13 @@ function fmtDate(v) {
 }
 
 const STATUS_MAP = {
-  PREPARATION:      { label: 'قيد الإعداد',     cls: 'bg-slate-100 text-slate-600' },
-  EXECUTION:        { label: 'قيد التنفيذ',     cls: 'bg-primary-light text-primary' },
-  AWAITING_CLOSURE: { label: 'بانتظار الإغلاق', cls: 'bg-amber-50 text-warning' },
-  CLOSED:           { label: 'مغلقة',           cls: 'bg-emerald-50 text-success' },
-  ARCHIVED:         { label: 'مؤرشفة',          cls: 'bg-red-50 text-danger' },
+  DRAFT:            { label: 'مسودة',            cls: 'bg-border/60 text-text-soft' },
+  PREPARATION:      { label: 'قيد الإعداد',      cls: 'bg-background text-text-soft border-border' },
+  IN_PROGRESS:      { label: 'قيد التنفيذ',      cls: 'bg-primary-light text-primary' },
+  EXECUTION:        { label: 'قيد التنفيذ',      cls: 'bg-primary-light text-primary' },
+  AWAITING_CLOSURE: { label: 'بانتظار الإغلاق',  cls: 'bg-sand/20 text-warning border-sand/40' },
+  CLOSED:           { label: 'مغلقة',             cls: 'bg-forest-50 text-accent border-accent/20' },
+  ARCHIVED:         { label: 'مؤرشفة',            cls: 'bg-border text-text-soft' },
 };
 
 // ======================================================================
@@ -39,10 +41,10 @@ const STATUS_MAP = {
 
 function StatCard({ icon, label, value, sub, color = 'primary', href }) {
   const colors = {
-    primary: { bg: 'bg-primary/10', text: 'text-primary',   border: 'border-primary/30',  val: 'text-primary' },
-    amber:   { bg: 'bg-amber-50',   text: 'text-amber-600', border: 'border-amber-200',   val: 'text-amber-600' },
-    red:     { bg: 'bg-red-50',     text: 'text-red-600',   border: 'border-red-200',     val: 'text-red-600' },
-    green:   { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', val: 'text-emerald-600' },
+    primary: { bg: 'bg-primary-light', text: 'text-primary',  border: 'border-primary/20', val: 'text-primary' },
+    amber:   { bg: 'bg-sand/20',       text: 'text-warning',  border: 'border-sand/40',    val: 'text-warning' },
+    red:     { bg: 'bg-burgundy/10',   text: 'text-danger',   border: 'border-burgundy/20',val: 'text-danger' },
+    green:   { bg: 'bg-forest-50',     text: 'text-accent',   border: 'border-accent/20',  val: 'text-accent' },
   };
   const c = colors[color] || colors.primary;
   const inner = (
@@ -77,9 +79,9 @@ function ChartCard({ title, sub, children, action }) {
 
 function AlertItem({ icon, text, tone = 'amber' }) {
   const cls = {
-    amber: 'border-amber-200 bg-amber-50 text-amber-800',
-    red:   'border-red-200 bg-red-50 text-red-700',
-    green: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    amber: 'border-sand/40 bg-sand/10 text-warning',
+    red:   'border-burgundy/20 bg-burgundy/5 text-danger',
+    green: 'border-accent/20 bg-forest-50 text-accent',
   };
   return (
     <div className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm ${cls[tone] || cls.amber}`}>
@@ -90,7 +92,7 @@ function AlertItem({ icon, text, tone = 'amber' }) {
 }
 
 function CourseCard({ course }) {
-  const s = STATUS_MAP[course.status] || { label: course.status, cls: 'bg-slate-100 text-slate-600' };
+  const s = STATUS_MAP[course.status] || { label: course.status, cls: 'bg-background text-text-soft' };
   // عدد العناصر من _count (لا نحمّل العناصر في القائمة لتحسين الأداء)
   const elementCount = course._count?.closureElements || 0;
 
@@ -275,13 +277,13 @@ export default function Home() {
             <ChartCard title="أفضل أداء" sub="بناءً على مؤشرات هذا الشهر">
               {dash.topPerformer ? (
                 <div className="flex flex-col items-center gap-2 py-2 text-center">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-2xl">🏆</div>
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-forest-50 text-2xl">🏆</div>
                   <div>
                     <p className="font-extrabold text-text-main">
                       {dash.topPerformer.user?.firstName} {dash.topPerformer.user?.lastName}
                     </p>
                     <p className="text-xs text-text-soft">{dash.topPerformer.user?.operationalProject?.name}</p>
-                    <p className="mt-1 text-lg font-extrabold text-emerald-600">
+                    <p className="mt-1 text-lg font-extrabold text-accent">
                       {fmt(dash.topPerformer.finalScore)}%
                     </p>
                   </div>
@@ -331,8 +333,9 @@ export default function Home() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {[
               { label: 'الإنتاجية والإتمام', val: dash.kpi.productivityScore, icon: '📊', color: 'primary' },
-              { label: 'جودة التقديم',        val: dash.kpi.qualityScore,      icon: '⭐', color: 'green' },
-              { label: 'الدرجة الكلية',       val: dash.kpi.finalScore,        icon: '🎯', color: Number(dash.kpi.finalScore) >= 80 ? 'green' : Number(dash.kpi.finalScore) >= 60 ? 'amber' : 'red' },
+              { label: 'جودة التقديم',        val: dash.kpi.qualityScore,      icon: '⭐', color: 'green'   },
+              { label: 'الدرجة الكلية',       val: dash.kpi.finalScore,        icon: '🎯',
+                color: Number(dash.kpi.finalScore) >= 80 ? 'green' : Number(dash.kpi.finalScore) >= 60 ? 'amber' : 'red' },
             ].map((k) => (
               <Link key={k.label} href="/kpis">
                 <div className="flex items-center gap-4 rounded-2xl border border-border bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-soft">

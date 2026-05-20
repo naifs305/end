@@ -281,11 +281,11 @@ export default function Archive() {
         </div>
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-          <StatCard title="إجمالي الأرشيف" value={stats.total} />
-          <StatCard title="مؤرشفة" value={stats.archived} />
-          <StatCard title="مغلقة" value={stats.closed} />
-          <StatCard title="داخلية" value={stats.internal} />
-          <StatCard title="خارجية" value={stats.external} />
+          <StatCard title="إجمالي الأرشيف" value={stats.total} accent />
+          <StatCard title="مغلقة"           value={stats.closed} />
+          <StatCard title="مؤرشفة"          value={stats.archived} />
+          <StatCard title="داخلية"          value={stats.internal} />
+          <StatCard title="خارجية"          value={stats.external} />
         </div>
 
         <div className="rounded-2xl border border-border bg-white p-4 md:p-6 shadow-card">
@@ -417,10 +417,10 @@ export default function Archive() {
                         </td>
                         <td className="px-6 py-4">
                           <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
+                            className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-bold ${
                               course.status === 'ARCHIVED'
-                                ? 'bg-primary-light text-primary'
-                                : 'bg-primary-light text-primary'
+                                ? 'bg-border text-text-soft border-border'
+                                : 'bg-forest-50 text-accent border-accent/20'
                             }`}
                           >
                             {getStatusLabel(course.status)}
@@ -458,11 +458,11 @@ export default function Archive() {
   );
 }
 
-function StatCard({ title, value }) {
+function StatCard({ title, value, accent }) {
   return (
-    <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
-      <div className="mb-1 text-sm font-medium text-text-soft">{title}</div>
-      <div className="text-2xl font-extrabold text-primary">{value}</div>
+    <div className={`rounded-2xl border bg-white p-4 shadow-card ${accent ? 'border-primary/20 bg-primary-light/50' : 'border-border'}`}>
+      <div className="mb-1 text-xs font-bold uppercase tracking-wide text-text-soft/60">{title}</div>
+      <div className={`text-2xl font-extrabold ${accent ? 'text-primary' : 'text-text-main'}`}>{value}</div>
     </div>
   );
 }

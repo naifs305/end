@@ -9,11 +9,12 @@ import Link from 'next/link';
 // ─── ثوابت ────────────────────────────────────────────────────
 
 const STATUS_CFG = {
-  PREPARATION:      { label:'إعداد',      border:'border-r-slate-400',   bg:'bg-slate-50',   badge:'bg-slate-100 text-slate-700',   dot:'bg-slate-400' },
-  EXECUTION:        { label:'تنفيذ',      border:'border-r-primary',     bg:'bg-white',      badge:'bg-primary-light text-primary',  dot:'bg-primary' },
-  AWAITING_CLOSURE: { label:'انتظار إقفال',border:'border-r-amber-400',  bg:'bg-amber-50/30',badge:'bg-amber-50 text-warning',       dot:'bg-amber-400' },
-  CLOSED:           { label:'مقفلة',      border:'border-r-emerald-500', bg:'bg-emerald-50/20',badge:'bg-emerald-50 text-success',   dot:'bg-emerald-500' },
-  ARCHIVED:         { label:'مؤرشفة',     border:'border-r-gray-300',    bg:'bg-gray-50/30', badge:'bg-gray-100 text-gray-500',      dot:'bg-gray-400' },
+  PREPARATION:      { label:'إعداد',        border:'border-s-[3px] border-s-border',    bg:'bg-white',         badge:'bg-background text-text-soft border-border',          dot:'bg-border' },
+  IN_PROGRESS:      { label:'تنفيذ',        border:'border-s-[3px] border-s-primary',   bg:'bg-white',         badge:'bg-primary-light text-primary border-primary/20',     dot:'bg-primary' },
+  EXECUTION:        { label:'تنفيذ',        border:'border-s-[3px] border-s-primary',   bg:'bg-white',         badge:'bg-primary-light text-primary border-primary/20',     dot:'bg-primary' },
+  AWAITING_CLOSURE: { label:'انتظار إقفال', border:'border-s-[3px] border-s-warning',   bg:'bg-sand/5',        badge:'bg-sand/20 text-warning border-sand/40',             dot:'bg-warning' },
+  CLOSED:           { label:'مقفلة',        border:'border-s-[3px] border-s-accent',    bg:'bg-forest-50/30',  badge:'bg-forest-50 text-accent border-accent/20',          dot:'bg-accent' },
+  ARCHIVED:         { label:'مؤرشفة',       border:'border-s-[3px] border-s-text-soft', bg:'bg-background',    badge:'bg-border/60 text-text-soft border-border',           dot:'bg-text-soft' },
 };
 
 const STATUSES = [
@@ -112,7 +113,7 @@ function CourseCard({ course, role, user, onDelete, onArchive, onReassign, busy 
                   )}
                   {canDel && (
                     <button onClick={() => { setActionsOpen(false); onDelete(course.id); }} disabled={busy === course.id}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-danger hover:bg-red-50">
+                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-danger hover:bg-burgundy/5">
                       🗑️ حذف
                     </button>
                   )}
@@ -124,7 +125,7 @@ function CourseCard({ course, role, user, onDelete, onArchive, onReassign, busy 
 
         {!canManage && canDel && (
           <button onClick={() => onDelete(course.id)} disabled={busy === course.id}
-            className="mr-auto rounded-lg border border-red-200 px-2.5 py-1.5 text-[11px] font-bold text-danger hover:bg-red-50 disabled:opacity-50">
+            className="me-auto rounded-xl border border-burgundy/20 px-2.5 py-1.5 text-[11px] font-bold text-danger hover:bg-burgundy/5 disabled:opacity-50">
             حذف
           </button>
         )}

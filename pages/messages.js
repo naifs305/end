@@ -177,7 +177,7 @@ export default function MessagesPage() {
                       <div className="shrink-0 text-left">
                         <div className="text-[11px] text-gray-400">{formatDate(item.updatedAt || item.lastMessage?.createdAt)}</div>
                         {item.unreadCount > 0 ? (
-                          <div className="mt-2 inline-flex min-w-[24px] h-6 px-2 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold">
+                          <div className="mt-2 inline-flex min-w-[24px] h-6 px-2 items-center justify-center rounded-full bg-danger text-white text-xs font-bold">
                             {item.unreadCount}
                           </div>
                         ) : null}
@@ -238,7 +238,7 @@ export default function MessagesPage() {
           </div>
 
           <form onSubmit={handleSend} className="p-4 border-t border-gray-100 bg-white">
-            {error ? <div className="mb-3 text-sm text-red-600">{error}</div> : null}
+            {error ? <div className="mb-3 text-sm text-danger">{error}</div> : null}
             <div className="flex items-end gap-3">
               <textarea
                 value={messageText}

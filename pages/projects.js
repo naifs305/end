@@ -110,7 +110,7 @@ export default function ProjectsPage() {
           <p className="mt-0.5 text-xs text-text-soft">
             ضبط العلاقات بين المشرفين والمنسقين — كل مشروع يضم مشرفاً مسؤولاً وفريقاً من المنسقين
           </p>
-          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="mt-3 rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-xs text-warning">
             <strong>ملاحظة مهمة:</strong> عند تغطية منسق لدورة في مشروع آخر — يعتمد عناصره <strong>مشرف مشروع الدورة</strong> (وليس مشرف مشروع المنسق الأصلي). KPI المنسق يحتسب جميع دوراته بغض النظر عن المشروع.
           </div>
         </div>
@@ -174,7 +174,7 @@ export default function ProjectsPage() {
                 <div key={project.id} className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
                   {/* رأس المشروع */}
                   <div
-                    className="flex cursor-pointer items-center justify-between px-5 py-4 hover:bg-slate-50/50 transition"
+                    className="flex cursor-pointer items-center justify-between px-5 py-4 hover:bg-background transition"
                     onClick={() => setExpandedProject(isExpanded ? null : project.id)}
                   >
                     <div className="flex items-center gap-3">
@@ -191,7 +191,7 @@ export default function ProjectsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {!supervisorUser && (
-                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-500">بدون مشرف</span>
+                        <span className="rounded-full bg-burgundy/10 border border-burgundy/20 px-2 py-0.5 text-[10px] font-bold text-danger">بدون مشرف</span>
                       )}
                       <span className="text-xs text-text-soft">{isExpanded ? '▲' : '▼'}</span>
                     </div>
@@ -208,19 +208,19 @@ export default function ProjectsPage() {
                           {supervisorUser ? (
                             <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-3 py-2">
                               <div>
-                                <p className="font-bold text-sm text-blue-800">{supervisorUser.firstName} {supervisorUser.lastName}</p>
-                                <p className="text-xs text-blue-600">{supervisorUser.email}</p>
+                                <p className="font-bold text-sm text-primary">{supervisorUser.firstName} {supervisorUser.lastName}</p>
+                                <p className="text-xs text-text-soft">{supervisorUser.email}</p>
                                 {supervisorUser.roles?.includes('EMPLOYEE') && (
-                                  <p className="text-[10px] text-amber-600">يعمل أيضاً كمنسق</p>
+                                  <p className="text-[10px] text-warning">يعمل أيضاً كمنسق</p>
                                 )}
                               </div>
                               <button onClick={() => removeSupervisor(supervisorUser.id)}
-                                className="rounded-lg border border-red-200 px-2 py-1 text-[10px] font-bold text-red-500 hover:bg-red-50">
+                                className="rounded-lg border border-burgundy/20 px-2 py-1 text-[10px] font-bold text-danger hover:bg-burgundy/5">
                                 إزالة
                               </button>
                             </div>
                           ) : (
-                            <p className="rounded-xl border border-dashed border-red-200 bg-red-50 py-3 text-center text-xs text-red-500">
+                            <p className="rounded-xl border border-dashed border-burgundy/20 bg-burgundy/5 py-3 text-center text-xs text-danger">
                               ⚠️ لا يوجد مشرف — العناصر لن تُعتمد تلقائياً
                             </p>
                           )}
@@ -245,7 +245,7 @@ export default function ProjectsPage() {
                                     <span className="text-[9px] rounded-full bg-blue-100 text-blue-700 px-1.5 py-0.5 font-bold">مشرف</span>
                                   )}
                                   {!m.isActive && (
-                                    <span className="text-[9px] rounded-full bg-red-100 text-red-600 px-1.5 py-0.5 font-bold">معطل</span>
+                                    <span className="text-[9px] rounded-full bg-burgundy/10 text-danger px-1.5 py-0.5 font-bold">معطل</span>
                                   )}
                                 </div>
                               ))}
@@ -257,7 +257,7 @@ export default function ProjectsPage() {
                       {/* حذف المشروع */}
                       <div className="mt-3 border-t border-border pt-3">
                         <button onClick={() => deleteProject(project.id, project.name)}
-                          className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-50">
+                          className="rounded-xl border border-burgundy/20 px-3 py-1.5 text-xs font-bold text-danger hover:bg-burgundy/5">
                           🗑️ حذف المشروع
                         </button>
                         <span className="mr-2 text-[10px] text-text-soft">يُحذف فقط إذا لم تكن هناك موظفون أو دورات</span>

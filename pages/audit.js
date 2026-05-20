@@ -3,20 +3,20 @@ import MainLayout from '../components/layout/MainLayout';
 import api from '../lib/axios';
 
 const ACTION_MAP = {
-  COURSE_CREATED:             { label: 'إنشاء دورة',          cls: 'bg-primary-light text-primary',     icon: '➕' },
-  COURSE_UPDATED:             { label: 'تعديل دورة',           cls: 'bg-blue-50 text-blue-700',          icon: '✏️' },
-  COURSE_DELETED:             { label: 'حذف دورة',             cls: 'bg-red-50 text-danger',             icon: '🗑️' },
-  COURSE_ARCHIVED:            { label: 'أرشفة دورة',           cls: 'bg-slate-100 text-slate-600',       icon: '📁' },
-  COURSE_REASSIGNED:          { label: 'إعادة إسناد دورة',     cls: 'bg-amber-50 text-warning',          icon: '🔄' },
-  COURSE_CLOSED:              { label: 'إقفال دورة',           cls: 'bg-emerald-50 text-success',        icon: '🔒' },
-  ELEMENT_SUBMITTED:          { label: 'تقديم عنصر',           cls: 'bg-blue-50 text-blue-700',          icon: '📤' },
-  ELEMENT_APPROVED:           { label: 'اعتماد عنصر',          cls: 'bg-emerald-50 text-success',        icon: '✅' },
-  ELEMENT_REJECTED:           { label: 'رفض عنصر',             cls: 'bg-red-50 text-danger',             icon: '❌' },
-  ELEMENT_RETURNED:           { label: 'إعادة عنصر',           cls: 'bg-amber-50 text-warning',          icon: '↩️' },
-  ELEMENT_EXTENSION_GRANTED:  { label: 'تمديد موعد',           cls: 'bg-blue-50 text-blue-700',          icon: '⏱️' },
-  KPI_SNAPSHOTS_CALCULATED:   { label: 'احتساب مؤشرات الأداء', cls: 'bg-purple-50 text-purple-700',      icon: '📊' },
-  KPI_NOTE_ADDED:             { label: 'ملاحظة أداء',          cls: 'bg-purple-50 text-purple-700',      icon: '📝' },
-  ASSIGNMENT_REGISTER_UPDATED:{ label: 'تحديث سجل الإسناد',    cls: 'bg-slate-100 text-slate-600',       icon: '📋' },
+  COURSE_CREATED:             { label: 'إنشاء دورة',          cls: 'bg-primary-light text-primary border-primary/20',      icon: '➕' },
+  COURSE_UPDATED:             { label: 'تعديل دورة',           cls: 'bg-primary-light text-primary border-primary/10',      icon: '✏️' },
+  COURSE_DELETED:             { label: 'حذف دورة',             cls: 'bg-burgundy/10 text-danger border-burgundy/20',        icon: '🗑️' },
+  COURSE_ARCHIVED:            { label: 'أرشفة دورة',           cls: 'bg-border/60 text-text-soft border-border',            icon: '📁' },
+  COURSE_REASSIGNED:          { label: 'إعادة إسناد دورة',     cls: 'bg-sand/20 text-warning border-sand/40',              icon: '🔄' },
+  COURSE_CLOSED:              { label: 'إقفال دورة',           cls: 'bg-forest-50 text-accent border-accent/20',           icon: '🔒' },
+  ELEMENT_SUBMITTED:          { label: 'تقديم عنصر',           cls: 'bg-primary-light text-primary border-primary/10',      icon: '📤' },
+  ELEMENT_APPROVED:           { label: 'اعتماد عنصر',          cls: 'bg-forest-50 text-accent border-accent/20',           icon: '✅' },
+  ELEMENT_REJECTED:           { label: 'رفض عنصر',             cls: 'bg-burgundy/10 text-danger border-burgundy/20',        icon: '❌' },
+  ELEMENT_RETURNED:           { label: 'إعادة عنصر',           cls: 'bg-sand/20 text-warning border-sand/40',              icon: '↩️' },
+  ELEMENT_EXTENSION_GRANTED:  { label: 'تمديد موعد',           cls: 'bg-primary-light text-primary border-primary/10',      icon: '⏱️' },
+  KPI_SNAPSHOTS_CALCULATED:   { label: 'احتساب مؤشرات الأداء', cls: 'bg-forest-50 text-primary border-primary/10',          icon: '📊' },
+  KPI_NOTE_ADDED:             { label: 'ملاحظة أداء',          cls: 'bg-forest-50 text-accent border-accent/20',           icon: '📝' },
+  ASSIGNMENT_REGISTER_UPDATED:{ label: 'تحديث سجل الإسناد',    cls: 'bg-background text-text-soft border-border',          icon: '📋' },
 };
 
 function fmtRelative(date) {
@@ -118,17 +118,17 @@ export default function AuditLog() {
             <>
               <div className="divide-y divide-border">
                 {current.map((log) => {
-                  const act = ACTION_MAP[log.action] || { label: log.action, cls: 'bg-slate-100 text-slate-600', icon: '📌' };
+                  const act = ACTION_MAP[log.action] || { label: log.action, cls: 'bg-background text-text-soft border-border', icon: '📌' };
                   return (
-                    <div key={log.id} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50/50 transition">
+                    <div key={log.id} className="flex items-start gap-3 px-4 py-3 hover:bg-background transition">
                       <span className="mt-0.5 text-lg">{act.icon}</span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${act.cls}`}>{act.label}</span>
+                          <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${act.cls}`}>{act.label}</span>
                           <span className="font-bold text-sm text-text-main">
                             {log.user?.firstName} {log.user?.lastName}
                           </span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
+                          <span className="rounded-full bg-background border border-border px-2 py-0.5 text-[10px] text-text-soft">
                             {ROLE_LABEL[log.roleContext] || log.roleContext}
                           </span>
                         </div>

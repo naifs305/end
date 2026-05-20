@@ -13,10 +13,10 @@ const JOB_CFG = {
 };
 
 const STATUS_CFG = {
-  ACTIVE:    { label: 'نشطة',    cls: 'bg-emerald-50 text-success  border-emerald-200' },
-  PAUSED:    { label: 'متوقفة',  cls: 'bg-amber-50  text-warning  border-amber-200' },
-  COMPLETED: { label: 'مكتملة', cls: 'bg-blue-50   text-blue-700 border-blue-200' },
-  FAILED:    { label: 'خطأ',    cls: 'bg-red-50    text-danger   border-red-200' },
+  ACTIVE:    { label: 'نشطة',    cls: 'bg-forest-50 text-accent border-accent/20' },
+  PAUSED:    { label: 'متوقفة',  cls: 'bg-sand/20 text-warning border-sand/40' },
+  COMPLETED: { label: 'مكتملة', cls: 'bg-primary-light text-primary border-primary/20' },
+  FAILED:    { label: 'خطأ',    cls: 'bg-burgundy/10 text-danger border-burgundy/20' },
 };
 
 function fmtRelative(v) {
@@ -105,9 +105,9 @@ export default function JobsPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex gap-2 text-xs">
-              <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-bold text-success">{active} نشطة</span>
-              {paused  > 0 && <span className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 font-bold text-warning">{paused} متوقفة</span>}
-              {errored > 0 && <span className="rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 font-bold text-danger">{errored} خطأ</span>}
+              <span className="rounded-xl border border-accent/20 bg-forest-50 px-3 py-1.5 font-bold text-accent">{active} نشطة</span>
+              {paused  > 0 && <span className="rounded-xl border border-sand/40 bg-sand/10 px-3 py-1.5 font-bold text-warning">{paused} متوقفة</span>}
+              {errored > 0 && <span className="rounded-xl border border-burgundy/20 bg-burgundy/5 px-3 py-1.5 font-bold text-danger">{errored} خطأ</span>}
             </div>
             <button onClick={() => setShowForm(v => !v)}
               className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary-dark">
@@ -156,13 +156,13 @@ export default function JobsPage() {
                 const cfg  = JOB_CFG[job.type]  || JOB_CFG.CUSTOM;
                 const scfg = STATUS_CFG[job.status] || STATUS_CFG.ACTIVE;
                 return (
-                  <div key={job.id} className="flex items-start gap-3 px-4 py-4 hover:bg-slate-50/50 transition">
+                  <div key={job.id} className="flex items-start gap-3 px-4 py-4 hover:bg-background transition">
                     <span className="mt-0.5 text-xl">{cfg.icon}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-extrabold text-text-main">{job.name}</span>
                         <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${scfg.cls}`}>{scfg.label}</span>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{cfg.label}</span>
+                        <span className="rounded-full bg-background border border-border px-2 py-0.5 text-[10px] text-text-soft">{cfg.label}</span>
                       </div>
                       <div className="mt-1 flex flex-wrap gap-4 text-xs text-text-soft">
                         <span>كل <strong>{job.intervalHours}</strong> ساعة</span>
@@ -171,7 +171,7 @@ export default function JobsPage() {
                         <span>• عدد التشغيلات: <strong>{job.runCount}</strong></span>
                       </div>
                       {job.lastError && (
-                        <div className="mt-1.5 rounded-lg bg-red-50 px-2 py-1 text-xs text-red-600">
+                        <div className="mt-1.5 rounded-xl border border-burgundy/20 bg-burgundy/5 px-2 py-1 text-xs text-danger">
                           ⚠️ خطأ أخير: {job.lastError}
                         </div>
                       )}
@@ -183,11 +183,11 @@ export default function JobsPage() {
                     </div>
                     <div className="flex shrink-0 gap-2">
                       <button onClick={() => toggleJob(job)}
-                        className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition ${job.status === 'ACTIVE' ? 'border-amber-200 bg-amber-50 text-warning hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-success hover:bg-emerald-100'}`}>
+                        className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition ${job.status === 'ACTIVE' ? 'border-sand/40 bg-sand/10 text-warning hover:bg-sand/20' : 'border-accent/20 bg-forest-50 text-accent hover:bg-forest-50'}`}>
                         {job.status === 'ACTIVE' ? '⏸ إيقاف' : '▶ تفعيل'}
                       </button>
                       <button onClick={() => deleteJob(job.id, job.name)}
-                        className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-50">
+                        className="rounded-xl border border-burgundy/20 px-3 py-1.5 text-xs font-bold text-danger hover:bg-burgundy/5">
                         حذف
                       </button>
                     </div>

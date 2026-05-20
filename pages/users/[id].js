@@ -154,7 +154,7 @@ export default function EditUser() {
               <div className="col-span-2">
                 <label className="mb-1.5 block text-xs font-bold text-text-main">الحالة</label>
                 <div className="flex gap-2">
-                  {[{v:true,l:'نشط',c:'border-accent/40 bg-forest-50 text-accent'},{v:false,l:'معطل',c:'border-danger/30 bg-red-50 text-danger'}].map(o=>(
+                  {[{v:true,l:'نشط',c:'border-accent/40 bg-forest-50 text-accent'},{v:false,l:'معطل',c:'border-burgundy/30 bg-burgundy/5 text-danger'}].map(o=>(
                     <button key={String(o.v)} type="button" onClick={()=>setUser({...user,isActive:o.v})}
                       className={`flex-1 rounded-xl border py-2.5 text-sm font-bold transition ${user.isActive===o.v ? o.c : 'border-border bg-background text-text-soft hover:bg-background'}`}>
                       {o.l}

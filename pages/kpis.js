@@ -44,7 +44,7 @@ const IND_CFG = [
 ];
 
 const INSIGHT_ICON = { positive:'✅', warning:'⚠️', critical:'🔴', info:'ℹ️' };
-const INSIGHT_BG   = { positive:'bg-emerald-50 border-emerald-200 text-emerald-800', warning:'bg-amber-50 border-amber-200 text-amber-800', critical:'bg-red-50 border-red-200 text-red-700', info:'bg-blue-50 border-blue-200 text-blue-800' };
+const INSIGHT_BG   = { positive:'bg-forest-50 border-accent/20 text-accent', warning:'bg-sand/20 border-sand/40 text-warning', critical:'bg-burgundy/10 border-burgundy/20 text-danger', info:'bg-primary-light border-primary/20 text-primary' };
 
 // ─── مكوّن قياس دائري SVG ────────────────────────────────────
 
@@ -79,7 +79,7 @@ function Tip({ text }) {
     <span className="relative">
       <button type="button"
         onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}
-        className="mr-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold text-slate-500 hover:bg-primary/20 hover:text-primary">?</button>
+        className="me-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-border text-[9px] font-bold text-text-soft hover:bg-primary/20 hover:text-primary">?</button>
       {show && (
         <span className="absolute bottom-full right-0 z-50 mb-1 w-48 rounded-xl border border-border bg-white p-2 text-[11px] leading-relaxed text-text-main shadow-soft">
           {text}
@@ -109,7 +109,7 @@ function EmployeeCard({ snap, selected, onSelect, isManager }) {
       {/* الاسم والمشروع */}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white ${noData ? 'bg-slate-300' : 'bg-primary'}`}>
+          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white ${noData ? 'bg-text-soft/40' : 'bg-primary'}`}>
             {name[0]}{name.split(' ')[1]?.[0] || ''}
           </div>
           <div className="min-w-0">
@@ -134,7 +134,7 @@ function EmployeeCard({ snap, selected, onSelect, isManager }) {
                   <span className="text-text-soft">{ind.icon} {ind.label}</span>
                   <span className={`font-bold ${val >= 80 ? 'text-success' : val >= 60 ? 'text-warning' : 'text-danger'}`}>{noData ? '-' : `${Math.round(val)}%`}</span>
                 </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-forest-50">
                   <div className={`h-full rounded-full transition-all duration-500 ${val >= 80 ? 'bg-accent' : val >= 60 ? 'bg-sand' : 'bg-burgundy'}`} style={{ width: noData ? '0%' : `${val}%` }} />
                 </div>
               </div>
@@ -146,10 +146,10 @@ function EmployeeCard({ snap, selected, onSelect, isManager }) {
       {/* شارتَا الالتزام والانضباط */}
       <div className="flex flex-wrap gap-1.5 border-t border-border pt-2.5">
         {[
-          { key:'commitmentStatusLabel',  bg:'bg-slate-50', val:s.commitmentStatusLabel  },
-          { key:'disciplineStatusLabel',  bg:'bg-slate-50', val:s.disciplineStatusLabel  },
+          { key:'commitmentStatusLabel',  val:s.commitmentStatusLabel  },
+          { key:'disciplineStatusLabel',  val:s.disciplineStatusLabel  },
         ].map((b) => b.val && (
-          <span key={b.key} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{b.val}</span>
+          <span key={b.key} className="rounded-full bg-background border border-border px-2 py-0.5 text-[10px] text-text-soft">{b.val}</span>
         ))}
         <span className="mr-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
           {s.actualCoursesCount ?? 0} دورة
@@ -236,13 +236,13 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
         {/* المؤشرات الست */}
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {/* Radar */}
-          <div className="rounded-xl border border-border bg-slate-50 p-3">
+          <div className="rounded-xl border border-border bg-background p-3">
             <h4 className="mb-2 text-xs font-extrabold text-text-soft uppercase">خريطة المؤشرات</h4>
             <RadarKPI data={radarData} />
           </div>
 
           {/* Bars */}
-          <div className="rounded-xl border border-border bg-slate-50 p-3">
+          <div className="rounded-xl border border-border bg-background p-3">
             <h4 className="mb-3 text-xs font-extrabold text-text-soft uppercase">تفصيل المؤشرات</h4>
             <div className="space-y-2.5">
               {IND_CFG.map(ind => {
@@ -291,7 +291,7 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
                 {trend.summary?.direction === 'improving' ? '▲ تحسن' : trend.summary?.direction === 'declining' ? '▼ تراجع' : '← مستقر'}
               </span>
             </div>
-            <div className="flex items-end gap-1.5 overflow-x-auto rounded-xl border border-border bg-slate-50 p-3">
+            <div className="flex items-end gap-1.5 overflow-x-auto rounded-xl border border-border bg-background p-3">
               {trend.trend.map((t, i) => {
                 const h = Math.max(6, Math.round((Number(t.finalScore) / 100) * 64));
                 const val = Number(t.finalScore) || 0;
@@ -314,7 +314,7 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
         {s.elementBreakdown?.length > 0 && (
           <div>
             <button onClick={() => setShowBreakdown(v => !v)}
-              className="flex w-full items-center justify-between rounded-xl border border-border bg-background px-4 py-2.5 text-xs font-bold text-text-main hover:bg-slate-100">
+              className="flex w-full items-center justify-between rounded-xl border border-border bg-background px-4 py-2.5 text-xs font-bold text-text-main hover:bg-forest-50/50 transition">
               <span>📋 تفصيل الأداء حسب نوع العنصر ({s.elementBreakdown.length})</span>
               <span className="text-text-soft">{showBreakdown ? '▲' : '▼'}</span>
             </button>
@@ -330,13 +330,13 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
                   </thead>
                   <tbody>
                     {s.elementBreakdown.map(el => (
-                      <tr key={el.key} className="border-t border-border hover:bg-slate-50">
+                      <tr key={el.key} className="border-t border-border hover:bg-background">
                         <td className="px-3 py-2 font-bold text-text-main">{el.name}</td>
                         <td className="px-3 py-2 text-center">{el.total}</td>
-                        <td className="px-3 py-2 text-center font-bold text-success">{el.approved}</td>
+                        <td className="px-3 py-2 text-center font-bold text-accent">{el.approved}</td>
                         <td className="px-3 py-2 text-center font-bold text-warning">{el.returned}</td>
                         <td className="px-3 py-2">
-                          <span className={`rounded-full px-2 py-0.5 font-bold ${el.approvalRate >= 80 ? 'bg-emerald-50 text-success' : el.approvalRate >= 60 ? 'bg-amber-50 text-warning' : 'bg-red-50 text-danger'}`}>
+                          <span className={`rounded-full px-2 py-0.5 font-bold ${el.approvalRate >= 80 ? 'bg-forest-50 text-accent' : el.approvalRate >= 60 ? 'bg-sand/20 text-warning' : 'bg-burgundy/10 text-danger'}`}>
                             {fmt(el.approvalRate)}%
                           </span>
                         </td>
@@ -526,7 +526,7 @@ export default function KpisPage() {
                 </div>
               ))}
               {stats.noData > 0 && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-500">
+                <div className="rounded-xl border border-border bg-background px-2.5 py-1 text-xs text-text-soft">
                   {stats.noData} بدون بيانات
                 </div>
               )}
@@ -783,7 +783,7 @@ function AssignmentSection({ periodLabel, year, month }) {
         <span className="text-xs text-text-soft">{show ? '▲ إخفاء' : '▼ إظهار'}</span>
       </button>
       {!show && (
-        <div className="border-t border-border bg-amber-50/40 px-5 py-2 text-[10px] text-amber-700">
+        <div className="border-t border-border bg-sand/10 px-5 py-2 text-[10px] text-warning">
           💡 هذا السجل مخصص للتخطيط المسبق فقط — KPI يعمل بالكامل بدونه
         </div>
       )}
