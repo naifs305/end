@@ -63,9 +63,10 @@ export default function Sidebar() {
     <aside className="hidden w-64 flex-col bg-white md:flex" style={{ borderInlineEnd: '1px solid #D8DDDA', boxShadow: '2px 0 8px rgba(0,0,0,0.04)' }}>
 
       {/* الشعار */}
-      <div className="flex h-16 items-center justify-center border-b border-border px-4">
-        <div className="relative h-9 w-28">
-          <Image src="/nauss-logo.png" alt="جامعة نايف" fill className="object-contain" priority />
+      <div className="flex h-16 items-center border-b border-border px-4">
+        <div className="relative h-12 w-full max-w-[180px]">
+          <Image src="/nauss-logo.png" alt="جامعة نايف العربية للعلوم الأمنية" fill
+            className="object-contain object-right" priority />
         </div>
       </div>
 
