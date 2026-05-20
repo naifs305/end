@@ -20,6 +20,7 @@ const ICONS = {
   check:    'M9 11l3 3L22 4 M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11',
   archive:  'M21 8l-1-1H4L3 8v2h18V8z M5 10v9a1 1 0 001 1h12a1 1 0 001-1v-9 M9 14h6',
   chart:    'M18 20V10 M12 20V4 M6 20v-6',
+  report:   'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8',
   kpi:      'M22 12h-4l-3 9L9 3l-3 9H2',
   search:   'M11 19a8 8 0 100-16 8 8 0 000 16z M21 21l-4.35-4.35',
   message:  'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z',
@@ -90,6 +91,7 @@ export default function Sidebar() {
         {link('/reports', 'chart', 'التقارير الميدانية')}
         {!isQuality && canViewKpis && link('/kpis', 'kpi', 'مؤشرات الأداء')}
         {isQuality && link('/quality', 'kpi', 'لوحة الجودة')}
+        {!isQuality && (isAdmin || isSupervisor) && link('/executive-report', 'report', 'التقرير القيادي')}
         {!isQuality && isAdmin && link('/audit', 'search', 'سجل المراجعة')}
 
         {!isQuality && (
