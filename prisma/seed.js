@@ -12,6 +12,8 @@ const directPrisma = new PrismaClient({
 async function main() {
   // --- تطبيق تغييرات المخطط مباشرة (مرنة وآمنة — IF NOT EXISTS) ---
   const schemaMigrations = [
+    `ALTER TABLE "EmployeeKpiSnapshot" ADD COLUMN IF NOT EXISTS "timelinessScore" FLOAT8 NOT NULL DEFAULT 0`,
+    `ALTER TABLE "EmployeeKpiSnapshot" ADD COLUMN IF NOT EXISTS "criticalScore"   FLOAT8 NOT NULL DEFAULT 0`,
     `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "deadlineRefPoint"      TEXT`,
     `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "deadlineIdealHours"    INTEGER`,
     `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "deadlineMaxHours"      INTEGER`,

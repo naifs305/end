@@ -1,11 +1,11 @@
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const COLORS = {
-  'قيد الإعداد':     '#94a3b8',
-  'قيد التنفيذ':     '#006C6D',
-  'بانتظار الإغلاق': '#C6922D',
-  'مغلقة':           '#2E7D5A',
-  'مؤرشفة':          '#A63D4A',
+  'قيد الإعداد':     '#9DA3A1',
+  'قيد التنفيذ':     '#253C32',
+  'بانتظار الإغلاق': '#C3B39F',
+  'مغلقة':           '#5D8A70',
+  'مؤرشفة':          '#633646',
 };
 
 const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {

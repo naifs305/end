@@ -27,11 +27,11 @@ function fmtRelative(v) {
 const AR_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 
 const LEVEL_CFG = {
-  OUTSTANDING:      { label:'متميز',         color:'#2E7D5A', bg:'bg-emerald-50',  border:'border-emerald-200', text:'text-emerald-700', ring:'#2E7D5A' },
-  VERY_GOOD:        { label:'جيد جداً',       color:'#006C6D', bg:'bg-primary-light',border:'border-primary/30',  text:'text-primary',    ring:'#006C6D' },
-  GOOD:             { label:'جيد',           color:'#64748b', bg:'bg-slate-100',   border:'border-slate-300',   text:'text-slate-700',  ring:'#64748b' },
-  NEEDS_IMPROVEMENT:{ label:'يحتاج تحسين',   color:'#C6922D', bg:'bg-amber-50',    border:'border-amber-200',   text:'text-amber-700',  ring:'#C6922D' },
-  WEAK:             { label:'ضعيف',          color:'#A63D4A', bg:'bg-red-50',      border:'border-red-200',     text:'text-danger',     ring:'#A63D4A' },
+  OUTSTANDING:      { label:'متميز',         color:'#253C32', bg:'bg-forest-50',    border:'border-forest-400/40', text:'text-primary',      ring:'#253C32' },
+  VERY_GOOD:        { label:'جيد جداً',       color:'#394F49', bg:'bg-primary-light',border:'border-forest-400/30', text:'text-forest-500',   ring:'#394F49' },
+  GOOD:             { label:'جيد',           color:'#4B5952', bg:'bg-forest-100',   border:'border-forest-200',    text:'text-slate-g',      ring:'#4B5952' },
+  NEEDS_IMPROVEMENT:{ label:'يحتاج تحسين',   color:'#8B7D6B', bg:'bg-sand/20',      border:'border-sand/50',       text:'text-warning',      ring:'#C3B39F' },
+  WEAK:             { label:'ضعيف',          color:'#633646', bg:'bg-burgundy/10',  border:'border-burgundy/30',   text:'text-danger',       ring:'#633646' },
 };
 
 const IND_CFG = [
@@ -54,12 +54,12 @@ function CircleGauge({ score, size = 88 }) {
   const c   = 2 * Math.PI * r;
   const off = c - (s / 100) * c;
   const level = s >= 80 ? 'OUTSTANDING' : s >= 70 ? 'VERY_GOOD' : s >= 60 ? 'GOOD' : s >= 50 ? 'NEEDS_IMPROVEMENT' : 'WEAK';
-  const clr = LEVEL_CFG[level]?.ring || '#94a3b8';
+  const clr = LEVEL_CFG[level]?.ring || '#9DA3A1';
 
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#f0f0ee" strokeWidth={8} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#D7DBDA" strokeWidth={8} />
         <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={clr} strokeWidth={8}
           strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round"
           style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
@@ -135,7 +135,7 @@ function EmployeeCard({ snap, selected, onSelect, isManager }) {
                   <span className={`font-bold ${val >= 80 ? 'text-success' : val >= 60 ? 'text-warning' : 'text-danger'}`}>{noData ? '-' : `${Math.round(val)}%`}</span>
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div className={`h-full rounded-full transition-all duration-500 ${val >= 80 ? 'bg-emerald-500' : val >= 60 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: noData ? '0%' : `${val}%` }} />
+                  <div className={`h-full rounded-full transition-all duration-500 ${val >= 80 ? 'bg-accent' : val >= 60 ? 'bg-sand' : 'bg-burgundy'}`} style={{ width: noData ? '0%' : `${val}%` }} />
                 </div>
               </div>
             );
@@ -258,7 +258,7 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
                       <span className={`font-extrabold ${val >= 80 ? 'text-success' : val >= 60 ? 'text-warning' : 'text-danger'}`}>{fmt(val)}%</span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-white">
-                      <div className={`h-full rounded-full transition-all duration-700 ${val >= 80 ? 'bg-emerald-500' : val >= 60 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${val}%` }} />
+                      <div className={`h-full rounded-full transition-all duration-700 ${val >= 80 ? 'bg-accent' : val >= 60 ? 'bg-sand' : 'bg-burgundy'}`} style={{ width: `${val}%` }} />
                     </div>
                   </div>
                 );
@@ -295,7 +295,7 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
               {trend.trend.map((t, i) => {
                 const h = Math.max(6, Math.round((Number(t.finalScore) / 100) * 64));
                 const val = Number(t.finalScore) || 0;
-                const clr = val >= 80 ? 'bg-emerald-500' : val >= 60 ? 'bg-amber-400' : 'bg-red-400';
+                const clr = val >= 80 ? 'bg-accent' : val >= 60 ? 'bg-sand' : 'bg-burgundy';
                 return (
                   <div key={t.periodLabel} className="flex min-w-[44px] flex-col items-center gap-0.5">
                     <span className={`text-[9px] font-bold ${val >= 80 ? 'text-success' : val >= 60 ? 'text-warning' : 'text-danger'}`}>{Math.round(val)}%</span>

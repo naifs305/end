@@ -19,9 +19,9 @@ export default function RadarKPI({ data = [] }) {
         <Radar
           name="الأداء"
           dataKey="score"
-          stroke="#006C6D"
-          fill="#006C6D"
-          fillOpacity={0.25}
+          stroke="#253C32"
+          fill="#5D8A70"
+          fillOpacity={0.22}
           strokeWidth={2}
         />
         <Tooltip

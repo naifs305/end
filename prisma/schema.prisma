@@ -347,8 +347,10 @@ model EmployeeKpiSnapshot {
   stalePendingElementsRate         Float               @default(0)
 
   productivityScore                Float               @default(0)
-  speedScore                       Float               @default(0)
+  timelinessScore                  Float               @default(0)
   qualityScore                     Float               @default(0)
+  criticalScore                    Float               @default(0)
+  speedScore                       Float               @default(0)
   disciplineScore                  Float               @default(0)
   finalScore                       Float               @default(0)
   performanceLevel                 PerformanceLevel    @default(GOOD)

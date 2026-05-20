@@ -4,9 +4,9 @@ import {
 } from 'recharts';
 
 const scoreColor = (v) => {
-  if (v >= 80) return '#2E7D5A';
-  if (v >= 60) return '#C6922D';
-  return '#A63D4A';
+  if (v >= 80) return '#5D8A70';
+  if (v >= 60) return '#C3B39F';
+  return '#633646';
 };
 
 export default function TeamBarChart({ data = [] }) {
