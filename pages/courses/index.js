@@ -5,6 +5,7 @@ import api from '../../lib/axios';
 import useAuth from '../../context/AuthContext';
 import { canCreateCourse, normalizeRole } from '../../lib/roles';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 
 // ─── ثوابت ────────────────────────────────────────────────────
 
@@ -112,7 +113,7 @@ function CourseCard({ course, role, user, onDelete, onArchive, onReassign, busy 
                     </button>
                   )}
                   {canDel && (
-                    <button onClick={() => { setActionsOpen(false); onDelete(course.id); }} disabled={busy === course.id}
+                    <button onClick={() => { setActionsOpen(false); onDelete(course.id, course.name); }} disabled={busy === course.id}
                       className="flex w-full items-center gap-2 px-3 py-2 text-xs text-danger hover:bg-burgundy/5">
                       🗑️ حذف
                     </button>
@@ -195,27 +196,27 @@ export default function CoursesPage() {
   }, [courses]);
 
   // إجراءات
-  const handleDelete = async (id) => {
-    if (!confirm('حذف هذه الدورة؟')) return;
+  const handleDelete = async (id, name) => {
+    if (!window.confirm(`حذف الدورة "${name}"؟\nهذا الإجراء لا يمكن التراجع عنه.`)) return;
     setBusyId(id);
-    try { await api.delete(`/courses/${id}`); await load(); }
-    catch (e) { alert(e?.response?.data?.message || 'تعذر الحذف'); }
+    try { await api.delete(`/courses/${id}`); toast.success('تم حذف الدورة'); await load(); }
+    catch (e) { toast.error(e?.response?.data?.message || 'تعذر الحذف'); }
     finally { setBusyId(null); }
   };
 
   const handleArchive = async (id) => {
     setBusyId(id);
-    try { await api.post(`/courses/${id}/archive`); await load(); }
-    catch (e) { alert(e?.response?.data?.message || 'تعذر الأرشفة'); }
+    try { await api.post(`/courses/${id}/archive`); toast.success('تم أرشفة الدورة'); await load(); }
+    catch (e) { toast.error(e?.response?.data?.message || 'تعذر الأرشفة'); }
     finally { setBusyId(null); }
   };
 
   const handleReassign = async (id) => {
-    const uid = prompt('معرّف الموظف الجديد (ID):');
-    if (!uid) return;
+    const uid = window.prompt('معرّف الموظف الجديد (ID):');
+    if (!uid?.trim()) return;
     setBusyId(id);
-    try { await api.put(`/courses/${id}/reassign`, { primaryEmployeeId: uid }); await load(); }
-    catch (e) { alert(e?.response?.data?.message || 'تعذر النقل'); }
+    try { await api.put(`/courses/${id}/reassign`, { primaryEmployeeId: uid.trim() }); toast.success('تم نقل الدورة'); await load(); }
+    catch (e) { toast.error(e?.response?.data?.message || 'تعذر النقل'); }
     finally { setBusyId(null); }
   };
 

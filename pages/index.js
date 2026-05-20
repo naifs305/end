@@ -28,7 +28,6 @@ function fmtDate(v) {
 const STATUS_MAP = {
   DRAFT:            { label: 'مسودة',            cls: 'bg-border/60 text-text-soft' },
   PREPARATION:      { label: 'قيد الإعداد',      cls: 'bg-background text-text-soft border-border' },
-  IN_PROGRESS:      { label: 'قيد التنفيذ',      cls: 'bg-primary-light text-primary' },
   EXECUTION:        { label: 'قيد التنفيذ',      cls: 'bg-primary-light text-primary' },
   AWAITING_CLOSURE: { label: 'بانتظار الإغلاق',  cls: 'bg-sand/20 text-warning border-sand/40' },
   CLOSED:           { label: 'مغلقة',             cls: 'bg-forest-50 text-accent border-accent/20' },

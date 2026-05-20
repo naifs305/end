@@ -10,12 +10,13 @@ import FinancialForm from '../../components/operational/FinancialForm';
 
 // ── ثوابت الحالات ─────────────────────────────────────────────────────
 const STATUS_META = {
-  DRAFT:            { label: 'مسودة',           cls: 'bg-border/60 text-text-soft',              border: '#D7DBDA' },
-  PREPARATION:      { label: 'قيد الإعداد',      cls: 'bg-sand/20 text-warning border-sand/40',   border: '#C3B39F' },
-  IN_PROGRESS:      { label: 'قيد التنفيذ',      cls: 'bg-primary-light text-primary',             border: '#253C32' },
-  AWAITING_CLOSURE: { label: 'بانتظار الإغلاق',  cls: 'bg-sand/30 text-warning border-sand/50',   border: '#8B7D6B' },
-  CLOSED:           { label: 'مغلقة',             cls: 'bg-forest-50 text-primary border-primary/20', border: '#5D8A70' },
-  ARCHIVED:         { label: 'مؤرشفة',            cls: 'bg-border text-text-soft',                border: '#9DA3A1' },
+  DRAFT:            { label: 'مسودة',           cls: 'bg-border/60 text-text-soft',                  border: '#D7DBDA' },
+  PREPARATION:      { label: 'قيد الإعداد',      cls: 'bg-sand/20 text-warning border-sand/40',       border: '#C3B39F' },
+  EXECUTION:        { label: 'قيد التنفيذ',      cls: 'bg-primary-light text-primary border-primary/20', border: '#253C32' },
+  IN_PROGRESS:      { label: 'قيد التنفيذ',      cls: 'bg-primary-light text-primary border-primary/20', border: '#253C32' },
+  AWAITING_CLOSURE: { label: 'بانتظار الإغلاق',  cls: 'bg-sand/30 text-warning border-sand/50',       border: '#8B7D6B' },
+  CLOSED:           { label: 'مغلقة',             cls: 'bg-forest-50 text-accent border-accent/20',    border: '#5D8A70' },
+  ARCHIVED:         { label: 'مؤرشفة',            cls: 'bg-border text-text-soft border-border',       border: '#9DA3A1' },
 };
 
 const EL_STATUS_META = {
