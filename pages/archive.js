@@ -192,7 +192,7 @@ export default function Archive() {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
     doc.setFontSize(16);
-    doc.text(isAdmin ? 'Course Closure Archive' : 'My Course Archive', 14, 15);
+    doc.text(isAdmin ? 'أرشيف الإقفالات' : 'أرشيف دوراتي', 14, 15);
 
     const tableRows = filteredCourses.map((course) => [
       course.name || '-',
@@ -222,7 +222,7 @@ export default function Archive() {
         valign: 'middle',
       },
       headStyles: {
-        fillColor: [0, 108, 109],
+        fillColor: [37, 60, 50],
         textColor: 255,
       },
       alternateRowStyles: {
@@ -237,7 +237,7 @@ export default function Archive() {
   if (!['MANAGER', 'PROJECT_SUPERVISOR', 'EMPLOYEE'].includes(activeRole)) {
     return (
       <MainLayout>
-        <div className="rounded-3xl border border-danger/20 bg-white p-6 text-danger shadow-card">
+        <div className="rounded-2xl border border-danger/20 bg-white p-6 text-danger shadow-card">
           غير مصرح لك بالدخول إلى هذه الصفحة.
         </div>
       </MainLayout>
@@ -250,7 +250,7 @@ export default function Archive() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="rounded-3xl border border-border bg-white p-6 shadow-card">
+        <div className="rounded-2xl border border-border bg-white p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-extrabold text-primary">
@@ -288,7 +288,7 @@ export default function Archive() {
           <StatCard title="خارجية" value={stats.external} />
         </div>
 
-        <div className="rounded-3xl border border-border bg-white p-4 md:p-6 shadow-card">
+        <div className="rounded-2xl border border-border bg-white p-4 md:p-6 shadow-card">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-extrabold text-primary">فلاتر الأرشيف</h2>
             <button
@@ -371,7 +371,7 @@ export default function Archive() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-3xl border border-border bg-white shadow-card">
+        <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
           <div className="border-b border-border p-4">
             <h2 className="text-lg font-extrabold text-primary">
               {isAdmin ? 'سجل الإقفالات' : 'سجل دوراتي المؤرشفة'}
@@ -420,7 +420,7 @@ export default function Archive() {
                             className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
                               course.status === 'ARCHIVED'
                                 ? 'bg-primary-light text-primary'
-                                : 'bg-[#fcf8f1] text-[#8c6b2a]'
+                                : 'bg-primary-light text-primary'
                             }`}
                           >
                             {getStatusLabel(course.status)}
@@ -460,7 +460,7 @@ export default function Archive() {
 
 function StatCard({ title, value }) {
   return (
-    <div className="rounded-3xl border border-border bg-white p-4 shadow-card">
+    <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
       <div className="mb-1 text-sm font-medium text-text-soft">{title}</div>
       <div className="text-2xl font-extrabold text-primary">{value}</div>
     </div>

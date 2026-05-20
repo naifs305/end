@@ -6,530 +6,282 @@ import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
 
-const initialForm = {
-  title: '',
+// ── أدوات ──────────────────────────────────────────────────────
+function fmtDate(date) {
+  if (!date) return '';
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+const EMPTY = {
+  name:'', code:'', beneficiaryEntity:'', city:'', locationType:'',
+  startDate:'', endDate:'', numTrainees:'',
   operationalProjectId: '',
-  locationType: '',
-  city: '',
-  startDate: '',
-  endDate: '',
-  traineesCount: '',
-  requiresAdvance: false,
-  requiresAdvanceSettlement: false,
-  requiresMaterialReturn: false,
-  requiresCoordinatorCompensation: false,
-  requiresTrainerCompensation: false,
+  requiresAdvance:false, requiresAdvanceSettlement:false,
+  requiresRevenue:false, materialsIssued:false,
+  requiresSupervisorCompensation:false, requiresTrainerCompensation:false,
+  requiresPreTest:false, requiresPostTest:false,
 };
 
-const locationTypeOptions = [
-  { value: 'INTERNAL', label: 'داخلي' },
-  { value: 'EXTERNAL', label: 'خارجي' },
-  { value: 'REMOTE', label: 'عن بُعد' },
-];
-
-function inferCourseType(locationType) {
-  return locationType === 'INTERNAL' ? 'internal' : 'external';
-}
-
-function formatDateForApi(date) {
-  if (!date) return '';
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-const DateRangeInput = forwardRef(function DateRangeInput(
-  { startDate, endDate, onClear, onClick },
-  ref,
-) {
+// ── مدخل DatePicker مخصص ──────────────────────────────────────
+const DateInput = forwardRef(function DateInput({ startDate, endDate, onClick, onClear }, ref) {
   return (
-    <div className="w-full">
-      <button
-        type="button"
-        ref={ref}
-        onClick={onClick}
-        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-right transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="text-lg text-slate-400">📅</div>
-
-            <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="mb-1 text-xs font-medium text-slate-500">تاريخ البداية</div>
-                <div className="truncate text-sm font-semibold text-slate-900">
-                  {startDate || 'اختر تاريخ البداية'}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="mb-1 text-xs font-medium text-slate-500">تاريخ النهاية</div>
-                <div className="truncate text-sm font-semibold text-slate-900">
-                  {endDate || 'اختر تاريخ النهاية'}
-                </div>
-              </div>
-            </div>
+    <button type="button" ref={ref} onClick={onClick}
+      className="w-full rounded-xl border border-border bg-white px-4 py-3 text-right text-sm outline-none hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/10">
+      <div className="flex items-center gap-3">
+        <span className="text-text-soft">📅</span>
+        <div className="grid flex-1 grid-cols-2 gap-2">
+          <div className="rounded-lg bg-background px-3 py-2">
+            <div className="text-[10px] text-text-soft">من</div>
+            <div className="font-bold text-text-main">{startDate || '—'}</div>
           </div>
-
-          {(startDate || endDate) && (
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onClear();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onClear();
-                }
-              }}
-              className="shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
-            >
-              مسح
-            </span>
-          )}
+          <div className="rounded-lg bg-background px-3 py-2">
+            <div className="text-[10px] text-text-soft">إلى</div>
+            <div className="font-bold text-text-main">{endDate || '—'}</div>
+          </div>
         </div>
-      </button>
-    </div>
+        {(startDate || endDate) && (
+          <button type="button" onClick={e=>{e.stopPropagation();onClear();}}
+            className="shrink-0 rounded-lg border border-border px-2 py-1 text-[10px] text-text-soft hover:bg-background">✕</button>
+        )}
+      </div>
+    </button>
   );
 });
 
-export default function CreateCoursePage() {
-  const router = useRouter();
-  const { user, loading } = useAuth();
-
-  const [form, setForm] = useState(initialForm);
-  const [projects, setProjects] = useState([]);
-  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-
-  const startDateObj = form.startDate ? new Date(form.startDate) : null;
-  const endDateObj = form.endDate ? new Date(form.endDate) : null;
-
-  useEffect(() => {
-    const loadProjects = async () => {
-      try {
-        setIsLoadingProjects(true);
-        const res = await api.get('/projects');
-
-        const items = Array.isArray(res.data)
-          ? res.data
-          : Array.isArray(res.data?.data)
-          ? res.data.data
-          : [];
-
-        setProjects(items);
-
-        if (items.length > 0) {
-          setForm((prev) => ({
-            ...prev,
-            operationalProjectId: prev.operationalProjectId || items[0].id,
-          }));
-        }
-      } catch (error) {
-        console.error('Failed to load projects: - create.js:132', error);
-        toast.error('تعذر تحميل المشاريع التشغيلية');
-      } finally {
-        setIsLoadingProjects(false);
-      }
-    };
-
-    loadProjects();
-  }, []);
-
-  const canSubmit = useMemo(() => {
-    return (
-      form.title.trim() &&
-      form.operationalProjectId &&
-      form.locationType &&
-      form.city.trim() &&
-      form.startDate &&
-      form.endDate &&
-      form.traineesCount &&
-      Number(form.traineesCount) > 0 &&
-      user?.id
-    );
-  }, [form, user]);
-
-  const handleChange = (key, value) => {
-    setForm((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  const handleDateRangeChange = (dates) => {
-    const [start, end] = dates;
-
-    setForm((prev) => ({
-      ...prev,
-      startDate: start ? formatDateForApi(start) : '',
-      endDate: end ? formatDateForApi(end) : '',
-    }));
-
-    if (start && end) {
-      setTimeout(() => {
-        setIsDatePickerOpen(false);
-      }, 50);
-    }
-  };
-
-  const clearDateRange = () => {
-    setForm((prev) => ({
-      ...prev,
-      startDate: '',
-      endDate: '',
-    }));
-    setIsDatePickerOpen(false);
-  };
-
-  const normalizePayload = () => {
-    return {
-      name: form.title.trim(),
-      city: form.city.trim(),
-      locationType: form.locationType,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      numTrainees: Number(form.traineesCount),
-      operationalProjectId: form.operationalProjectId,
-      primaryEmployeeId: user?.id,
-      supportingEmployeeIds: [],
-      courseType: inferCourseType(form.locationType),
-      requiresAdvance: form.requiresAdvance,
-      requiresRevenue: false,
-      materialsIssued: form.requiresMaterialReturn,
-      requiresAdvanceSettlement: form.requiresAdvanceSettlement,
-      requiresSupervisorCompensation: form.requiresCoordinatorCompensation,
-      requiresTrainerCompensation: form.requiresTrainerCompensation,
-    };
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!canSubmit) {
-      toast.error('أكمل الحقول المطلوبة أولًا');
-      return;
-    }
-
-    if (new Date(form.endDate) < new Date(form.startDate)) {
-      toast.error('تاريخ النهاية يجب أن يكون بعد أو مساويًا لتاريخ البداية');
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      const payload = normalizePayload();
-      const res = await api.post('/courses', payload);
-
-      toast.success('تم إنشاء الدورة بنجاح');
-
-      const createdId =
-        res?.data?.id ||
-        res?.data?.data?.id ||
-        res?.data?.course?.id;
-
-      if (createdId) {
-        router.push(`/courses/${createdId}`);
-        return;
-      }
-
-      router.push('/courses');
-    } catch (error) {
-      console.error('Create course failed: - create.js:241', error);
-      toast.error(error?.response?.data?.message || 'تعذر إنشاء الدورة');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <MainLayout>
-        <div className="p-6 text-right">جاري التحميل...</div>
-      </MainLayout>
-    );
-  }
-
-  if (!user) return null;
-
+// ── toggle ────────────────────────────────────────────────────
+function Toggle({ label, desc, checked, onChange, critical }) {
   return (
-    <MainLayout>
-      <div className="min-h-screen bg-slate-50" dir="rtl">
-        <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h1 className="text-2xl font-bold text-slate-900">إنشاء دورة جديدة</h1>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-5">
-                <h2 className="text-lg font-bold text-slate-900">البيانات الأساسية</h2>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Field
-                  label="عنوان الدورة"
-                  required
-                  value={form.title}
-                  onChange={(value) => handleChange('title', value)}
-                  placeholder="مثال: التفتيش الأمني"
-                  className="md:col-span-2"
-                />
-
-                <SelectField
-                  label="مقر التنفيذ"
-                  required
-                  value={form.locationType}
-                  onChange={(value) => handleChange('locationType', value)}
-                  options={locationTypeOptions}
-                />
-
-                <Field
-                  label="المدينة"
-                  required
-                  value={form.city}
-                  onChange={(value) => handleChange('city', value)}
-                  placeholder="مثال: الرياض"
-                />
-
-                <DateRangeField
-                  startDate={startDateObj}
-                  endDate={endDateObj}
-                  startDateValue={form.startDate}
-                  endDateValue={form.endDate}
-                  isOpen={isDatePickerOpen}
-                  setIsOpen={setIsDatePickerOpen}
-                  onChange={handleDateRangeChange}
-                  onClear={clearDateRange}
-                />
-
-                <Field
-                  label="عدد المتدربين"
-                  required
-                  type="number"
-                  min="1"
-                  value={form.traineesCount}
-                  onChange={(value) => handleChange('traineesCount', value)}
-                  placeholder="مثال: 25"
-                />
-
-                <SelectField
-                  label="المشروع التشغيلي"
-                  required
-                  value={form.operationalProjectId}
-                  onChange={(value) => handleChange('operationalProjectId', value)}
-                  disabled={isLoadingProjects}
-                  options={projects.map((project) => ({
-                    value: project.id,
-                    label: project.name,
-                  }))}
-                />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-5">
-                <h2 className="text-lg font-bold text-slate-900">الإعدادات التشغيلية</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  هذه الخيارات تتحكم في العناصر التشغيلية المشروطة داخل الدورة
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <CheckboxField
-                  label="يتطلب سلفة"
-                  checked={form.requiresAdvance}
-                  onChange={(checked) => handleChange('requiresAdvance', checked)}
-                />
-
-                <CheckboxField
-                  label="يتطلب تسوية سلفة"
-                  checked={form.requiresAdvanceSettlement}
-                  onChange={(checked) =>
-                    handleChange('requiresAdvanceSettlement', checked)
-                  }
-                />
-
-                <CheckboxField
-                  label="يتطلب إعادة مواد تدريبية"
-                  checked={form.requiresMaterialReturn}
-                  onChange={(checked) =>
-                    handleChange('requiresMaterialReturn', checked)
-                  }
-                />
-
-                <CheckboxField
-                  label="يتطلب مستحقات منسق"
-                  checked={form.requiresCoordinatorCompensation}
-                  onChange={(checked) =>
-                    handleChange('requiresCoordinatorCompensation', checked)
-                  }
-                />
-
-                <CheckboxField
-                  label="يتطلب مستحقات مدرب"
-                  checked={form.requiresTrainerCompensation}
-                  onChange={(checked) =>
-                    handleChange('requiresTrainerCompensation', checked)
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="sticky bottom-4 z-10">
-              <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
-                <div className="flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => router.push('/courses')}
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                  >
-                    إلغاء
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={!canSubmit || isSubmitting}
-                    className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSubmitting ? 'جاري الإنشاء...' : 'إنشاء الدورة'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </form>
+    <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition
+      ${checked ? 'border-primary/30 bg-primary-light/50' : 'border-border bg-background hover:border-primary/20'}
+      ${critical ? 'ring-1 ring-primary/20' : ''}`}>
+      <button type="button" onClick={() => onChange(!checked)}
+        className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors duration-200 focus:outline-none
+          ${checked ? 'bg-primary' : 'bg-forest-200'}`}>
+        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200
+          ${checked ? 'translate-x-[-1px] rtl:translate-x-4' : 'translate-x-[-1px] rtl:translate-x-0.5'}`} />
+      </button>
+      <div>
+        <div className={`text-sm font-bold ${checked ? 'text-primary' : 'text-text-main'}`}>
+          {label} {critical && <span className="text-xs text-sand font-normal">⭐ حرج</span>}
         </div>
+        {desc && <div className="mt-0.5 text-[11px] text-text-soft">{desc}</div>}
       </div>
-    </MainLayout>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  required,
-  type = 'text',
-  min,
-  className = '',
-}) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="mb-2 flex items-center gap-1 text-sm font-medium text-slate-700">
-        {label}
-        {required ? <span className="text-red-500">*</span> : null}
-      </span>
-
-      <input
-        type={type}
-        min={min}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-      />
     </label>
   );
 }
 
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-  required,
-  disabled = false,
-}) {
+// ── صف حقل ───────────────────────────────────────────────────
+function Field({ label, required, children, span2 }) {
   return (
-    <label className="block">
-      <span className="mb-2 flex items-center gap-1 text-sm font-medium text-slate-700">
-        {label}
-        {required ? <span className="text-red-500">*</span> : null}
-      </span>
-
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:bg-slate-100"
-      >
-        <option value="">
-          {label === 'المشروع التشغيلي' ? 'اختر المشروع التشغيلي' : 'اختر مقر التنفيذ'}
-        </option>
-
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function DateRangeField({
-  startDate,
-  endDate,
-  startDateValue,
-  endDateValue,
-  isOpen,
-  setIsOpen,
-  onChange,
-  onClear,
-}) {
-  return (
-    <div className="md:col-span-2">
-      <span className="mb-2 flex items-center gap-1 text-sm font-medium text-slate-700">
-        تاريخ الدورة
-        <span className="text-red-500">*</span>
-      </span>
-
-      <DatePicker
-        selected={startDate}
-        onChange={onChange}
-        startDate={startDate}
-        endDate={endDate}
-        selectsRange
-        open={isOpen}
-        onInputClick={() => setIsOpen(true)}
-        onClickOutside={() => setIsOpen(false)}
-        shouldCloseOnSelect={false}
-        monthsShown={2}
-        popperPlacement="bottom-start"
-        dateFormat="yyyy-MM-dd"
-        placeholderText="اختر تاريخ البداية والنهاية"
-        calendarClassName="border border-slate-200 rounded-xl shadow-xl"
-        wrapperClassName="w-full"
-        customInput={
-          <DateRangeInput
-            startDate={startDateValue}
-            endDate={endDateValue}
-            onClear={onClear}
-          />
-        }
-      />
+    <div className={span2 ? 'md:col-span-2' : ''}>
+      <label className="mb-1.5 block text-xs font-bold text-text-main">
+        {label} {required && <span className="text-danger">*</span>}
+      </label>
+      {children}
     </div>
   );
 }
 
-function CheckboxField({ label, checked, onChange }) {
+const inputCls = 'w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10';
+
+// ── الصفحة ───────────────────────────────────────────────────
+export default function CreateCoursePage() {
+  const router  = useRouter();
+  const { user, loading } = useAuth();
+  const [form,     setForm]     = useState(EMPTY);
+  const [projects, setProjects] = useState([]);
+  const [dateOpen, setDateOpen] = useState(false);
+  const [saving,   setSaving]   = useState(false);
+
+  useEffect(() => {
+    api.get('/projects').then(r => {
+      const d = Array.isArray(r.data) ? r.data : r.data?.data || [];
+      setProjects(d);
+      if (d.length) setForm(p => ({ ...p, operationalProjectId: p.operationalProjectId || d[0].id }));
+    }).catch(() => toast.error('تعذر تحميل المشاريع'));
+  }, []);
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const toggle = k => setForm(p => ({ ...p, [k]: !p[k] }));
+
+  const canSubmit = useMemo(() =>
+    form.name.trim() && form.operationalProjectId && form.locationType &&
+    form.city.trim() && form.startDate && form.endDate &&
+    form.numTrainees && Number(form.numTrainees) > 0,
+  [form]);
+
+  const handleSubmit = async e => {
+    e.preventDefault();
+    if (!canSubmit) { toast.error('أكمل الحقول المطلوبة'); return; }
+    if (new Date(form.endDate) < new Date(form.startDate)) {
+      toast.error('تاريخ النهاية يجب أن يكون بعد تاريخ البداية'); return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        name: form.name.trim(),
+        code: form.code.trim() || undefined,
+        beneficiaryEntity: form.beneficiaryEntity.trim() || undefined,
+        city: form.city.trim(),
+        locationType: form.locationType,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        numTrainees: Number(form.numTrainees),
+        operationalProjectId: form.operationalProjectId,
+        primaryEmployeeId: user.id,
+        courseType: form.locationType === 'INTERNAL' ? 'internal' : 'external',
+        requiresAdvance:               form.requiresAdvance,
+        requiresAdvanceSettlement:     form.requiresAdvanceSettlement,
+        requiresRevenue:               form.requiresRevenue,
+        materialsIssued:               form.materialsIssued,
+        requiresSupervisorCompensation:form.requiresSupervisorCompensation,
+        requiresTrainerCompensation:   form.requiresTrainerCompensation,
+        requiresPreTest:               form.requiresPreTest,
+        requiresPostTest:              form.requiresPostTest,
+      };
+      const res = await api.post('/courses', payload);
+      toast.success('تم إنشاء الدورة ✓');
+      const id = res?.data?.id || res?.data?.data?.id;
+      router.push(id ? `/courses/${id}` : '/courses');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'تعذر إنشاء الدورة');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="h-8 w-8 animate-spin rounded-full border-3 border-primary border-t-transparent" />
+    </div>
+  );
+  if (!user) return null;
+
+  const sDate = form.startDate ? new Date(form.startDate) : null;
+  const eDate = form.endDate   ? new Date(form.endDate)   : null;
+
   return (
-    <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 transition hover:border-slate-300">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-slate-300"
-      />
-      <span className="text-sm font-medium text-slate-700">{label}</span>
-    </label>
+    <MainLayout>
+      <div className="mx-auto max-w-2xl space-y-5">
+
+        {/* رأس */}
+        <div className="rounded-2xl border border-border bg-white px-5 py-4 shadow-card">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-extrabold text-primary">إنشاء دورة تدريبية</h1>
+              <p className="mt-0.5 text-xs text-text-soft">أدخل بيانات الدورة وحدد الإعدادات التشغيلية</p>
+            </div>
+            <button onClick={() => router.push('/courses')} type="button"
+              className="rounded-xl border border-border px-3 py-2 text-sm text-text-soft hover:bg-background">
+              ← رجوع
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* البيانات الأساسية */}
+          <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
+            <h2 className="mb-4 font-extrabold text-text-main">📋 البيانات الأساسية</h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field label="اسم الدورة" required span2>
+                <input value={form.name} onChange={e=>set('name',e.target.value)} required
+                  placeholder="مثال: أساليب التفتيش الأمني"
+                  className={inputCls} />
+              </Field>
+              <Field label="كود الدورة">
+                <input value={form.code} onChange={e=>set('code',e.target.value)}
+                  placeholder="مثال: SEC-101 (اختياري)"
+                  className={inputCls} />
+              </Field>
+              <Field label="الجهة المستفيدة">
+                <input value={form.beneficiaryEntity} onChange={e=>set('beneficiaryEntity',e.target.value)}
+                  placeholder="اسم الجهة المستفيدة (اختياري)"
+                  className={inputCls} />
+              </Field>
+              <Field label="مقر التنفيذ" required>
+                <select value={form.locationType} onChange={e=>set('locationType',e.target.value)} required className={inputCls}>
+                  <option value="">اختر مقر التنفيذ</option>
+                  <option value="INTERNAL">داخلي</option>
+                  <option value="EXTERNAL">خارجي</option>
+                  <option value="REMOTE">عن بُعد</option>
+                </select>
+              </Field>
+              <Field label="المدينة" required>
+                <input value={form.city} onChange={e=>set('city',e.target.value)} required
+                  placeholder="مثال: الرياض"
+                  className={inputCls} />
+              </Field>
+              <Field label="المشروع التشغيلي" required>
+                <select value={form.operationalProjectId} onChange={e=>set('operationalProjectId',e.target.value)} required className={inputCls}>
+                  <option value="">اختر المشروع</option>
+                  {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </Field>
+              <Field label="تاريخ الدورة (بداية - نهاية)" required span2>
+                <DatePicker
+                  selected={sDate} onChange={([s,e])=>{ set('startDate',fmtDate(s)); set('endDate',fmtDate(e)); if(s&&e) setTimeout(()=>setDateOpen(false),60); }}
+                  startDate={sDate} endDate={eDate} selectsRange
+                  open={dateOpen} onInputClick={()=>setDateOpen(true)} onClickOutside={()=>setDateOpen(false)}
+                  shouldCloseOnSelect={false} monthsShown={2} dateFormat="yyyy-MM-dd"
+                  customInput={<DateInput startDate={form.startDate} endDate={form.endDate} onClear={()=>{set('startDate','');set('endDate','');}} />}
+                />
+              </Field>
+              <Field label="عدد المتدربين" required>
+                <input type="number" min="1" value={form.numTrainees} onChange={e=>set('numTrainees',e.target.value)} required
+                  placeholder="مثال: 25"
+                  className={inputCls} />
+              </Field>
+            </div>
+          </div>
+
+          {/* الإعدادات التشغيلية */}
+          <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
+            <h2 className="mb-1 font-extrabold text-text-main">⚙️ الإعدادات التشغيلية</h2>
+            <p className="mb-4 text-xs text-text-soft">تحدد العناصر المطلوبة لإقفال الدورة — عناصر ⭐ حرجة تؤثر مباشرة في مؤشرات الأداء</p>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              <Toggle label="يتطلب سلفة مؤقتة" desc="طلب السلفة قبل الدورة"
+                checked={form.requiresAdvance} onChange={v=>set('requiresAdvance',v)} />
+              <Toggle label="يتطلب تسوية سلفة" desc="تسوية السلفة بعد الدورة" critical
+                checked={form.requiresAdvanceSettlement} onChange={v=>set('requiresAdvanceSettlement',v)} />
+              <Toggle label="يدر إيرادات مالية" desc="رفع الإيرادات بعد الدورة"
+                checked={form.requiresRevenue} onChange={v=>set('requiresRevenue',v)} />
+              <Toggle label="صُرفت مواد تدريبية" desc="إعادة المواد بعد الدورة"
+                checked={form.materialsIssued} onChange={v=>set('materialsIssued',v)} />
+              <Toggle label="مستحقات مشرف المشروع" desc="رفع مستحقات المشرف" critical
+                checked={form.requiresSupervisorCompensation} onChange={v=>set('requiresSupervisorCompensation',v)} />
+              <Toggle label="مستحقات المدرب" desc="رفع مستحقات المدرب" critical
+                checked={form.requiresTrainerCompensation} onChange={v=>set('requiresTrainerCompensation',v)} />
+              <Toggle label="يشتمل على اختبار قبلي" desc="تقديم الاختبار القبلي للمتدربين"
+                checked={form.requiresPreTest} onChange={v=>set('requiresPreTest',v)} />
+              <Toggle label="يشتمل على اختبار بعدي" desc="تقديم الاختبار البعدي للمتدربين"
+                checked={form.requiresPostTest} onChange={v=>set('requiresPostTest',v)} />
+            </div>
+          </div>
+
+          {/* أزرار الحفظ */}
+          <div className="sticky bottom-4 z-10">
+            <div className="rounded-2xl border border-border bg-white/95 p-4 shadow-deep backdrop-blur">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-text-soft">
+                  {canSubmit ? '✓ البيانات مكتملة — جاهز للإنشاء' : 'أكمل الحقول المطلوبة *'}
+                </p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={()=>router.push('/courses')}
+                    className="rounded-xl border border-border px-5 py-2.5 text-sm font-bold text-text-main hover:bg-background">
+                    إلغاء
+                  </button>
+                  <button type="submit" disabled={!canSubmit||saving}
+                    className="rounded-xl bg-primary px-6 py-2.5 text-sm font-extrabold text-white hover:bg-primary-dark disabled:opacity-50">
+                    {saving ? 'جاري الإنشاء...' : '+ إنشاء الدورة'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </form>
+      </div>
+    </MainLayout>
   );
 }

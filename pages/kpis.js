@@ -644,11 +644,98 @@ export default function KpisPage() {
           </div>
         )}
 
+        {/* ─── تقرير أداء المشرفين ─── */}
+        {isManager && <SupervisorReport periodLabel={periodLabel} />}
+
         {/* ─── سجل الإسناد (مخفي) ─── */}
         {isManager && <AssignmentSection periodLabel={periodLabel} year={year} month={month} />}
 
       </div>
     </MainLayout>
+  );
+}
+
+// ─── تقرير أداء المشرفين ─────────────────────────────────────
+
+function SupervisorReport({ periodLabel }) {
+  const [data, setData]   = useState([]);
+  const [show, setShow]   = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!show) return;
+    setLoading(true);
+    api.get('/kpis/supervisor-performance', { params: { periodType:'MONTHLY', periodLabel } })
+      .then(r => setData(r.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [show, periodLabel]);
+
+  const RESP_COLOR = { 'سريع جداً':'text-success bg-forest-50 border-forest-200', 'مقبول':'text-primary bg-primary-light border-primary/20', 'بطيء':'text-warning bg-sand/20 border-sand/50', 'متأخر':'text-danger bg-burgundy/10 border-burgundy/30' };
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-forest-200 bg-white shadow-card">
+      <button onClick={()=>setShow(v=>!v)}
+        className="flex w-full items-center justify-between px-5 py-3.5 hover:bg-background transition">
+        <div className="flex items-center gap-2">
+          <span className="text-base">👑</span>
+          <div className="text-right">
+            <h4 className="text-sm font-extrabold text-text-main">تقرير أداء المشرفين</h4>
+            <p className="text-[10px] text-text-soft">سرعة البت + معدل الاعتماد — للمدير فقط</p>
+          </div>
+        </div>
+        <span className="text-xs text-text-soft">{show ? '▲ إخفاء' : '▼ إظهار'}</span>
+      </button>
+      {show && (
+        <div className="border-t border-border">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-text-soft text-sm">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              جاري التحميل...
+            </div>
+          ) : !data.length ? (
+            <div className="py-8 text-center text-sm text-text-soft">لا توجد بيانات بت لهذه الفترة</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead className="bg-background text-text-soft">
+                  <tr>
+                    {['المشرف','إجمالي البت','معتمد','مُعاد','مرفوض','معدل الاعتماد','متوسط وقت البت','التقييم'].map(h=>(
+                      <th key={h} className="px-3 py-2 text-right font-bold">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {data.map(s=>(
+                    <tr key={s.userId} className="hover:bg-background">
+                      <td className="px-3 py-2 font-bold text-text-main">{s.name}</td>
+                      <td className="px-3 py-2 text-center font-extrabold text-primary">{s.totalDecisions}</td>
+                      <td className="px-3 py-2 text-center text-success font-bold">{s.approved}</td>
+                      <td className="px-3 py-2 text-center text-warning">{s.returned}</td>
+                      <td className="px-3 py-2 text-center text-danger">{s.rejected}</td>
+                      <td className="px-3 py-2">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-forest-100">
+                          <div className="h-full rounded-full bg-accent transition-all" style={{width:`${s.approvalRate}%`}} />
+                        </div>
+                        <span className="text-[10px] font-bold">{s.approvalRate}%</span>
+                      </td>
+                      <td className="px-3 py-2 font-bold text-text-main">
+                        {s.avgResponseHours != null ? `${s.avgResponseHours} ساعة` : '-'}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`rounded-full border px-2 py-0.5 font-bold ${RESP_COLOR[s.responsiveness]||'bg-background text-text-soft border-border'}`}>
+                          {s.responsiveness}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
