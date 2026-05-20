@@ -462,18 +462,21 @@ export default function KpisPage() {
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()+1;
 
   // إحصائيات
+  // تقسيم الموظفين: نشطون (لديهم دورات) وغير نشطين
+  const activeSnaps   = useMemo(() => snapshots.filter(x => x.isSubjectToEvaluation), [snapshots]);
+  const inactiveSnaps = useMemo(() => snapshots.filter(x => !x.isSubjectToEvaluation), [snapshots]);
+
   const stats = useMemo(() => {
-    const s = snapshots.filter(x => x.isSubjectToEvaluation);
     const counts = {};
-    for (const key of Object.keys(LEVEL_CFG)) counts[key] = s.filter(x => x.performanceLevel === key).length;
-    const avg = s.length ? s.reduce((a,x) => a + Number(x.finalScoreDisplay ?? x.finalScore ?? 0), 0) / s.length : 0;
-    return { counts, avg, total: s.length, noData: snapshots.filter(x => !x.isSubjectToEvaluation).length };
-  }, [snapshots]);
+    for (const key of Object.keys(LEVEL_CFG)) counts[key] = activeSnaps.filter(x => x.performanceLevel === key).length;
+    const avg = activeSnaps.length ? activeSnaps.reduce((a,x) => a + Number(x.finalScoreDisplay ?? x.finalScore ?? 0), 0) / activeSnaps.length : 0;
+    return { counts, avg, total: activeSnaps.length, noData: inactiveSnaps.length };
+  }, [activeSnaps, inactiveSnaps]);
 
   const teamBarData = useMemo(() =>
-    snapshots.filter(s => s.isSubjectToEvaluation && s.finalScoreDisplay != null)
+    activeSnaps.filter(s => s.finalScoreDisplay != null)
       .map(s => ({ name: `${s.user?.firstName||''} ${s.user?.lastName||''}`.trim(), score: Number(s.finalScoreDisplay||s.finalScore||0) })),
-  [snapshots]);
+  [activeSnaps]);
 
   return (
     <MainLayout>
@@ -571,10 +574,10 @@ export default function KpisPage() {
           </div>
         )}
 
-        {/* ─── شبكة بطاقات الموظفين ─── */}
-        {!loading && snapshots.length > 0 && (
+        {/* ─── شبكة بطاقات الموظفين النشطين ─── */}
+        {!loading && activeSnaps.length > 0 && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {snapshots.map((snap, idx) => {
+            {activeSnaps.map((snap, idx) => {
               const uid = snap.userId;
               const isSelected = selectedId === uid;
               return (
@@ -597,6 +600,32 @@ export default function KpisPage() {
               );
             })}
           </div>
+        )}
+
+        {/* ─── موظفون بدون دورات في هذه الفترة ─── */}
+        {!loading && inactiveSnaps.length > 0 && (
+          <details className="overflow-hidden rounded-2xl border border-dashed border-forest-200 bg-forest-50/30">
+            <summary className="cursor-pointer px-5 py-3 text-sm font-bold text-text-soft hover:text-primary list-none flex items-center justify-between">
+              <span>⏸ موظفون بدون نشاط في {AR_MONTHS[month-1]} {year} ({inactiveSnaps.length} موظف)</span>
+              <span className="text-xs">▼ عرض</span>
+            </summary>
+            <div className="border-t border-forest-100 px-5 py-3">
+              <p className="mb-3 text-xs text-text-soft">هؤلاء الموظفون لا تُحسَب لهم مؤشرات هذه الفترة لأن دوراتهم تقع خارج نطاقها الزمني.</p>
+              <div className="flex flex-wrap gap-2">
+                {inactiveSnaps.map(s => (
+                  <div key={s.userId} className="flex items-center gap-2 rounded-xl border border-forest-100 bg-white px-3 py-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-forest-100 text-[11px] font-bold text-forest-600">
+                      {s.user?.firstName?.[0]}{s.user?.lastName?.[0]}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-text-main">{s.user?.firstName} {s.user?.lastName}</p>
+                      <p className="text-[10px] text-text-soft">{s.user?.operationalProject?.name || '-'}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </details>
         )}
 
         {/* ─── التفاصيل في الشاشات الكبيرة ─── */}

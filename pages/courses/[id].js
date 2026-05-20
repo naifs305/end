@@ -311,10 +311,13 @@ export default function CourseDetail() {
             </div>
           )}
 
-          {/* تاريخ التقديم */}
+          {/* تاريخ التقديم + من قدّم */}
           {el.executionAt && (
-            <div className="text-xs font-medium text-primary">
-              تم التقديم: {formatDateTime(el.executionAt)}
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <span className="font-medium text-primary">تم التقديم: {formatDateTime(el.executionAt)}</span>
+              {el.executor && (
+                <span className="text-text-soft">بواسطة: <strong className="text-text-main">{el.executor.firstName} {el.executor.lastName}</strong></span>
+              )}
             </div>
           )}
 
