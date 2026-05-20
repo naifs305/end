@@ -170,9 +170,11 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary-dark disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary-dark disabled:opacity-50 transition"
             >
-              {loading ? '...' : 'تقديم'}
+              {loading
+                ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> جاري الرفع...</>
+                : element.status === 'RETURNED' ? '↩ إعادة تقديم' : '📤 رفع للاعتماد'}
             </button>
 
             {/* زر إضافة مبرر — مخفي بالافتراض */}
@@ -206,7 +208,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
           <button
             onClick={handleWithdraw}
             disabled={loading || reminding}
-            className="rounded-xl bg-warning px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+            className="rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-xs font-bold text-warning hover:bg-sand/20 disabled:opacity-50 transition"
           >
             سحب التقديم
           </button>
@@ -215,7 +217,9 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
             disabled={loading || reminding}
             className="rounded-xl border border-primary bg-white px-3 py-2 text-xs font-bold text-primary hover:bg-primary-light disabled:opacity-50"
           >
-            {reminding ? '...' : 'تذكير المشرف'}
+            {reminding
+              ? <span className="flex items-center gap-1"><span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" /> إرسال...</span>
+              : '🔔 تذكير المشرف'}
           </button>
         </div>
       )}

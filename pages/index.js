@@ -179,7 +179,14 @@ export default function Home() {
     );
   }
 
-  if (!user || !dash) return null;
+  if (!user) return null;
+  if (!dash) return (
+    <MainLayout>
+      <div className="rounded-2xl border border-border bg-white p-10 text-center shadow-card">
+        <p className="text-text-soft text-sm">تعذر تحميل بيانات لوحة التحكم</p>
+      </div>
+    </MainLayout>
+  );
 
   const now     = new Date();
   const month   = now.toLocaleString('ar-SA', { month: 'long' });
