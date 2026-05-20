@@ -206,7 +206,7 @@ export default function ProjectsPage() {
                         <div>
                           <h4 className="mb-2 text-xs font-extrabold uppercase text-text-soft">مشرف المشروع</h4>
                           {supervisorUser ? (
-                            <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-3 py-2">
+                            <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary-light px-3 py-2">
                               <div>
                                 <p className="font-bold text-sm text-primary">{supervisorUser.firstName} {supervisorUser.lastName}</p>
                                 <p className="text-xs text-text-soft">{supervisorUser.email}</p>
@@ -242,7 +242,7 @@ export default function ProjectsPage() {
                                   </div>
                                   <span className="text-xs text-text-main flex-1">{m.firstName} {m.lastName}</span>
                                   {m.roles?.includes('PROJECT_SUPERVISOR') && (
-                                    <span className="text-[9px] rounded-full bg-blue-100 text-blue-700 px-1.5 py-0.5 font-bold">مشرف</span>
+                                    <span className="text-[9px] rounded-full bg-primary-light text-primary border border-primary/20 px-1.5 py-0.5 font-bold">مشرف</span>
                                   )}
                                   {!m.isActive && (
                                     <span className="text-[9px] rounded-full bg-burgundy/10 text-danger px-1.5 py-0.5 font-bold">معطل</span>

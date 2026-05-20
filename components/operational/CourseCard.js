@@ -1,24 +1,31 @@
 import Link from 'next/link';
 
+const STATUS_CFG = {
+  DRAFT:            { label: 'مسودة',            cls: 'bg-background text-text-soft border-border' },
+  PREPARATION:      { label: 'قيد الإعداد',       cls: 'bg-background text-text-soft border-border' },
+  IN_PROGRESS:      { label: 'قيد التنفيذ',       cls: 'bg-primary-light text-primary border-primary/20' },
+  EXECUTION:        { label: 'قيد التنفيذ',       cls: 'bg-primary-light text-primary border-primary/20' },
+  AWAITING_CLOSURE: { label: 'بانتظار الإغلاق',   cls: 'bg-sand/20 text-warning border-sand/40' },
+  CLOSED:           { label: 'مغلقة',              cls: 'bg-forest-50 text-accent border-accent/20' },
+  ARCHIVED:         { label: 'مؤرشفة',             cls: 'bg-border/60 text-text-soft border-border' },
+};
+
 export default function CourseCard({ course }) {
+  const s = STATUS_CFG[course.status] || STATUS_CFG.DRAFT;
+
   return (
     <Link href={`/courses/${course.id}`}>
-      <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition border-t-4 border-primary cursor-pointer flex flex-col h-full">
-          <h3 className="font-bold text-lg mb-2 text-gray-800">{course.name}</h3>
-          <p className="text-sm text-gray-500 mb-2 flex-grow">
-            {course.beneficiaryEntity} - {course.city}
-          </p>
-          <div className="flex justify-between items-center text-xs text-gray-400 mt-4 border-t pt-4">
-            <span>{new Date(course.startDate).toLocaleDateString('ar-SA')}</span>
-            <span className={`px-2 py-1 rounded font-semibold ${
-              course.status === 'CLOSED' ? 'bg-green-100 text-green-700' :
-              course.status === 'ARCHIVED' ? 'bg-gray-200 text-gray-600' :
-              course.status === 'AWAITING_CLOSURE' ? 'bg-yellow-100 text-yellow-700' :
-              'bg-blue-100 text-blue-700'
-            }`}>
-              {course.status.replace(/_/g, ' ')}
-            </span>
-          </div>
+      <div className="flex h-full cursor-pointer flex-col rounded-2xl border border-border border-t-4 border-t-primary bg-white p-4 shadow-card transition hover:shadow-soft hover:-translate-y-0.5">
+        <h3 className="mb-1 font-extrabold text-text-main leading-snug line-clamp-2">{course.name}</h3>
+        <p className="mb-3 text-xs text-text-soft flex-grow">
+          {course.beneficiaryEntity}{course.city ? ` · ${course.city}` : ''}
+        </p>
+        <div className="flex items-center justify-between border-t border-border pt-3 text-xs">
+          <span className="text-text-soft">
+            {new Date(course.startDate).toLocaleDateString('ar-SA', { day: 'numeric', month: 'short' })}
+          </span>
+          <span className={`rounded-full border px-2 py-0.5 font-bold ${s.cls}`}>{s.label}</span>
+        </div>
       </div>
     </Link>
   );

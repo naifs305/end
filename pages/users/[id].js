@@ -115,7 +115,7 @@ export default function EditUser() {
         <div className="rounded-2xl border border-border bg-white px-5 py-4 shadow-card">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-full text-lg font-extrabold text-white ${user.isActive ? 'bg-primary' : 'bg-slate-300'}`}>
+              <div className={`flex h-12 w-12 items-center justify-center rounded-full text-lg font-extrabold text-white ${user.isActive ? 'bg-primary' : 'bg-text-soft/40'}`}>
                 {user.firstName?.[0]}{user.lastName?.[0]}
               </div>
               <div>

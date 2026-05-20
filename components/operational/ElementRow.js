@@ -186,14 +186,14 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
           </div>
 
           {showDelayReason && (
-            <div className="rounded-xl border border-border bg-amber-50/50 p-2">
+            <div className="rounded-xl border border-sand/40 bg-sand/10 p-2">
               <textarea
                 value={delayReason}
                 onChange={(e) => setDelayReason(e.target.value)}
                 rows={2}
                 maxLength={400}
                 placeholder="اكتب مبرراً للتأخر (اختياري — سيظهر للمشرف والمدير)"
-                className="w-full resize-none rounded-lg border border-amber-200 bg-white p-2 text-xs text-text-main outline-none focus:border-primary"
+                className="w-full resize-none rounded-lg border border-sand/30 bg-white p-2 text-xs text-text-main outline-none focus:border-primary"
               />
               <p className="mt-1 text-right text-[10px] text-text-soft">{delayReason.length}/400</p>
             </div>
@@ -227,7 +227,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
             <button
               onClick={handleApprove}
               disabled={loading}
-              className="rounded-xl bg-success px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+              className="rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
             >
               اعتماد ✓
             </button>
@@ -251,7 +251,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
 
           {/* نموذج الإعادة */}
           {showReturnForm && (
-            <div className="rounded-xl border border-warning/30 bg-amber-50 p-2">
+            <div className="rounded-xl border border-sand/40 bg-sand/10 p-2">
               <p className="mb-1 text-xs font-bold text-warning">سبب الإعادة (مطلوب)</p>
               <textarea
                 value={returnReason}
@@ -259,7 +259,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
                 rows={2}
                 maxLength={400}
                 placeholder="وضّح للموظف ما يجب تصحيحه..."
-                className="w-full resize-none rounded-lg border border-amber-300 bg-white p-2 text-xs outline-none focus:border-warning"
+                className="w-full resize-none rounded-lg border border-sand/30 bg-white p-2 text-xs outline-none focus:border-warning"
               />
               <div className="mt-1.5 flex gap-2">
                 <button onClick={handleReturn} disabled={loading}
@@ -276,7 +276,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
 
           {/* نموذج الرفض */}
           {showRejectForm && (
-            <div className="rounded-xl border border-danger/30 bg-red-50 p-2">
+            <div className="rounded-xl border border-burgundy/20 bg-burgundy/5 p-2">
               <p className="mb-1 text-xs font-bold text-danger">سبب الرفض (مطلوب)</p>
               <textarea
                 value={rejectReason}
@@ -284,7 +284,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
                 rows={2}
                 maxLength={400}
                 placeholder="وضّح سبب الرفض النهائي..."
-                className="w-full resize-none rounded-lg border border-red-300 bg-white p-2 text-xs outline-none focus:border-danger"
+                className="w-full resize-none rounded-lg border border-burgundy/20 bg-white p-2 text-xs outline-none focus:border-danger"
               />
               <div className="mt-1.5 flex gap-2">
                 <button onClick={handleReject} disabled={loading}

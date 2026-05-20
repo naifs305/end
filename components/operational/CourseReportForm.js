@@ -147,11 +147,11 @@ function getInitialForm(reportType) {
 function RatingBadgePreview({ value }) {
   if (!value) return null;
   const map = {
-    excellent: 'bg-emerald-50 text-success border-emerald-200',
-    good: 'bg-primary-light text-primary border-primary/20',
-    needs_improvement: 'bg-amber-50 text-warning border-amber-200',
-    weak: 'bg-red-50 text-danger border-danger/20',
-    requires_development: 'bg-[#f7f1e7] text-[#8c6b2a] border-[#e6d4ad]',
+    excellent:            'bg-forest-50 text-accent border-accent/20',
+    good:                 'bg-primary-light text-primary border-primary/20',
+    needs_improvement:    'bg-sand/20 text-warning border-sand/40',
+    weak:                 'bg-burgundy/10 text-danger border-burgundy/20',
+    requires_development: 'bg-sand/10 text-warning border-sand/30',
   };
   const label = ratings.find((r) => r.value === value)?.label || value;
   return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${map[value] || 'bg-background text-text-soft border-border'}`}>{label}</span>;

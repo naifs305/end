@@ -161,7 +161,7 @@ export default function MessagesPage() {
                     key={item.user?.id}
                     type="button"
                     onClick={() => setSelectedUserId(item.user?.id)}
-                    className={`w-full text-right px-4 py-4 border-b border-gray-100 transition ${selected ? 'bg-primary-light' : 'bg-white hover:bg-gray-50'}`}
+                    className={`w-full text-right px-4 py-4 border-b border-border transition ${selected ? 'bg-primary-light' : 'bg-white hover:bg-background'}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -207,13 +207,13 @@ export default function MessagesPage() {
                 loadPage();
                 if (selectedUserId) loadThread(selectedUserId);
               }}
-              className="px-3 py-2 rounded-xl border border-gray-200 text-sm hover:bg-gray-50"
+              className="px-3 py-2 rounded-xl border border-border text-sm hover:bg-background"
             >
               تحديث
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-3 min-h-[320px]">
+          <div className="flex-1 overflow-y-auto p-4 bg-background space-y-3 min-h-[320px]">
             {threadLoading ? (
               <div className="text-sm text-gray-500">جاري تحميل المحادثة...</div>
             ) : !selectedUserId ? (
@@ -246,7 +246,7 @@ export default function MessagesPage() {
                 rows={3}
                 placeholder={selectedUserId ? 'اكتب رسالتك هنا' : 'اختر محادثة أولاً'}
                 disabled={!selectedUserId || sending}
-                className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100"
+                className="flex-1 rounded-2xl border border-border px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:bg-background"
               />
               <button
                 type="submit"

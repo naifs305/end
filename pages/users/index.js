@@ -55,8 +55,8 @@ export default function UserManagement() {
               ['المجموع', stats.total, 'text-primary'],
               ['نشطون', stats.active, 'text-success'],
               ['مديرون', stats.managers, 'text-purple-700'],
-              ['مشرفون', stats.supervisors, 'text-blue-700'],
-              ['منسقون', stats.employees, 'text-slate-600'],
+              ['مشرفون', stats.supervisors, 'text-primary'],
+              ['منسقون', stats.employees,   'text-text-soft'],
             ].map(([l, v, c]) => (
               <div key={l} className="rounded-xl border border-border bg-background px-3 py-1.5 text-center">
                 <div className={`text-lg font-extrabold ${c}`}>{v}</div>

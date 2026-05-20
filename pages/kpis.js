@@ -29,7 +29,7 @@ const AR_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو
 const LEVEL_CFG = {
   OUTSTANDING:      { label:'متميز',         color:'#253C32', bg:'bg-forest-50',    border:'border-forest-400/40', text:'text-primary',      ring:'#253C32' },
   VERY_GOOD:        { label:'جيد جداً',       color:'#394F49', bg:'bg-primary-light',border:'border-forest-400/30', text:'text-forest-500',   ring:'#394F49' },
-  GOOD:             { label:'جيد',           color:'#4B5952', bg:'bg-forest-100',   border:'border-forest-200',    text:'text-slate-g',      ring:'#4B5952' },
+  GOOD:             { label:'جيد',           color:'#4B5952', bg:'bg-forest-100',   border:'border-forest-200',    text:'text-text-main',    ring:'#4B5952' },
   NEEDS_IMPROVEMENT:{ label:'يحتاج تحسين',   color:'#8B7D6B', bg:'bg-sand/20',      border:'border-sand/50',       text:'text-warning',      ring:'#C3B39F' },
   WEAK:             { label:'ضعيف',          color:'#633646', bg:'bg-burgundy/10',  border:'border-burgundy/30',   text:'text-danger',       ring:'#633646' },
 };

@@ -1,25 +1,27 @@
 export default function StatusBadge({ status }) {
   const colors = {
-    NOT_APPLICABLE: 'bg-gray-100 text-gray-600',
-    NOT_STARTED: 'bg-gray-200 text-gray-800',
-    IN_PROGRESS: 'bg-blue-100 text-blue-800',
-    PENDING_APPROVAL: 'bg-yellow-100 text-yellow-800',
-    APPROVED: 'bg-green-100 text-green-800',
-    REJECTED: 'bg-red-100 text-red-800',
+    NOT_APPLICABLE:   'bg-border/40 text-text-soft border-border/40',
+    NOT_STARTED:      'bg-background text-text-soft border-border',
+    IN_PROGRESS:      'bg-primary-light text-primary border-primary/20',
+    PENDING_APPROVAL: 'bg-sand/20 text-warning border-sand/40',
+    APPROVED:         'bg-forest-50 text-accent border-accent/20',
+    REJECTED:         'bg-burgundy/10 text-danger border-burgundy/20',
+    RETURNED:         'bg-sand/20 text-warning border-sand/40',
   };
 
   const labels = {
-    NOT_APPLICABLE: 'غير مطبق',
-    NOT_STARTED: 'غير مبدوء',
-    IN_PROGRESS: 'قيد العمل',
-    PENDING_APPROVAL: 'بانتظار الاعتماد',
-    APPROVED: 'مكتمل',
-    REJECTED: 'مرفوض',
+    NOT_APPLICABLE:   'غير مطبق',
+    NOT_STARTED:      'لم يبدأ',
+    IN_PROGRESS:      'قيد العمل',
+    PENDING_APPROVAL: 'قيد الاعتماد',
+    APPROVED:         'مُعتمد',
+    REJECTED:         'مرفوض',
+    RETURNED:         'مُعاد',
   };
 
   return (
-    <span className={`px-2 py-1 text-xs font-medium rounded-full ${colors[status]}`}>
-      {labels[status]}
+    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-bold ${colors[status] || 'bg-background text-text-soft border-border'}`}>
+      {labels[status] || status}
     </span>
   );
 }
