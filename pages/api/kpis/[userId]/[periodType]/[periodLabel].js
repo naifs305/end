@@ -1,9 +1,16 @@
 // GET /api/kpis/[userId]/[periodType]/[periodLabel]
-const { withManagerOrSupervisor, withMethods } = require('../../../../../lib/middleware/auth');
+// مدير/مشرف: أي موظف — موظف: نفسه فقط
+const { withAuth, withMethods } = require('../../../../../lib/middleware/auth');
 const kpis = require('../../../../../lib/services/kpis');
 
 async function handler(req, res) {
   const { userId, periodType, periodLabel } = req.query;
+
+  // الموظف لا يرى بيانات غيره
+  if (req.activeRole === 'EMPLOYEE' && req.user.id !== userId) {
+    return res.status(403).json({ message: 'غير مصرح' });
+  }
+
   try {
     const data = await kpis.getEmployeeSnapshotDetails(userId, periodType, periodLabel, {
       activeRole: req.activeRole,
@@ -16,5 +23,5 @@ async function handler(req, res) {
   }
 }
 
-module.exports = withMethods(['GET'], withManagerOrSupervisor(handler));
+module.exports = withMethods(['GET'], withAuth(handler));
 module.exports.default = module.exports;

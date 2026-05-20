@@ -385,18 +385,32 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
 // ─── لوحة الموظف الشخصية ─────────────────────────────────────
 
 function EmployeePersonalView({ snap, periodLabel, AR_MONTHS, month, year }) {
+  const [detail,        setDetail]        = useState(null);
   const [trend,         setTrend]         = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   useEffect(() => {
     if (!snap?.userId) return;
+    // جلب التفاصيل الكاملة (insights + elementBreakdown)
+    setLoadingDetail(true);
+    api.get(`/kpis/${snap.userId}/${snap.periodType}/${snap.periodLabel}`)
+      .then(r => setDetail(r.data))
+      .catch(() => {})
+      .finally(() => setLoadingDetail(false));
+    // مسار الأداء
     api.get(`/kpis/trend/${snap.userId}`, { params: { periodType: snap.periodType, periodsCount: 6 } })
       .then(r => setTrend(r.data)).catch(() => {});
-  }, [snap?.userId, snap?.periodType]);
+  }, [snap?.userId, snap?.periodType, snap?.periodLabel]);
 
   if (!snap) return null;
+  if (loadingDetail) return (
+    <div className="flex items-center justify-center rounded-2xl border border-border bg-white py-16 shadow-card">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+    </div>
+  );
 
-  const s     = snap;
+  const s = detail || snap;
   const score = Number(s.finalScoreDisplay ?? s.finalScore ?? 0);
   const level = s.performanceLevel || 'NEEDS_IMPROVEMENT';
   const lcfg  = LEVEL_CFG[level] || LEVEL_CFG.NEEDS_IMPROVEMENT;
@@ -478,7 +492,7 @@ function EmployeePersonalView({ snap, periodLabel, AR_MONTHS, month, year }) {
             {s.insights.map((ins, i) => (
               <div key={i} className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-xs ${INSIGHT_BG[ins.type] || INSIGHT_BG.info}`}>
                 <span className="shrink-0">{INSIGHT_ICON[ins.type]}</span>
-                <span>{ins.message}</span>
+                <span>{ins.text || ins.message}</span>
               </div>
             ))}
           </div>
@@ -674,7 +688,9 @@ export default function KpisPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
             <div>
               <h1 className="text-xl font-extrabold text-primary">📊 مؤشرات الأداء</h1>
-              <p className="mt-0.5 text-xs text-text-soft">قياس أداء الفريق بـ 6 مؤشرات ذكية مرتبطة بمواعيد الإقفال</p>
+              <p className="mt-0.5 text-xs text-text-soft">
+                {isEmployee ? 'تقييمك الشخصي — 6 مؤشرات مرتبطة بمواعيد إقفال دوراتك' : 'قياس أداء الفريق بـ 6 مؤشرات ذكية مرتبطة بمواعيد الإقفال'}
+              </p>
             </div>
 
             {/* تنقل الأشهر */}
@@ -689,7 +705,12 @@ export default function KpisPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {lastCalc && <span className="text-[10px] text-text-soft">آخر احتساب: {fmtRelative(lastCalc)}</span>}
+              {lastCalc && !isEmployee && <span className="text-[10px] text-text-soft">آخر احتساب: {fmtRelative(lastCalc)}</span>}
+              {isEmployee && snapshots.length > 0 && lastCalc && (
+                <span className="rounded-xl bg-forest-50 border border-accent/20 px-3 py-1.5 text-[11px] text-accent font-bold">
+                  ✓ مؤشراتك محدَّثة {fmtRelative(lastCalc)}
+                </span>
+              )}
               {isManager && (
                 <button onClick={calculate} disabled={calculating}
                   className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-60">
