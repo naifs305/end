@@ -89,10 +89,12 @@ export default function Sidebar() {
 
         {section('التقارير والمتابعة')}
         {link('/reports', 'chart', 'التقارير الميدانية')}
+
         {!isQuality && canViewKpis && link('/kpis', 'kpi', 'مؤشرات الأداء')}
         {isQuality && link('/quality', 'kpi', 'لوحة الجودة')}
         {!isQuality && (isAdmin || isSupervisor) && link('/executive-report', 'report', 'التقرير القيادي')}
         {!isQuality && isAdmin && link('/audit', 'search', 'سجل المراجعة')}
+        {link('/search', 'search', 'بحث شامل')}
 
         {!isQuality && (
           <>
