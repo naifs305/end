@@ -1,7 +1,11 @@
-export default function InputField({ label, name, type = "text", value, onChange, required = false, placeholder }) {
+export default function InputField({ label, name, type = 'text', value, onChange, required = false, placeholder }) {
   return (
     <div>
-      {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
+      {label && (
+        <label className="mb-1.5 block text-xs font-bold text-text-main">
+          {label} {required && <span className="text-danger">*</span>}
+        </label>
+      )}
       <input
         type={type}
         name={name}
@@ -9,7 +13,7 @@ export default function InputField({ label, name, type = "text", value, onChange
         onChange={onChange}
         required={required}
         placeholder={placeholder}
-        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+        className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
       />
     </div>
   );

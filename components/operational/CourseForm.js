@@ -103,7 +103,7 @@ export default function CourseForm({ initialData, onSubmit, isEditMode = false }
       </div>
 
       <div className="border-t pt-4 mt-4">
-        <h3 className="font-bold mb-4 text-gray-700">الإعدادات التشغيلية</h3>
+        <h3 className="font-bold mb-4 text-text-main">الإعدادات التشغيلية</h3>
         <div className="flex flex-wrap gap-6">
           <label className="flex items-center cursor-pointer">
             <input type="checkbox" name="requiresAdvance" checked={form.requiresAdvance} onChange={handleChange} className="ml-2 w-4 h-4 text-primary rounded" />
@@ -121,7 +121,7 @@ export default function CourseForm({ initialData, onSubmit, isEditMode = false }
       </div>
 
       <div className="flex justify-end pt-4">
-        <button type="submit" disabled={loading} className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-green-800 transition disabled:opacity-50">
+        <button type="submit" disabled={loading} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-dark transition disabled:opacity-50">
           {loading ? 'جاري الحفظ...' : (isEditMode ? 'حفظ التعديلات' : 'إنشاء الدورة')}
         </button>
       </div>

@@ -134,25 +134,25 @@ export default function MessagesPage() {
   return (
     <MainLayout title="المراسلات الداخلية">
       <div className="grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] gap-6 h-[calc(100vh-180px)]">
-        <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-gray-100 space-y-3">
+        <section className="bg-white border border-border rounded-2xl overflow-hidden flex flex-col shadow-card">
+          <div className="p-4 border-b border-border space-y-3">
             <div>
-              <h1 className="text-lg font-bold text-gray-900">المحادثات</h1>
-              <p className="text-sm text-gray-500">دردشة داخلية بين المستخدمين</p>
+              <h1 className="text-lg font-extrabold text-primary">💬 المحادثات</h1>
+              <p className="text-xs text-text-soft mt-0.5">مراسلات داخلية مع الفريق</p>
             </div>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-              placeholder="ابحث عن مستخدم"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              placeholder="🔍 ابحث عن مستخدم..."
             />
           </div>
 
           <div className="flex-1 overflow-y-auto">
             {loading ? (
-              <div className="p-4 text-sm text-gray-500">جاري التحميل...</div>
+              <div className="p-4 text-sm text-text-soft">جاري التحميل...</div>
             ) : filteredConversations.length === 0 ? (
-              <div className="p-4 text-sm text-gray-500">لا توجد محادثات حالياً.</div>
+              <div className="p-4 text-sm text-text-soft">لا توجد محادثات حالياً.</div>
             ) : (
               filteredConversations.map((item) => {
                 const selected = selectedUserId === item.user?.id;
@@ -165,17 +165,17 @@ export default function MessagesPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="font-semibold text-gray-900 truncate">{getDisplayName(item.user)}</div>
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="font-semibold text-text-main truncate">{getDisplayName(item.user)}</div>
+                        <div className="text-xs text-text-soft mt-1">
                           {getRoleLabel(item.user?.roles || [])}
                           {item.user?.operationalProject?.name ? ` - ${item.user.operationalProject.name}` : ''}
                         </div>
-                        <div className="text-sm text-gray-600 mt-2 truncate">
+                        <div className="text-sm text-text-soft mt-2 truncate">
                           {item.lastMessage?.body || 'ابدأ محادثة جديدة'}
                         </div>
                       </div>
                       <div className="shrink-0 text-left">
-                        <div className="text-[11px] text-gray-400">{formatDate(item.updatedAt || item.lastMessage?.createdAt)}</div>
+                        <div className="text-[11px] text-text-soft/60">{formatDate(item.updatedAt || item.lastMessage?.createdAt)}</div>
                         {item.unreadCount > 0 ? (
                           <div className="mt-2 inline-flex min-w-[24px] h-6 px-2 items-center justify-center rounded-full bg-danger text-white text-xs font-bold">
                             {item.unreadCount}
@@ -190,12 +190,12 @@ export default function MessagesPage() {
           </div>
         </section>
 
-        <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col min-h-0">
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-3">
+        <section className="bg-white border border-border rounded-2xl overflow-hidden flex flex-col min-h-0 shadow-card">
+          <div className="p-4 border-b border-border flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold text-gray-900">{selectedUser ? getDisplayName(selectedUser) : 'اختر محادثة'}</h2>
+              <h2 className="text-base font-extrabold text-text-main">{selectedUser ? getDisplayName(selectedUser) : 'اختر محادثة'}</h2>
               {selectedUser ? (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-text-soft">
                   {getRoleLabel(selectedUser.roles || [])}
                   {selectedUser?.operationalProject?.name ? ` - ${selectedUser.operationalProject.name}` : ''}
                 </p>
@@ -215,20 +215,20 @@ export default function MessagesPage() {
 
           <div className="flex-1 overflow-y-auto p-4 bg-background space-y-3 min-h-[320px]">
             {threadLoading ? (
-              <div className="text-sm text-gray-500">جاري تحميل المحادثة...</div>
+              <div className="text-sm text-text-soft">جاري تحميل المحادثة...</div>
             ) : !selectedUserId ? (
-              <div className="text-sm text-gray-500">اختر مستخدمًا لبدء المحادثة.</div>
+              <div className="text-sm text-text-soft">اختر مستخدمًا لبدء المحادثة.</div>
             ) : thread.length === 0 ? (
-              <div className="text-sm text-gray-500">لا توجد رسائل بعد. ابدأ أول رسالة الآن.</div>
+              <div className="text-sm text-text-soft">لا توجد رسائل بعد. ابدأ أول رسالة الآن.</div>
             ) : (
               thread.map((item) => (
                 <div
                   key={`${item.id}-${item.createdAt}`}
                   className={`flex ${item.direction === 'out' ? 'justify-start' : 'justify-end'}`}
                 >
-                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${item.direction === 'out' ? 'bg-primary text-white' : 'bg-white text-gray-900 border border-gray-200'}`}>
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm text-sm ${item.direction === 'out' ? 'bg-primary text-white' : 'bg-white text-text-main border border-border'}`}>
                     <div className="text-sm whitespace-pre-wrap break-words">{item.body}</div>
-                    <div className={`mt-2 text-[11px] ${item.direction === 'out' ? 'text-white/80' : 'text-gray-400'}`}>
+                    <div className={`mt-2 text-[11px] ${item.direction === 'out' ? 'text-white/80' : 'text-text-soft/60'}`}>
                       {formatDate(item.createdAt)}
                     </div>
                   </div>
@@ -237,7 +237,7 @@ export default function MessagesPage() {
             )}
           </div>
 
-          <form onSubmit={handleSend} className="p-4 border-t border-gray-100 bg-white">
+          <form onSubmit={handleSend} className="p-4 border-t border-border bg-white">
             {error ? <div className="mb-3 text-sm text-danger">{error}</div> : null}
             <div className="flex items-end gap-3">
               <textarea
@@ -251,9 +251,11 @@ export default function MessagesPage() {
               <button
                 type="submit"
                 disabled={!selectedUserId || !messageText.trim() || sending}
-                className="px-5 py-3 rounded-2xl bg-primary text-white text-sm font-semibold disabled:opacity-50"
+                className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-primary text-white text-sm font-bold hover:bg-primary-dark disabled:opacity-50 transition"
               >
-                {sending ? 'جاري الإرسال...' : 'إرسال'}
+                {sending
+                ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> إرسال...</>
+                : '✉️ إرسال'}
               </button>
             </div>
           </form>
