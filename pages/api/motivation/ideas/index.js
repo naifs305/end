@@ -11,19 +11,23 @@ async function handler(req, res) {
     if (mine === 'true') whereParts.push(`i."userId" = '${req.user.id}'`);
     const whereClause = whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : '';
 
-    const ideas = await prisma.$queryRawUnsafe(`
-      SELECT i.*,
-        u."firstName", u."lastName",
-        u2."firstName" AS "reviewerFirst", u2."lastName" AS "reviewerLast",
-        EXISTS(SELECT 1 FROM "IdeaSupport" s WHERE s."ideaId"=i.id AND s."userId"='${req.user.id}') AS "iSupported"
-      FROM "ImprovementIdea" i
-      JOIN "User" u ON u.id = i."userId"
-      LEFT JOIN "User" u2 ON u2.id = i."reviewedById"
-      ${whereClause}
-      ORDER BY i."supportCount" DESC, i."createdAt" DESC
-      LIMIT 100
-    `);
-    return res.status(200).json(ideas);
+    try {
+      const ideas = await prisma.$queryRawUnsafe(`
+        SELECT i.*,
+          u."firstName", u."lastName",
+          u2."firstName" AS "reviewerFirst", u2."lastName" AS "reviewerLast",
+          EXISTS(SELECT 1 FROM "IdeaSupport" s WHERE s."ideaId"=i.id AND s."userId"='${req.user.id}') AS "iSupported"
+        FROM "ImprovementIdea" i
+        JOIN "User" u ON u.id = i."userId"
+        LEFT JOIN "User" u2 ON u2.id = i."reviewedById"
+        ${whereClause}
+        ORDER BY i."supportCount" DESC, i."createdAt" DESC
+        LIMIT 100
+      `);
+      return res.status(200).json(ideas);
+    } catch {
+      return res.status(200).json([]);
+    }
   }
 
   // POST

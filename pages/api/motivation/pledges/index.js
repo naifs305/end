@@ -14,14 +14,18 @@ async function handler(req, res) {
     const label = periodLabel || currentLabel();
     const uid = (req.activeRole === 'MANAGER' && userId) ? userId : req.user.id;
 
-    const rows = await prisma.$queryRawUnsafe(`
-      SELECT p.*, u."firstName", u."lastName"
-      FROM "MonthlyPledge" p
-      JOIN "User" u ON u.id = p."userId"
-      WHERE p."userId"=$1 AND p."periodLabel"=$2
-      LIMIT 1
-    `, uid, label);
-    return res.status(200).json(rows[0] || null);
+    try {
+      const rows = await prisma.$queryRawUnsafe(`
+        SELECT p.*, u."firstName", u."lastName"
+        FROM "MonthlyPledge" p
+        JOIN "User" u ON u.id = p."userId"
+        WHERE p."userId"=$1 AND p."periodLabel"=$2
+        LIMIT 1
+      `, uid, label);
+      return res.status(200).json(rows[0] || null);
+    } catch {
+      return res.status(200).json(null);
+    }
   }
 
   // POST — حفظ/تحديث التعهد
