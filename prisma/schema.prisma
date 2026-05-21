@@ -99,6 +99,8 @@ model User {
   updatedAt            DateTime @updatedAt
   termsAccepted        Boolean  @default(false)
   termsAcceptedAt      DateTime?
+  resetToken           String?
+  resetTokenExpiry     DateTime?
 
   primaryCourses       Course[]                @relation("PrimaryResponsible")
   supportingCourses    CourseSupport[]         @relation("SupportingMember")

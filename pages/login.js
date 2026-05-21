@@ -153,6 +153,9 @@ export default function Login() {
                       />
                       تذكرني
                     </label>
+                    <Link href="/forgot-password" className="text-sm text-text-soft hover:text-primary transition">
+                      نسيت كلمة المرور؟
+                    </Link>
                   </div>
 
                   <button

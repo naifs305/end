@@ -57,6 +57,12 @@ async function handler(req, res) {
     include: { operationalProject: true },
   });
 
+  // بريد ترحيب
+  try {
+    const emailSvc = require('../../../lib/services/emailService');
+    await emailSvc.sendWelcomeEmail({ userId: user.id, tempPassword: password });
+  } catch {}
+
   const token = signToken({ sub: user.id, email: user.email, roles: user.roles });
 
   return res.status(201).json({
