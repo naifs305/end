@@ -82,7 +82,7 @@ export default function JobsPage() {
   };
 
   const deleteJob = async (id, name) => {
-    if (!confirm(`حذف المهمة "${name}"؟`)) return;
+    if (!window.confirm(`حذف المهمة "${name}"؟`)) return;
     try { await api.delete(`/scheduled-jobs/${id}`); toast.success('تم الحذف'); load(); }
     catch { toast.error('خطأ'); }
   };

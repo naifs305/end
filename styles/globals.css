@@ -81,9 +81,9 @@ a {
 
 /* ── Scrollbar مخصص ── */
 ::-webkit-scrollbar        { width: 6px; height: 6px; }
-::-webkit-scrollbar-track  { background: #F7F7F5; }
-::-webkit-scrollbar-thumb  { background: #D8DDDA; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #006C6D; }
+::-webkit-scrollbar-track  { background: #FAFBFB; }
+::-webkit-scrollbar-thumb  { background: #BAC7C8; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #5D8A70; }
 
 /* ── أنيميشن ── */
 @keyframes fadeIn {

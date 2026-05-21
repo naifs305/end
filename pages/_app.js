@@ -13,28 +13,25 @@ export default function App({ Component, pageProps }) {
 
       <AuthProvider>
         <Toaster
-          position="top-left"
+          position="top-right"
           toastOptions={{
             duration: 4000,
             style: {
               fontFamily: 'Cairo, sans-serif',
               background: '#FFFFFF',
-              color: '#2F3437',
-              border: '1px solid #D8DDDA',
-              borderRadius: '16px',
-              boxShadow: '0 8px 24px rgba(0, 108, 109, 0.08)',
+              color: '#14221D',
+              border: '1px solid #D7DBDA',
+              borderRadius: '14px',
+              fontSize: '13px',
+              fontWeight: '600',
+              boxShadow: '0 4px 20px rgba(20,34,29,0.10)',
+              direction: 'rtl',
             },
             success: {
-              iconTheme: {
-                primary: '#2E7D5A',
-                secondary: '#FFFFFF',
-              },
+              iconTheme: { primary: '#5D8A70', secondary: '#FFFFFF' },
             },
             error: {
-              iconTheme: {
-                primary: '#A63D4A',
-                secondary: '#FFFFFF',
-              },
+              iconTheme: { primary: '#633646', secondary: '#FFFFFF' },
             },
           }}
         />

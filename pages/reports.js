@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
+import toast from 'react-hot-toast';
 
 const REPORT_TYPE = {
   opening_report: { label: 'افتتاح',   cls: 'bg-primary-light text-primary border-primary/20',   icon: '📋' },
@@ -57,9 +58,9 @@ export default function ReportsPage() {
     try {
       const res = await api.get(`/closure/${id}/export`, { responseType: 'text', headers: { Accept: 'text/html' } });
       const w = window.open('', '_blank');
-      if (!w) return alert('تعذر فتح نافذة الطباعة');
+      if (!w) return toast.error('تعذر فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة');
       w.document.open(); w.document.write(res.data); w.document.close();
-    } catch { alert('تعذر فتح التقرير'); }
+    } catch { toast.error('تعذر فتح التقرير'); }
   };
 
   const handleEml = async (id, key) => {
@@ -71,7 +72,8 @@ export default function ReportsPage() {
       const m = disp.match(/filename="?([^";]+)"?/i);
       a.href = url; a.download = m?.[1] || (key === 'opening_report' ? 'opening-report.eml' : 'closing-report.eml');
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    } catch { alert('تعذر تنزيل ملف EML'); }
+      toast.success('تم تنزيل الملف');
+    } catch { toast.error('تعذر تنزيل ملف EML'); }
   };
 
   if (!canViewReports(activeRole)) {

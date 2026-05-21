@@ -5,6 +5,7 @@ import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 
 const RadarKPI     = dynamic(() => import('../components/charts/RadarKPI'),     { ssr: false });
 
@@ -43,9 +44,9 @@ export default function QualityPage() {
     try {
       const res = await api.get(`/closure/${id}/export`, { responseType:'text', headers:{Accept:'text/html'} });
       const w = window.open('','_blank');
-      if (!w) return alert('تعذر فتح نافذة الطباعة');
+      if (!w) return toast.error('تعذر فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة');
       w.document.open(); w.document.write(res.data); w.document.close();
-    } catch { alert('تعذر فتح التقرير'); }
+    } catch { toast.error('تعذر فتح التقرير'); }
   };
 
   return (

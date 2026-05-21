@@ -77,7 +77,7 @@ export default function ProjectsPage() {
   };
 
   const deleteProject = async (id, name) => {
-    if (!confirm(`حذف مشروع "${name}"؟ يجب ألا يحتوي على موظفين أو دورات.`)) return;
+    if (!window.confirm(`حذف مشروع "${name}"؟\nيجب ألا يحتوي على موظفين أو دورات.`)) return;
     try {
       await api.delete(`/projects/${id}`);
       toast.success('تم حذف المشروع');

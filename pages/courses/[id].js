@@ -7,6 +7,7 @@ import ElementRow from '../../components/operational/ElementRow';
 import Modal from '../../components/operational/Modal';
 import CourseReportForm from '../../components/operational/CourseReportForm';
 import FinancialForm from '../../components/operational/FinancialForm';
+import toast from 'react-hot-toast';
 
 // ── ثوابت الحالات ─────────────────────────────────────────────────────
 const STATUS_META = {
@@ -99,9 +100,9 @@ export default function CourseDetail() {
         responseType: 'text', headers: { Accept: 'text/html' },
       });
       const w = window.open('', '_blank');
-      if (!w) { alert('تعذر فتح نافذة الطباعة'); return; }
+      if (!w) { toast.error('تعذر فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة'); return; }
       w.document.open(); w.document.write(res.data); w.document.close();
-    } catch { alert('تعذر فتح التقرير'); }
+    } catch { toast.error('تعذر فتح التقرير'); }
   };
 
   const handleReportEmlDownload = async (elementId, elementKey) => {
@@ -117,7 +118,8 @@ export default function CourseDetail() {
       a.href = url; a.download = match?.[1] || fallback;
       document.body.appendChild(a); a.click(); a.remove();
       window.URL.revokeObjectURL(url);
-    } catch { alert('تعذر تنزيل ملف EML'); }
+      toast.success('تم تنزيل الملف');
+    } catch { toast.error('تعذر تنزيل ملف EML'); }
   };
 
   // ── ترتيب وتجميع العناصر ─────────────────────────────────────────────
