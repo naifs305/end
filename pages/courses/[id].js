@@ -36,6 +36,14 @@ const ELEMENT_ORDER = {
   revenues: 12, materials: 13, settlement: 14,
 };
 
+// العناصر الحرجة التي تستوجب إنذاراً خاصاً
+const CRITICAL_ELEMENTS = new Set(['opening_report', 'closing_report', 'settlement']);
+const CRITICAL_META = {
+  opening_report: { label: 'تقرير الافتتاح',  icon: '📋', urgency: 'high' },
+  closing_report: { label: 'تقرير الاختتام',  icon: '📝', urgency: 'high' },
+  settlement:     { label: 'تسوية السلفة',    icon: '💰', urgency: 'critical' },
+};
+
 function fmt(date) {
   if (!date) return '-';
   return new Date(date).toLocaleDateString('ar-SA', { day:'numeric', month:'short', year:'numeric' });
@@ -203,10 +211,36 @@ export default function CourseDetail() {
     const waitH     = supervisorWaitHours(el);
     const hasExt    = (el.extensionHours || 0) > 0;
 
+    const isCritical   = CRITICAL_ELEMENTS.has(el.element?.key);
+    const criticalMeta = CRITICAL_META[el.element?.key];
+    const isRedAlert   = isCritical && overdue && !['APPROVED','PENDING_APPROVAL'].includes(el.status);
+    const isSettlement = el.element?.key === 'settlement';
+
     return (
       <div key={el.id}
-        className="rounded-2xl border border-border bg-white shadow-card overflow-hidden transition hover:shadow-soft"
-        style={{ borderInlineStart: `3px solid ${meta.border}` }}>
+        className={`rounded-2xl border bg-white shadow-card overflow-hidden transition hover:shadow-soft
+          ${isRedAlert ? 'border-danger shadow-[0_0_0_2px_rgba(99,54,70,0.15)]' : 'border-border'}`}
+        style={{ borderInlineStart: `3px solid ${isRedAlert ? '#633646' : meta.border}` }}>
+
+        {/* شريط الإنذار الأحمر للعناصر الحرجة المتأخرة */}
+        {isRedAlert && (
+          <div className={`flex items-center gap-2 px-4 py-2 text-xs font-bold text-white
+            ${isSettlement ? 'bg-danger' : 'bg-burgundy/80'}`}>
+            <span className="animate-pulse">🚨</span>
+            <span>إنذار {isSettlement ? 'حرج' : 'عاجل'}: {criticalMeta?.label} متأخر عن الموعد الأقصى</span>
+            {isSettlement && <span className="mr-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px]">يستوجب متابعة فورية</span>}
+          </div>
+        )}
+
+        {/* شارة العنصر الحرج (قبل الاستحقاق) */}
+        {isCritical && !isRedAlert && !['APPROVED','NOT_APPLICABLE'].includes(el.status) && (
+          <div className={`flex items-center gap-1.5 px-4 py-1.5 text-[10px] font-bold
+            ${isSettlement ? 'bg-burgundy/8 text-danger border-b border-burgundy/15' : 'bg-sand/10 text-warning border-b border-sand/20'}`}>
+            <span>{criticalMeta?.icon}</span>
+            <span>عنصر حرج — {criticalMeta?.label}</span>
+          </div>
+        )}
+
         <div className="p-4 space-y-3">
 
           {/* رأس العنصر */}
@@ -214,7 +248,7 @@ export default function CourseDetail() {
             <div className="flex flex-wrap items-center gap-2 min-w-0">
               <h4 className="font-extrabold text-sm text-text-main">{el.element.name}</h4>
               <Badge meta={meta} small />
-              {overdue && (
+              {overdue && !isRedAlert && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-burgundy/10 px-2 py-0.5 text-[10px] font-bold text-danger border border-burgundy/20">
                   ⚠ متأخر
                 </span>
@@ -333,9 +367,46 @@ export default function CourseDetail() {
 
   const courseStatus = STATUS_META[course.status] || STATUS_META.DRAFT;
 
+  // العناصر الحرجة المتأخرة
+  const criticalOverdue = sortedElements.filter(el =>
+    CRITICAL_ELEMENTS.has(el.element?.key) &&
+    isOverdue(el) &&
+    !['APPROVED','PENDING_APPROVAL','NOT_APPLICABLE'].includes(el.status)
+  );
+  const settlementOverdue = criticalOverdue.find(el => el.element?.key === 'settlement');
+
   return (
     <MainLayout>
       <div className="space-y-4">
+
+        {/* 🚨 بانر الإنذارات الحرجة */}
+        {criticalOverdue.length > 0 && (
+          <div className={`rounded-2xl border p-4 shadow-card
+            ${settlementOverdue ? 'border-danger/40 bg-danger/5' : 'border-burgundy/30 bg-burgundy/5'}`}>
+            <div className="flex items-start gap-3">
+              <span className="text-2xl animate-pulse shrink-0">🚨</span>
+              <div className="flex-1">
+                <p className={`font-extrabold text-sm mb-1 ${settlementOverdue ? 'text-danger' : 'text-danger'}`}>
+                  {settlementOverdue
+                    ? 'إنذار حرج — تسوية السلفة متأخرة وتستوجب متابعة فورية'
+                    : `${criticalOverdue.length} عنصر حرج متأخر في هذه الدورة`}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {criticalOverdue.map(el => (
+                    <span key={el.id}
+                      className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold
+                        ${el.element?.key === 'settlement'
+                          ? 'bg-danger/10 text-danger border-danger/20'
+                          : 'bg-burgundy/10 text-danger border-burgundy/20'}`}>
+                      <span>{CRITICAL_META[el.element?.key]?.icon}</span>
+                      <span>{el.element.name}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── رأس الصفحة ──────────────────────────────────────────────── */}
         <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden"

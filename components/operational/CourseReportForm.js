@@ -379,12 +379,27 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
     return true;
   };
 
+  const [showPhotoReminder, setShowPhotoReminder] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
+
+    // تذكير الصور — إذا لم يُرفق أي صورة
+    if (form.attachments.length === 0 && !showPhotoReminder) {
+      setShowPhotoReminder(true);
+      return;
+    }
+    setShowPhotoReminder(false);
+    await doSubmit();
+  };
+
+  const doSubmit = async () => {
     setLoading(true);
     try {
-      const endpoint = normalizedType === 'opening_report' ? `/closure/${trackingId}/opening-report` : `/closure/${trackingId}/closing-report`;
+      const endpoint = normalizedType === 'opening_report'
+        ? `/closure/${trackingId}/opening-report`
+        : `/closure/${trackingId}/closing-report`;
       await api.post(endpoint, {
         ...form,
         attendance_rate: attendanceRate,
@@ -407,6 +422,44 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
     : 'نموذج تفصيلي لتقييم التنفيذ التشغيلي وجودة البرنامج والبيئة التدريبية عند الاختتام';
 
   return (
+    <>
+    {/* نافذة تذكير الصور */}
+    {showPhotoReminder && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-border bg-white shadow-deep">
+          <div className="bg-sand/20 px-5 py-4 border-b border-sand/30">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">📷</span>
+              <div>
+                <h3 className="font-extrabold text-text-main">هل نسيت إرفاق الصور؟</h3>
+                <p className="text-xs text-text-soft mt-0.5">التقرير لا يحتوي على أي صور</p>
+              </div>
+            </div>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-sm text-text-soft leading-relaxed">
+              الصور توثّق سير الدورة وتُقوّي تقريرك. إذا كانت لديك صور، يُفضّل إرفاقها الآن.
+            </p>
+          </div>
+          <div className="flex gap-2 px-5 pb-5">
+            <button
+              type="button"
+              onClick={() => setShowPhotoReminder(false)}
+              className="flex-1 rounded-xl border border-border bg-background py-2.5 text-sm font-bold text-text-main hover:bg-forest-50 transition"
+            >
+              ← إضافة صور
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowPhotoReminder(false); doSubmit(); }}
+              className="flex-1 rounded-xl border border-sand/40 bg-sand/10 py-2.5 text-sm font-bold text-warning hover:bg-sand/20 transition"
+            >
+              إرسال بدون صور
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
         <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -500,5 +553,6 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
         <button type="submit" disabled={loading} className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{loading ? 'جاري الحفظ...' : 'حفظ وتقديم التقرير'}</button>
       </div>
     </form>
+    </>
   );
 }
