@@ -16,6 +16,17 @@ function fmt(v, d = 1) {
   return isNaN(n) ? '-' : n.toFixed(d);
 }
 
+// ساعات → "X ساعة" أو "X يوم" حسب الحجم
+function fmtDur(hours) {
+  if (hours == null || isNaN(Number(hours))) return '—';
+  const h = Number(hours);
+  if (h === 0)  return 'فوري';
+  if (h < 1)    return 'أقل من ساعة';
+  if (h < 24)   return `${Math.round(h)} ساعة`;
+  const d = h / 24;
+  return `${d < 2 ? d.toFixed(1) : Math.round(d)} يوم`;
+}
+
 function fmtRelative(v) {
   if (!v) return '-';
   const diffHours = (Date.now() - new Date(v).getTime()) / 3_600_000;
@@ -216,6 +227,12 @@ function TrendSparkline({ trend }) {
 function ElementBreakdownTable({ breakdown }) {
   if (!breakdown?.length) return null;
   const [open, setOpen] = useState(false);
+
+  // هل لدينا بيانات توقيت؟
+  const hasTimingData = breakdown.some(el =>
+    (el.beforeIdeal || 0) + (el.beforeMax || 0) + (el.afterMax || 0) > 0
+  );
+
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
       <button
@@ -226,42 +243,79 @@ function ElementBreakdownTable({ breakdown }) {
         <span className="text-xs text-text-soft">{open ? '▲ إخفاء' : '▼ إظهار'}</span>
       </button>
       {open && (
-        <div className="overflow-x-auto border-t border-border">
-          <table className="min-w-full text-xs">
-            <thead className="bg-background text-text-soft">
-              <tr>
-                {['العنصر', 'المطلوب', 'قُبل', 'أُعيد', 'مرفوض', 'معدل القبول', 'متوسط التقديم'].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-right font-bold">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {breakdown.map(el => {
-                const rate = Number(el.approvalRate) || 0;
-                const rateColor = rate >= 80 ? 'bg-forest-50 text-accent' : rate >= 60 ? 'bg-sand/20 text-warning' : 'bg-burgundy/10 text-danger';
-                return (
-                  <tr key={el.key} className="hover:bg-background transition">
-                    <td className="px-3 py-2 font-bold text-text-main">{el.name}</td>
-                    <td className="px-3 py-2 text-center">{el.total ?? '—'}</td>
-                    <td className="px-3 py-2 text-center font-bold text-accent">{el.approved ?? '—'}</td>
-                    <td className="px-3 py-2 text-center text-warning">{el.returned ?? '—'}</td>
-                    <td className="px-3 py-2 text-center text-danger">{el.rejected ?? '—'}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-forest-50">
-                          <div className={`h-full rounded-full ${rate >= 80 ? 'bg-accent' : rate >= 60 ? 'bg-sand' : 'bg-burgundy'}`} style={{ width: `${rate}%` }} />
+        <div className="border-t border-border">
+          {/* أسطورة التوقيت */}
+          {hasTimingData && (
+            <div className="flex flex-wrap gap-3 px-5 py-2.5 text-[10px] bg-background border-b border-border">
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-accent inline-block" /> قبل الموعد المثالي</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary inline-block" /> في الوقت (قبل الأقصى)</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-danger inline-block" /> بعد الموعد الأقصى</span>
+            </div>
+          )}
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs">
+              <thead className="bg-background text-text-soft">
+                <tr>
+                  <th className="px-3 py-2.5 text-right font-bold">العنصر</th>
+                  <th className="px-3 py-2.5 text-center font-bold">المطلوب</th>
+                  <th className="px-3 py-2.5 text-center font-bold">قُبل</th>
+                  <th className="px-3 py-2.5 text-center font-bold">أُعيد</th>
+                  <th className="px-3 py-2.5 text-center font-bold">معدل القبول</th>
+                  {hasTimingData && <th className="px-3 py-2.5 text-center font-bold">توزيع التوقيت</th>}
+                  <th className="px-3 py-2.5 text-center font-bold">متوسط التقديم</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {breakdown.map(el => {
+                  const rate = Number(el.approvalRate) || 0;
+                  const rateColor = rate >= 80 ? 'bg-forest-50 text-accent' : rate >= 60 ? 'bg-sand/20 text-warning' : 'bg-burgundy/10 text-danger';
+                  const timedTotal = (el.beforeIdeal||0) + (el.beforeMax||0) + (el.afterMax||0);
+                  return (
+                    <tr key={el.key} className="hover:bg-background transition">
+                      <td className="px-3 py-2 font-bold text-text-main">{el.name}</td>
+                      <td className="px-3 py-2 text-center">{el.total ?? '—'}</td>
+                      <td className="px-3 py-2 text-center font-bold text-accent">{el.approved ?? '—'}</td>
+                      <td className="px-3 py-2 text-center text-warning">{el.returned ?? '—'}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-1.5 w-14 overflow-hidden rounded-full bg-forest-50">
+                            <div className={`h-full rounded-full ${rate>=80?'bg-accent':rate>=60?'bg-sand':'bg-burgundy'}`} style={{width:`${rate}%`}} />
+                          </div>
+                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ${rateColor}`}>{fmt(rate)}%</span>
                         </div>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${rateColor}`}>{fmt(rate)}%</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-text-soft">
-                      {el.avgSubmissionHours > 0 ? `${fmt(el.avgSubmissionHours)} ساعة` : '—'}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      {hasTimingData && (
+                        <td className="px-3 py-2">
+                          {timedTotal > 0 ? (
+                            <div className="flex items-center gap-1 text-[10px]">
+                              {el.beforeIdeal > 0 && (
+                                <span className="rounded bg-forest-50 text-accent px-1.5 py-0.5 font-bold">
+                                  ✓ {el.beforeIdeal}
+                                </span>
+                              )}
+                              {el.beforeMax > 0 && (
+                                <span className="rounded bg-primary-light text-primary px-1.5 py-0.5 font-bold">
+                                  ⏱ {el.beforeMax}
+                                </span>
+                              )}
+                              {el.afterMax > 0 && (
+                                <span className="rounded bg-burgundy/10 text-danger px-1.5 py-0.5 font-bold">
+                                  ⚠ {el.afterMax}
+                                </span>
+                              )}
+                            </div>
+                          ) : <span className="text-text-soft/40">—</span>}
+                        </td>
+                      )}
+                      <td className="px-3 py-2 text-center text-text-soft">
+                        {fmtDur(el.avgSubmissionHours)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -706,13 +760,21 @@ export default function KpisPage() {
   const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
   const isEmployee   = activeRole === 'EMPLOYEE';
 
+  const OFFICIAL_START = '2026-06'; // البداية الرسمية للاحتساب
+
   const now = new Date();
+  const [periodMode, setPeriodMode] = useState('monthly'); // 'monthly' | 'yearly'
   const [year,  setYear]  = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [loadingLB, setLoadingLB] = useState(false);
 
-  const periodLabel = useMemo(
-    () => `${year}-${String(month).padStart(2, '0')}`,
-    [year, month],
+  const periodLabel = useMemo(() =>
+    periodMode === 'yearly'
+      ? String(year)
+      : `${year}-${String(month).padStart(2, '0')}`,
+    [year, month, periodMode],
   );
 
   const [snapshots,    setSnapshots]    = useState([]);
@@ -722,13 +784,14 @@ export default function KpisPage() {
   const [selectedSnap, setSelectedSnap] = useState(null);
   const [loadingDet,   setLoadingDet]   = useState(false);
   const [lastCalc,     setLastCalc]     = useState(null);
-  const [levelFilter,  setLevelFilter]  = useState(null); // null = الكل
+  const [levelFilter,  setLevelFilter]  = useState(null);
 
   // ── جلب اللقطات ──
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res  = await api.get('/kpis', { params: { periodType: 'MONTHLY', periodLabel } });
+      const pt  = periodMode === 'yearly' ? 'YEARLY' : 'MONTHLY';
+      const res = await api.get('/kpis', { params: { periodType: pt, periodLabel } });
       const data = res.data || [];
       setSnapshots(data);
       if (data.length) setLastCalc(data[0]?.updatedAt || data[0]?.createdAt);
@@ -737,7 +800,17 @@ export default function KpisPage() {
     } finally {
       setLoading(false);
     }
-  }, [periodLabel]);
+  }, [periodLabel, periodMode]);
+
+  // ── لوحة المشاريع ──
+  const loadLeaderboard = useCallback(() => {
+    if (!isManager && !isSupervisor) return;
+    setLoadingLB(true);
+    api.get('/kpis/leaderboard', { params: { periodLabel: periodMode === 'monthly' ? periodLabel : undefined } })
+      .then(r => setLeaderboard(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {})
+      .finally(() => setLoadingLB(false));
+  }, [periodLabel, periodMode, isManager, isSupervisor]);
 
   useEffect(() => {
     load();
@@ -746,11 +819,21 @@ export default function KpisPage() {
     setLevelFilter(null);
   }, [load]);
 
+  useEffect(() => {
+    if (showLeaderboard) loadLeaderboard();
+  }, [showLeaderboard, loadLeaderboard]);
+
   // ── احتساب المؤشرات ──
   const calculate = async () => {
     if (!isManager) return;
     setCalculating(true);
     try {
+      if (periodMode === 'yearly') {
+        await api.post('/kpis/calculate-yearly', { year });
+        toast.success('✓ تم احتساب المؤشرات السنوية بنجاح');
+        load();
+        return;
+      }
       await api.post('/kpis/calculate', { periodType: 'MONTHLY', year, value: month });
       toast.success('✓ تم احتساب المؤشرات بنجاح');
       await load();
@@ -788,12 +871,17 @@ export default function KpisPage() {
     await load();
   };
 
-  // ── تنقل الأشهر ──
+  // ── تنقل الأشهر/السنوات ──
   const prevMonth = () => {
+    if (periodMode === 'yearly') { setYear(y => y - 1); return; }
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
     else setMonth(m => m - 1);
   };
   const nextMonth = () => {
+    if (periodMode === 'yearly') {
+      if (year < now.getFullYear()) setYear(y => y + 1);
+      return;
+    }
     const nm = month === 12 ? 1 : month + 1;
     const ny = month === 12 ? year + 1 : year;
     if (ny > now.getFullYear() || (ny === now.getFullYear() && nm > now.getMonth() + 1)) return;
@@ -851,6 +939,16 @@ export default function KpisPage() {
               </p>
             </div>
 
+            {/* تبويب شهري / سنوي */}
+            <div className="flex overflow-hidden rounded-xl border border-border text-xs font-bold">
+              {['monthly','yearly'].map(m => (
+                <button key={m} onClick={() => { setPeriodMode(m); setSelectedId(null); setSelectedSnap(null); }}
+                  className={`px-4 py-2 transition ${periodMode===m ? 'bg-primary text-white' : 'bg-white text-text-soft hover:bg-background'}`}>
+                  {m === 'monthly' ? 'شهري' : 'سنوي'}
+                </button>
+              ))}
+            </div>
+
             {/* تنقل الأشهر */}
             <div className="flex items-center gap-2">
               <button
@@ -860,12 +958,24 @@ export default function KpisPage() {
                 ›
               </button>
               <div className="min-w-[130px] text-center">
-                <p className="font-extrabold text-primary">{AR_MONTHS[month - 1]} {year}</p>
-                {isCurrentMonth && <p className="text-[10px] text-accent">● الشهر الحالي</p>}
+                {periodMode === 'monthly' ? (
+                  <>
+                    <p className="font-extrabold text-primary">{AR_MONTHS[month - 1]} {year}</p>
+                    {isCurrentMonth && <p className="text-[10px] text-accent">● الشهر الحالي</p>}
+                    {periodLabel < OFFICIAL_START && (
+                      <p className="text-[10px] text-warning">تجريبي</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="font-extrabold text-primary">سنة {year}</p>
+                    <p className="text-[10px] text-text-soft">يناير — ديسمبر</p>
+                  </>
+                )}
               </div>
               <button
                 onClick={nextMonth}
-                disabled={isCurrentMonth}
+                disabled={isCurrentMonth && periodMode === 'monthly'}
                 className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-text-soft hover:bg-background hover:text-primary disabled:cursor-not-allowed disabled:opacity-30 transition text-lg"
               >
                 ‹
@@ -981,6 +1091,56 @@ export default function KpisPage() {
         {/* ══════ لوحة الموظف الشخصية ══════ */}
         {!loading && isEmployee && snapshots.length > 0 && (
           <EmployeePersonalView snap={snapshots[0]} month={month} year={year} />
+        )}
+
+        {/* ══════ لوحة ترتيب المشاريع — مدير/مشرف ══════ */}
+        {!loading && (isManager || isSupervisor) && periodMode === 'monthly' && (
+          <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
+            <button onClick={() => setShowLeaderboard(v=>!v)}
+              className="flex w-full items-center justify-between px-5 py-3.5 hover:bg-background transition">
+              <div>
+                <h3 className="font-extrabold text-text-main">🏆 ترتيب المشاريع — {AR_MONTHS[month-1]} {year}</h3>
+                <p className="text-[11px] text-text-soft mt-0.5">مقارنة متوسطات الفرق حسب المشروع</p>
+              </div>
+              <span className="text-xs text-text-soft">{showLeaderboard ? '▲' : '▼'}</span>
+            </button>
+            {showLeaderboard && (
+              <div className="border-t border-border">
+                {loadingLB ? (
+                  <div className="flex justify-center py-8"><div className="h-6 w-6 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>
+                ) : leaderboard.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-text-soft">لا توجد بيانات لهذه الفترة</p>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {leaderboard.map((proj, idx) => (
+                      <div key={proj.projectId} className="flex items-center gap-4 px-5 py-3.5">
+                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white
+                          ${idx===0?'bg-primary':idx===1?'bg-accent':idx===2?'bg-sand':'bg-text-soft/40'}`}>
+                          {idx+1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-extrabold text-sm text-text-main">{proj.projectName}</p>
+                          <p className="text-[11px] text-text-soft">
+                            {proj.employeesCount} موظف مُقيَّم
+                            {proj.topEmployee && ` · الأفضل: ${proj.topEmployee.name}`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="w-24 h-1.5 overflow-hidden rounded-full bg-forest-50">
+                            <div className="h-full rounded-full bg-primary transition-all"
+                              style={{width:`${Math.min(100,proj.avgScore)}%`}} />
+                          </div>
+                          <span className="text-sm font-extrabold text-primary w-12 text-left">
+                            {Number(proj.avgScore).toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {/* ══════ مقارنة الفريق — مدير/مشرف ══════ */}
@@ -1164,7 +1324,7 @@ function SupervisorReport({ periodLabel }) {
                         <span className="text-[10px] font-bold">{s.approvalRate}%</span>
                       </td>
                       <td className="px-3 py-2.5 font-bold text-text-main">
-                        {s.avgResponseHours != null ? `${s.avgResponseHours} ساعة` : '—'}
+                        {s.avgResponseHours != null ? fmtDur(s.avgResponseHours) : '—'}
                       </td>
                       <td className="px-3 py-2.5">
                         <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${RESP_COLOR[s.responsiveness] || 'bg-background text-text-soft border-border'}`}>

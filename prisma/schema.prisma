@@ -170,6 +170,7 @@ model Course {
   requiresTrainerCompensation    Boolean      @default(false)
   requiresPreTest                Boolean      @default(false)
   requiresPostTest               Boolean      @default(false)
+  isCrossProject                 Boolean      @default(false)  // دورة خارج مشروع المنسق
   status                         CourseStatus @default(PREPARATION)
 
   operationalProjectId           String

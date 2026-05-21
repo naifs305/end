@@ -104,6 +104,11 @@ export default function CreateCoursePage() {
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const toggle = k => setForm(p => ({ ...p, [k]: !p[k] }));
 
+  // اكتشاف تلقائي: هل الدورة خارج مشروع المنسق؟
+  const isCrossProject = user && form.operationalProjectId &&
+    user.operationalProjectId &&
+    form.operationalProjectId !== user.operationalProjectId;
+
   const canSubmit = useMemo(() =>
     form.name.trim() && form.operationalProjectId && form.locationType &&
     form.city.trim() && form.startDate && form.endDate &&
@@ -138,6 +143,7 @@ export default function CreateCoursePage() {
         requiresTrainerCompensation:   form.requiresTrainerCompensation,
         requiresPreTest:               form.requiresPreTest,
         requiresPostTest:              form.requiresPostTest,
+        isCrossProject:                isCrossProject || false,
       };
       const res = await api.post('/courses', payload);
       toast.success('تم إنشاء الدورة ✓');
@@ -217,6 +223,12 @@ export default function CreateCoursePage() {
                   <option value="">اختر المشروع</option>
                   {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
+                {isCrossProject && (
+                  <div className="mt-2 rounded-xl border border-accent/30 bg-forest-50 px-3 py-2 text-xs">
+                    <p className="font-bold text-accent mb-0.5">🌟 دورة خارج مشروعك</p>
+                    <p className="text-text-soft">هذه الدورة تنتمي لمشروع غير مشروعك الأصلي. ستحصل على نقاط تحفيزية إضافية في تقييم أدائك عند إنجازها في الوقت المحدد.</p>
+                  </div>
+                )}
               </Field>
               <Field label="تاريخ الدورة (بداية - نهاية)" required span2>
                 <DatePicker

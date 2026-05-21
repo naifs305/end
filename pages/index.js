@@ -334,6 +334,37 @@ export default function Home() {
           </div>
         )}
 
+        {/* ── لوحة ترتيب المشاريع ── */}
+        {(isAdmin || isSupervisor) && dash.projectLeaderboard?.length > 1 && (
+          <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
+            <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+              <div>
+                <h3 className="font-extrabold text-text-main">🏆 ترتيب المشاريع — {month}</h3>
+                <p className="text-[11px] text-text-soft mt-0.5">مقارنة متوسط أداء الفرق</p>
+              </div>
+              <Link href="/kpis" className="text-xs font-bold text-primary hover:text-primary-dark">التفاصيل ←</Link>
+            </div>
+            <div className="divide-y divide-border">
+              {dash.projectLeaderboard.slice(0,4).map((proj, idx) => (
+                <div key={proj.projectId} className="flex items-center gap-3 px-5 py-3">
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white
+                    ${idx===0?'bg-primary':idx===1?'bg-accent':'bg-text-soft/40'}`}>{idx+1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-text-main truncate">{proj.projectName}</p>
+                    <p className="text-[10px] text-text-soft">{proj.employeesCount} موظف{proj.topEmployee ? ` · الأفضل: ${proj.topEmployee.name}` : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="w-20 h-1.5 overflow-hidden rounded-full bg-forest-50">
+                      <div className="h-full rounded-full bg-primary" style={{width:`${Math.min(100,proj.avgScore)}%`}} />
+                    </div>
+                    <span className="text-sm font-extrabold text-primary w-10 text-left">{proj.avgScore}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── الموظف: مؤشرات KPI ── */}
         {isEmployee && dash.kpi && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
