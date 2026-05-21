@@ -46,6 +46,34 @@ enum PerformanceLevel {
   WEAK
 }
 
+enum BadgeType {
+  COMMITTED        // ملتزم: كل العناصر قبل الموعد المثالي
+  PRECISE          // دقيق: صفر إعادات في فترة كاملة
+  FAST             // سريع: أسرع متوسط تقديم في الفريق
+  IMPROVER         // متحسن: أفضل تحسن في الاتجاه
+  CONSISTENT       // ثابت: 3 أشهر متتالية فوق 80%
+  PIONEER          // رائد: أول من يكمل كل العناصر لدورة
+  IDEA_CHAMPION    // مبدع: مبادرة معتمدة ومنفذة
+  TEAM_PLAYER      // فريق: تحدي فريق محقق
+  PLEDGE_KEEPER    // وفي: تحقيق التعهد الشخصي
+  STAR             // نجم: أداء متميز مرتين متتاليتين
+}
+
+enum IdeaStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  IMPLEMENTED
+  REJECTED
+}
+
+enum ChallengeStatus {
+  ACTIVE
+  ACHIEVED
+  FAILED
+  CANCELLED
+}
+
 model OperationalProject {
   id          String   @id @default(uuid())
   name        String   @unique
@@ -91,8 +119,15 @@ model User {
   grantedExtensions    CourseClosureTracking[]    @relation("ExtensionGranter")
 
   // ----- علاقة الإشراف على مشاريع تشغيلية -----
-  // مشرف المشروع مرتبط بمشروع واحد أو أكثر عبر هذا الجدول
   supervisedProjects   ProjectSupervisor[]        @relation("SupervisorUser")
+
+  // ----- الأدوات التحفيزية -----
+  badges               EmployeeBadge[]            @relation("BadgeUser")
+  awardedBadges        EmployeeBadge[]            @relation("BadgeAwarder")
+  ideas                ImprovementIdea[]          @relation("IdeaAuthor")
+  reviewedIdeas        ImprovementIdea[]          @relation("IdeaReviewer")
+  ideaSupports         IdeaSupport[]              @relation("IdeaSupportUser")
+  pledges              MonthlyPledge[]            @relation("PledgeUser")
 }
 
 // =============================================================
@@ -430,4 +465,104 @@ model ScheduledJob {
 
   @@index([status, nextRunAt])
   @@index([type])
+}
+
+// =============================================================
+// الأدوات التحفيزية الأربع
+// =============================================================
+
+// ── 1. نظام الشارات ──────────────────────────────────────────
+model EmployeeBadge {
+  id          String    @id @default(uuid())
+  userId      String
+  badgeType   BadgeType
+  periodLabel String?   // الفترة المرتبطة (YYYY-MM)
+  note        String?   // ملاحظة اختيارية
+  awardedAt   DateTime  @default(now())
+  awardedById String?   // المدير الذي منح الشارة (null = تلقائي)
+
+  user        User      @relation("BadgeUser",   fields: [userId],      references: [id], onDelete: Cascade)
+  awarder     User?     @relation("BadgeAwarder", fields: [awardedById], references: [id])
+
+  @@index([userId])
+  @@index([badgeType])
+  @@index([periodLabel])
+}
+
+// ── 2. بنك المبادرات ─────────────────────────────────────────
+model ImprovementIdea {
+  id           String     @id @default(uuid())
+  userId       String
+  title        String
+  description  String
+  category     String     @default("general") // process, technical, training, general
+  status       IdeaStatus @default(PENDING)
+  supportCount Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewNotes  String?
+  implementedAt DateTime?
+
+  user         User        @relation("IdeaAuthor",   fields: [userId],       references: [id], onDelete: Cascade)
+  reviewer     User?       @relation("IdeaReviewer", fields: [reviewedById], references: [id])
+  supporters   IdeaSupport[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model IdeaSupport {
+  id        String   @id @default(uuid())
+  ideaId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  idea      ImprovementIdea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  user      User            @relation("IdeaSupportUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ideaId, userId])
+  @@index([ideaId])
+}
+
+// ── 3. التحدي الشهري للفريق ──────────────────────────────────
+model TeamChallenge {
+  id           String          @id @default(uuid())
+  periodLabel  String          @unique
+  title        String
+  description  String?
+  targetMetric String          // 'timeliness' | 'quality' | 'zero_returns' | 'all_before_ideal'
+  targetValue  Float           // e.g., 90 = 90%
+  status       ChallengeStatus @default(ACTIVE)
+  result       Float?          // القيمة الفعلية عند الانتهاء
+  achieved     Boolean         @default(false)
+  createdById  String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([periodLabel])
+  @@index([status])
+}
+
+// ── 4. التعهد الشخصي الشهري ──────────────────────────────────
+model MonthlyPledge {
+  id           String    @id @default(uuid())
+  userId       String
+  periodLabel  String
+  pledge1      String
+  pledge2      String?
+  pledge3      String?
+  fulfilled1   Boolean?  // null = لم يُقيَّم بعد
+  fulfilled2   Boolean?
+  fulfilled3   Boolean?
+  fulfillRate  Float?    // 0-100
+  createdAt    DateTime  @default(now())
+  evaluatedAt  DateTime?
+
+  user         User      @relation("PledgeUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, periodLabel])
+  @@index([userId])
+  @@index([periodLabel])
 }

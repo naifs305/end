@@ -34,6 +34,115 @@ async function main() {
       console.log('Schema step:', e.message.slice(0, 80));
     }
   }
+
+  // --- جداول الأدوات التحفيزية الأربع ---
+  const motivationTables = [
+    // أنواع الشارات
+    `DO $$ BEGIN
+       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'BadgeType') THEN
+         CREATE TYPE "BadgeType" AS ENUM (
+           'COMMITTED','PRECISE','FAST','IMPROVER','CONSISTENT',
+           'PIONEER','IDEA_CHAMPION','TEAM_PLAYER','PLEDGE_KEEPER','STAR'
+         );
+       END IF;
+     END $$`,
+    `DO $$ BEGIN
+       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'IdeaStatus') THEN
+         CREATE TYPE "IdeaStatus" AS ENUM ('PENDING','UNDER_REVIEW','APPROVED','IMPLEMENTED','REJECTED');
+       END IF;
+     END $$`,
+    `DO $$ BEGIN
+       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ChallengeStatus') THEN
+         CREATE TYPE "ChallengeStatus" AS ENUM ('ACTIVE','ACHIEVED','FAILED','CANCELLED');
+       END IF;
+     END $$`,
+    // جدول الشارات
+    `CREATE TABLE IF NOT EXISTS "EmployeeBadge" (
+       "id"          TEXT NOT NULL DEFAULT gen_random_uuid()::TEXT,
+       "userId"      TEXT NOT NULL,
+       "badgeType"   "BadgeType" NOT NULL,
+       "periodLabel" TEXT,
+       "note"        TEXT,
+       "awardedAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       "awardedById" TEXT,
+       CONSTRAINT "EmployeeBadge_pkey" PRIMARY KEY ("id")
+     )`,
+    `CREATE INDEX IF NOT EXISTS "EmployeeBadge_userId_idx"   ON "EmployeeBadge"("userId")`,
+    `CREATE INDEX IF NOT EXISTS "EmployeeBadge_badgeType_idx" ON "EmployeeBadge"("badgeType")`,
+    // جدول المبادرات
+    `CREATE TABLE IF NOT EXISTS "ImprovementIdea" (
+       "id"            TEXT NOT NULL DEFAULT gen_random_uuid()::TEXT,
+       "userId"        TEXT NOT NULL,
+       "title"         TEXT NOT NULL,
+       "description"   TEXT NOT NULL,
+       "category"      TEXT NOT NULL DEFAULT 'general',
+       "status"        "IdeaStatus" NOT NULL DEFAULT 'PENDING',
+       "supportCount"  INTEGER NOT NULL DEFAULT 0,
+       "createdAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       "updatedAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       "reviewedAt"    TIMESTAMP(3),
+       "reviewedById"  TEXT,
+       "reviewNotes"   TEXT,
+       "implementedAt" TIMESTAMP(3),
+       CONSTRAINT "ImprovementIdea_pkey" PRIMARY KEY ("id")
+     )`,
+    `CREATE INDEX IF NOT EXISTS "ImprovementIdea_userId_idx" ON "ImprovementIdea"("userId")`,
+    `CREATE INDEX IF NOT EXISTS "ImprovementIdea_status_idx" ON "ImprovementIdea"("status")`,
+    // جدول تأييد المبادرات
+    `CREATE TABLE IF NOT EXISTS "IdeaSupport" (
+       "id"        TEXT NOT NULL DEFAULT gen_random_uuid()::TEXT,
+       "ideaId"    TEXT NOT NULL,
+       "userId"    TEXT NOT NULL,
+       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       CONSTRAINT "IdeaSupport_pkey" PRIMARY KEY ("id")
+     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "IdeaSupport_ideaId_userId_key" ON "IdeaSupport"("ideaId","userId")`,
+    // جدول التحدي الشهري
+    `CREATE TABLE IF NOT EXISTS "TeamChallenge" (
+       "id"           TEXT NOT NULL DEFAULT gen_random_uuid()::TEXT,
+       "periodLabel"  TEXT NOT NULL,
+       "title"        TEXT NOT NULL,
+       "description"  TEXT,
+       "targetMetric" TEXT NOT NULL,
+       "targetValue"  DOUBLE PRECISION NOT NULL,
+       "status"       "ChallengeStatus" NOT NULL DEFAULT 'ACTIVE',
+       "result"       DOUBLE PRECISION,
+       "achieved"     BOOLEAN NOT NULL DEFAULT false,
+       "createdById"  TEXT NOT NULL,
+       "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       "updatedAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       CONSTRAINT "TeamChallenge_pkey" PRIMARY KEY ("id")
+     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "TeamChallenge_periodLabel_key" ON "TeamChallenge"("periodLabel")`,
+    // جدول التعهد الشخصي
+    `CREATE TABLE IF NOT EXISTS "MonthlyPledge" (
+       "id"           TEXT NOT NULL DEFAULT gen_random_uuid()::TEXT,
+       "userId"       TEXT NOT NULL,
+       "periodLabel"  TEXT NOT NULL,
+       "pledge1"      TEXT NOT NULL,
+       "pledge2"      TEXT,
+       "pledge3"      TEXT,
+       "fulfilled1"   BOOLEAN,
+       "fulfilled2"   BOOLEAN,
+       "fulfilled3"   BOOLEAN,
+       "fulfillRate"  DOUBLE PRECISION,
+       "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       "evaluatedAt"  TIMESTAMP(3),
+       CONSTRAINT "MonthlyPledge_pkey" PRIMARY KEY ("id")
+     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "MonthlyPledge_userId_periodLabel_key" ON "MonthlyPledge"("userId","periodLabel")`,
+    `CREATE INDEX IF NOT EXISTS "MonthlyPledge_userId_idx" ON "MonthlyPledge"("userId")`,
+  ];
+
+  for (const sql of motivationTables) {
+    try {
+      await directPrisma.$executeRawUnsafe(sql);
+    } catch (e) {
+      console.log('Motivation DDL:', e.message.slice(0, 80));
+    }
+  }
+  console.log('Motivation tables ensured.');
+
   console.log('Schema columns ensured.');
 
   // --- المشاريع الافتراضية ---

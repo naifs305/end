@@ -23,6 +23,7 @@ const ICONS = {
   chart:    'M18 20V10 M12 20V4 M6 20v-6',
   kpi:      'M22 12h-4l-3 9L9 3l-3 9H2',
   search:   'M11 19a8 8 0 100-16 8 8 0 000 16z M21 21l-4.35-4.35',
+  star:     'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z',
   message:  'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z',
   users:    'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2 M23 21v-2a4 4 0 00-3-3.87 M16 3.13a4 4 0 010 7.75 M9 7a4 4 0 100 8 4 4 0 000-8z',
   project:  'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z',
@@ -141,6 +142,7 @@ export default function MobileNav({ open, onClose }) {
           {link('/reports', 'chart', 'التقارير الميدانية')}
           {!isQuality && canViewKpis && link('/kpis', 'kpi', 'مؤشرات الأداء')}
           {isQuality && link('/quality', 'kpi', 'لوحة الجودة')}
+          {!isQuality && link('/motivation', 'star', 'مركز التحفيز')}
           {!isQuality && (isAdmin || isSupervisor) && link('/executive-report', 'report', 'التقرير القيادي')}
           {!isQuality && isAdmin && link('/audit', 'search', 'سجل المراجعة')}
 
