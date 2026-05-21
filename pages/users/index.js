@@ -52,11 +52,11 @@ export default function UserManagement() {
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
             {[
-              ['المجموع', stats.total, 'text-primary'],
-              ['نشطون', stats.active, 'text-success'],
-              ['مديرون', stats.managers, 'text-purple-700'],
-              ['مشرفون', stats.supervisors, 'text-primary'],
-              ['منسقون', stats.employees,   'text-text-soft'],
+              ['المجموع',  stats.total,      'text-primary'],
+              ['نشطون',   stats.active,     'text-accent'],
+              ['مديرون',  stats.managers,   'text-primary'],
+              ['مشرفون',  stats.supervisors,'text-primary'],
+              ['منسقون',  stats.employees,  'text-text-soft'],
             ].map(([l, v, c]) => (
               <div key={l} className="rounded-xl border border-border bg-background px-3 py-1.5 text-center">
                 <div className={`text-lg font-extrabold ${c}`}>{v}</div>

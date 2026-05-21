@@ -379,60 +379,60 @@ export default function Archive() {
           </div>
 
           {loading ? (
-            <div className="p-6 text-text-soft">جاري التحميل...</div>
+            <div className="flex items-center justify-center gap-2 py-14 text-text-soft">
+              <div className="h-6 w-6 animate-spin rounded-full border-3 border-primary border-t-transparent" />
+              <span className="text-sm">جاري التحميل...</span>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-background">
-                  <tr className="text-right text-text-soft">
-                    <th className="px-6 py-4 font-bold">الدورة</th>
-                    <th className="px-6 py-4 font-bold">الكود</th>
-                    <th className="px-6 py-4 font-bold">المشروع</th>
-                    <th className="px-6 py-4 font-bold">المدينة</th>
-                    <th className="px-6 py-4 font-bold">النوع</th>
-                    <th className="px-6 py-4 font-bold">الحالة</th>
-                    <th className="px-6 py-4 font-bold">تاريخ الإغلاق</th>
-                    <th className="px-6 py-4 font-bold">الإجراء</th>
+                <thead className="bg-background border-b border-border">
+                  <tr className="text-right">
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">الدورة</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">الكود</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">المشروع</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">المدينة</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">النوع</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">الحالة</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">تاريخ الإغلاق</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">إجراء</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredCourses.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="px-6 py-10 text-center text-text-soft">
+                      <td colSpan="8" className="px-4 py-12 text-center text-text-soft">
                         لا توجد نتائج في الأرشيف
                       </td>
                     </tr>
                   ) : (
-                    paginatedCourses.map((course, index) => (
-                      <tr
-                        key={course.id}
-                        className="border-t border-border transition hover:bg-background"
-                      >
-                        <td className="px-6 py-4 font-bold text-text-main">{course.name || '-'}</td>
-                        <td className="px-6 py-4 text-text-soft">{course.code || '-'}</td>
-                        <td className="px-6 py-4 text-text-soft">{getProjectName(course)}</td>
-                        <td className="px-6 py-4 text-text-soft">{course.city || '-'}</td>
-                        <td className="px-6 py-4 text-text-soft">
+                    paginatedCourses.map((course) => (
+                      <tr key={course.id} className="border-t border-border transition hover:bg-background">
+                        <td className="px-4 py-3 font-bold text-text-main max-w-[200px]">
+                          <Link href={`/courses/${course.id}`} className="line-clamp-1 hover:text-primary transition">
+                            {course.name || '-'}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-text-soft font-mono">{course.code || '—'}</td>
+                        <td className="px-4 py-3 text-xs text-text-soft">{getProjectName(course)}</td>
+                        <td className="px-4 py-3 text-xs text-text-soft">{course.city || '—'}</td>
+                        <td className="px-4 py-3 text-xs text-text-soft">
                           {course.courseType === 'internal' ? 'داخلية' : 'خارجية'}
                         </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-bold ${
-                              course.status === 'ARCHIVED'
-                                ? 'bg-border text-text-soft border-border'
-                                : 'bg-forest-50 text-accent border-accent/20'
-                            }`}
-                          >
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                            course.status === 'ARCHIVED'
+                              ? 'bg-border/60 text-text-soft border-border'
+                              : 'bg-forest-50 text-accent border-accent/20'
+                          }`}>
                             {getStatusLabel(course.status)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-text-soft">{formatDate(course.endDate)}</td>
-                        <td className="px-6 py-4">
-                          <Link
-                            href={`/courses/${course.id}`}
-                            className="font-bold text-primary hover:text-primary-dark"
-                          >
-                            عرض
+                        <td className="px-4 py-3 text-xs text-text-soft">{formatDate(course.endDate)}</td>
+                        <td className="px-4 py-3">
+                          <Link href={`/courses/${course.id}`}
+                            className="rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-bold text-text-main hover:border-primary hover:text-primary transition">
+                            عرض ←
                           </Link>
                         </td>
                       </tr>
