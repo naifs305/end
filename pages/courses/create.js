@@ -194,9 +194,6 @@ export default function CreateCoursePage() {
                   placeholder="مثال: أساليب التفتيش الأمني"
                   className={inputCls} />
               </Field>
-              <Field label="كود الدورة">
-                <input value="يتم توليده تلقائياً بعد الحفظ مثل od-2026-0001" readOnly className={inputCls} />
-              </Field>
               <Field label="الجهة المستفيدة">
                 <input value={form.beneficiaryEntity} onChange={e=>set('beneficiaryEntity',e.target.value)}
                   placeholder="اسم الجهة المستفيدة (اختياري)"
