@@ -216,12 +216,19 @@ export default function CourseDetail() {
     const criticalMeta = CRITICAL_META[el.element?.key];
     const isRedAlert   = isCritical && overdue && !['APPROVED','PENDING_APPROVAL'].includes(el.status);
     const isSettlement = el.element?.key === 'settlement';
+    const palette = el.status === 'APPROVED'
+      ? { bg: 'linear-gradient(135deg,#F0F8F4 0%,#FFFFFF 60%)', border: '#5D8A70', glow: 'rgba(93,138,112,0.16)' }
+      : el.status === 'PENDING_APPROVAL'
+        ? { bg: 'linear-gradient(135deg,#EEF5F2 0%,#FFFFFF 62%)', border: '#253C32', glow: 'rgba(37,60,50,0.14)' }
+        : overdue || isRedAlert
+          ? { bg: 'linear-gradient(135deg,#FFF5EF 0%,#FFFFFF 62%)', border: '#633646', glow: 'rgba(99,54,70,0.14)' }
+          : { bg: 'linear-gradient(135deg,#FBF8F2 0%,#FFFFFF 62%)', border: '#C3B39F', glow: 'rgba(195,179,159,0.18)' };
 
     return (
       <div key={el.id}
-        className={`rounded-xl border bg-white overflow-hidden transition hover:shadow-soft
+        className={`relative rounded-2xl border overflow-hidden transition hover:-translate-y-0.5 min-h-[128px]
           ${isRedAlert ? 'border-danger shadow-[0_0_0_2px_rgba(99,54,70,0.15)]' : 'border-border'}`}
-        style={{ borderInlineStart: `3px solid ${isRedAlert ? '#633646' : meta.border}` }}>
+        style={{ borderInlineStart: `5px solid ${isRedAlert ? '#633646' : palette.border}`, background: palette.bg, boxShadow: `0 10px 24px ${palette.glow}` }}>
 
         {/* شريط الإنذار الأحمر للعناصر الحرجة المتأخرة */}
         {isRedAlert && (
@@ -242,12 +249,12 @@ export default function CourseDetail() {
           </div>
         )}
 
-        <div className="p-3 space-y-2">
+        <div className="p-3 space-y-2.5">
 
           {/* رأس العنصر */}
-          <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="pl-32">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <h4 className="font-extrabold text-sm text-text-main leading-snug">{el.element.name}</h4>
+              <h4 className="font-extrabold text-[15px] text-text-main leading-snug">{el.element.name}</h4>
               <Badge meta={meta} small />
               {overdue && !isRedAlert && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-burgundy/10 px-2 py-0.5 text-[10px] font-bold text-danger border border-burgundy/20">
@@ -260,15 +267,15 @@ export default function CourseDetail() {
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-              <ElementRow element={{ ...el, course }} activeRole={activeRole} isOverdue={overdue} onUpdate={fetchCourse} />
-              {renderAction(el)}
-            </div>
+          </div>
+          <div className="absolute left-3 top-3 z-10 flex max-w-[150px] flex-wrap items-center justify-end gap-1.5">
+            <ElementRow element={{ ...el, course }} activeRole={activeRole} isOverdue={overdue} onUpdate={fetchCourse} />
+            {renderAction(el)}
           </div>
 
           {/* المواعيد */}
           {deadline && !['APPROVED','NOT_APPLICABLE'].includes(el.status) && (
-            <div className="flex flex-wrap gap-3 text-[11px]">
+            <div className="flex flex-wrap gap-2 text-[11px] rounded-xl bg-white/70 px-2.5 py-1.5 border border-white/70">
               {idealDl && (
                 <span className="text-text-soft">
                   مثالي: <span className="font-bold text-accent">{fmt(idealDl)}</span>

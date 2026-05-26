@@ -195,26 +195,26 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   // ======================================================================
 
   return (
-    <div className="flex flex-col gap-2 w-full">
+    <div className="flex flex-wrap items-center justify-end gap-2">
 
       {/* أزرار الموظف — تقديم / سحب */}
       {canExecute && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
         <button
           type="button"
           onClick={openSolfForCourse}
-          className="w-fit rounded-xl border border-primary bg-white px-3 py-2 text-xs font-bold text-primary hover:bg-primary-light"
+          className="w-fit rounded-xl border border-primary/30 bg-white px-3 py-2 text-xs font-bold text-primary shadow-sm hover:bg-primary-light"
         >
           فتح منصة السلف لهذه الدورة
         </button>
       )}
 
       {canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status) && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary-dark disabled:opacity-50 transition"
+              className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-primary-dark disabled:opacity-50 transition"
             >
               {loading
                 ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> جاري الرفع...</>
@@ -234,7 +234,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           </div>
 
           {showDelayReason && (
-            <div className="rounded-xl border border-sand/40 bg-sand/10 p-2">
+            <div className="w-full rounded-xl border border-sand/40 bg-sand/10 p-2">
               <textarea
                 value={delayReason}
                 onChange={(e) => setDelayReason(e.target.value)}
@@ -276,19 +276,19 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           type="button"
           onClick={handleManualFinancialClose}
           disabled={loading}
-          className="w-fit rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent hover:bg-accent hover:text-white disabled:opacity-50"
+          className="w-fit rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent shadow-sm hover:bg-accent hover:text-white disabled:opacity-50"
         >
           تقفيل يدوي خارج منصة السلف
         </button>
       )}
 
       {isApprover && element.status === 'PENDING_APPROVAL' && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 w-full">
           <div className="flex flex-wrap gap-2">
             <button
               onClick={handleApprove}
               disabled={loading}
-              className="rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+              className="rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
             >
               اعتماد ✓
             </button>
