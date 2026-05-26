@@ -23,6 +23,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
   const [extHours, setExtHours]             = useState('');
   const [extReason, setExtReason]           = useState('');
   const [savingExt, setSavingExt]           = useState(false);
+  const isFinancialElement = ['advance_req', 'settlement'].includes(element?.element?.key);
 
   const isEmployee = activeRole === 'EMPLOYEE';
   const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
@@ -103,6 +104,21 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
       onUpdate();
     } catch (err) {
       toast.error(err.response?.data?.message || 'حدث خطأ');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManualFinancialClose = async () => {
+    const notes = window.prompt('ملاحظة التقفيل اليدوي (اختياري):', 'تم تنفيذ الإجراء خارج منصة السلف');
+    if (notes === null) return;
+    setLoading(true);
+    try {
+      await api.post(`/closure/${element.id}/manual-financial-close`, { notes });
+      toast.success('تم تقفيل العنصر مباشرة');
+      onUpdate();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'تعذر تقفيل العنصر');
     } finally {
       setLoading(false);
     }
@@ -225,6 +241,17 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
       )}
 
       {/* أزرار المعتمد */}
+      {isApprover && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
+        <button
+          type="button"
+          onClick={handleManualFinancialClose}
+          disabled={loading}
+          className="w-fit rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent hover:bg-accent hover:text-white disabled:opacity-50"
+        >
+          تقفيل يدوي خارج منصة السلف
+        </button>
+      )}
+
       {isApprover && element.status === 'PENDING_APPROVAL' && (
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">
