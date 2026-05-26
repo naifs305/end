@@ -214,11 +214,11 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-primary-dark disabled:opacity-50 transition"
+              className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold shadow-sm disabled:opacity-50 transition ${isFinancialElement ? 'border border-sand/50 bg-white text-warning hover:bg-sand/10' : 'bg-primary text-white hover:bg-primary-dark'}`}
             >
               {loading
                 ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> جاري الرفع...</>
-                : element.status === 'RETURNED' ? '↩ إعادة تقديم' : 'تقديم'}
+                : isFinancialElement ? 'تقديم خارج المنصة' : element.status === 'RETURNED' ? '↩ إعادة تقديم' : 'تقديم'}
             </button>
 
             {/* زر إضافة مبرر — مخفي بالافتراض */}

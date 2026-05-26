@@ -4,9 +4,6 @@ import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
 import MainLayout from '../../components/layout/MainLayout';
 import ElementRow from '../../components/operational/ElementRow';
-import Modal from '../../components/operational/Modal';
-import CourseReportForm from '../../components/operational/CourseReportForm';
-import FinancialForm from '../../components/operational/FinancialForm';
 import toast from 'react-hot-toast';
 
 // ── ثوابت الحالات ─────────────────────────────────────────────────────
@@ -80,7 +77,6 @@ export default function CourseDetail() {
 
   const [course,          setCourse]          = useState(null);
   const [loading,         setLoading]         = useState(true);
-  const [selectedElement, setSelectedElement] = useState(null);
   const [showAll,         setShowAll]         = useState(false);
 
   const isEmployee   = activeRole === 'EMPLOYEE';
@@ -177,8 +173,6 @@ export default function CourseDetail() {
   const isReportKey = (key) => key === 'opening_report' || key === 'closing_report' || key === 'report';
 
   const renderAction = (el) => {
-    const isFinancialElement = ['advance_req', 'settlement'].includes(el.element?.key);
-
     if (isReportKey(el.element.key) && ['PENDING_APPROVAL','APPROVED'].includes(el.status)) {
       return (
         <div className="flex flex-wrap items-center gap-2">
@@ -191,15 +185,6 @@ export default function CourseDetail() {
             📧 EML
           </button>
         </div>
-      );
-    }
-    if ((isEmployee || isCoordinator) && el.element.isFormBased && !isFinancialElement &&
-        !['APPROVED','PENDING_APPROVAL','NOT_APPLICABLE'].includes(el.status)) {
-      return (
-        <button onClick={() => setSelectedElement(el)}
-          className="rounded-xl bg-accent px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 transition">
-          فتح النموذج
-        </button>
       );
     }
     return null;
@@ -542,29 +527,6 @@ export default function CourseDetail() {
           </div>
         )}
       </div>
-
-      {/* ── المودال ──────────────────────────────────────────────────── */}
-      {selectedElement && (
-        <Modal isOpen onClose={() => setSelectedElement(null)} title={selectedElement.element.name}>
-          {isReportKey(selectedElement.element.key) && (
-            <CourseReportForm
-              trackingId={selectedElement.id}
-              course={course}
-              reportType={selectedElement.element.key}
-              onClose={() => setSelectedElement(null)}
-              onSuccess={fetchCourse}
-            />
-          )}
-          {(selectedElement.element.key === 'advance_req' || selectedElement.element.key === 'settlement') && (
-            <FinancialForm
-              type={selectedElement.element.key === 'advance_req' ? 'advance' : 'settlement'}
-              trackingId={selectedElement.id}
-              onClose={() => setSelectedElement(null)}
-              onSuccess={fetchCourse}
-            />
-          )}
-        </Modal>
-      )}
     </MainLayout>
   );
 }
