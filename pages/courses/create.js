@@ -13,7 +13,7 @@ function fmtDate(date) {
 }
 
 const EMPTY = {
-  name:'', code:'', beneficiaryEntity:'', city:'', locationType:'',
+  name:'', beneficiaryEntity:'', city:'', locationType:'',
   startDate:'', endDate:'', numTrainees:'',
   operationalProjectId: '',
   requiresAdvance:false, requiresAdvanceSettlement:false,
@@ -125,7 +125,6 @@ export default function CreateCoursePage() {
     try {
       const payload = {
         name: form.name.trim(),
-        code: form.code.trim() || undefined,
         beneficiaryEntity: form.beneficiaryEntity.trim() || undefined,
         city: form.city.trim(),
         locationType: form.locationType,
@@ -196,9 +195,7 @@ export default function CreateCoursePage() {
                   className={inputCls} />
               </Field>
               <Field label="كود الدورة">
-                <input value={form.code} onChange={e=>set('code',e.target.value)}
-                  placeholder="مثال: SEC-101 (اختياري)"
-                  className={inputCls} />
+                <input value="يتم توليده تلقائياً بعد الحفظ مثل od-2026-0001" readOnly className={inputCls} />
               </Field>
               <Field label="الجهة المستفيدة">
                 <input value={form.beneficiaryEntity} onChange={e=>set('beneficiaryEntity',e.target.value)}
