@@ -177,6 +177,8 @@ export default function CourseDetail() {
   const isReportKey = (key) => key === 'opening_report' || key === 'closing_report' || key === 'report';
 
   const renderAction = (el) => {
+    const isFinancialElement = ['advance_req', 'settlement'].includes(el.element?.key);
+
     if (isReportKey(el.element.key) && ['PENDING_APPROVAL','APPROVED'].includes(el.status)) {
       return (
         <div className="flex flex-wrap items-center gap-2">
@@ -191,7 +193,7 @@ export default function CourseDetail() {
         </div>
       );
     }
-    if ((isEmployee || isCoordinator) && el.element.isFormBased &&
+    if ((isEmployee || isCoordinator) && el.element.isFormBased && !isFinancialElement &&
         !['APPROVED','PENDING_APPROVAL','NOT_APPLICABLE'].includes(el.status)) {
       return (
         <button onClick={() => setSelectedElement(el)}
@@ -267,7 +269,7 @@ export default function CourseDetail() {
                 </span>
               )}
             </div>
-            <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1.5 sm:max-w-[62%]">
+            <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1.5 sm:w-[360px] sm:max-w-[62%]">
               <ElementRow element={{ ...el, course }} activeRole={activeRole} isOverdue={overdue} onUpdate={fetchCourse} />
               {renderAction(el)}
             </div>

@@ -198,6 +198,16 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
     <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
 
       {/* أزرار الموظف — تقديم / سحب */}
+      {canExecute && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
+        <button
+          type="button"
+          onClick={openSolfForCourse}
+          className="w-fit whitespace-nowrap rounded-xl border border-primary/30 bg-white px-3 py-2 text-xs font-bold text-primary shadow-sm hover:bg-primary-light"
+        >
+          منصة السلف
+        </button>
+      )}
+
       {canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status) && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -237,16 +247,6 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             </div>
           )}
         </div>
-      )}
-
-      {canExecute && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
-        <button
-          type="button"
-          onClick={openSolfForCourse}
-          className="w-fit whitespace-nowrap rounded-xl border border-primary/30 bg-white px-3 py-2 text-xs font-bold text-primary shadow-sm hover:bg-primary-light"
-        >
-          منصة السلف
-        </button>
       )}
 
       {canExecute && element.status === 'PENDING_APPROVAL' && (
