@@ -195,26 +195,16 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   // ======================================================================
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
 
       {/* أزرار الموظف — تقديم / سحب */}
-      {canExecute && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
-        <button
-          type="button"
-          onClick={openSolfForCourse}
-          className="w-fit rounded-xl border border-primary/30 bg-white px-3 py-2 text-xs font-bold text-primary shadow-sm hover:bg-primary-light"
-        >
-          فتح منصة السلف لهذه الدورة
-        </button>
-      )}
-
       {canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status) && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-primary-dark disabled:opacity-50 transition"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-primary-dark disabled:opacity-50 transition"
             >
               {loading
                 ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> جاري الرفع...</>
@@ -249,19 +239,29 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
         </div>
       )}
 
+      {canExecute && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
+        <button
+          type="button"
+          onClick={openSolfForCourse}
+          className="w-fit whitespace-nowrap rounded-xl border border-primary/30 bg-white px-3 py-2 text-xs font-bold text-primary shadow-sm hover:bg-primary-light"
+        >
+          منصة السلف
+        </button>
+      )}
+
       {canExecute && element.status === 'PENDING_APPROVAL' && (
         <div className="flex flex-wrap gap-2">
           <button
             onClick={handleWithdraw}
             disabled={loading || reminding}
-            className="rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-xs font-bold text-warning hover:bg-sand/20 disabled:opacity-50 transition"
+            className="whitespace-nowrap rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-xs font-bold text-warning hover:bg-sand/20 disabled:opacity-50 transition"
           >
             سحب التقديم
           </button>
           <button
             onClick={handleRemind}
             disabled={loading || reminding}
-            className="rounded-xl border border-primary bg-white px-3 py-2 text-xs font-bold text-primary hover:bg-primary-light disabled:opacity-50"
+            className="whitespace-nowrap rounded-xl border border-primary bg-white px-3 py-2 text-xs font-bold text-primary hover:bg-primary-light disabled:opacity-50"
           >
             {reminding
               ? <span className="flex items-center gap-1"><span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" /> إرسال...</span>
@@ -276,9 +276,9 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           type="button"
           onClick={handleManualFinancialClose}
           disabled={loading}
-          className="w-fit rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent shadow-sm hover:bg-accent hover:text-white disabled:opacity-50"
+          className="w-fit whitespace-nowrap rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent shadow-sm hover:bg-accent hover:text-white disabled:opacity-50"
         >
-          تقفيل يدوي خارج منصة السلف
+          تقفيل يدوي
         </button>
       )}
 
@@ -288,7 +288,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             <button
               onClick={handleApprove}
               disabled={loading}
-              className="rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+              className="whitespace-nowrap rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
             >
               اعتماد ✓
             </button>
@@ -296,7 +296,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               type="button"
               onClick={() => { setShowReturnForm((v) => !v); setShowRejectForm(false); }}
               disabled={loading}
-              className="rounded-xl bg-warning px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+              className="whitespace-nowrap rounded-xl bg-warning px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
             >
               إعادة للموظف
             </button>
@@ -304,7 +304,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               type="button"
               onClick={() => { setShowRejectForm((v) => !v); setShowReturnForm(false); }}
               disabled={loading}
-              className="rounded-xl bg-danger px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+              className="whitespace-nowrap rounded-xl bg-danger px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
             >
               رفض
             </button>
@@ -368,7 +368,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           <button
             type="button"
             onClick={() => setShowExtendForm((v) => !v)}
-            className="w-fit rounded-xl border border-primary/40 bg-primary-light/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-light"
+            className="w-fit whitespace-nowrap rounded-xl border border-primary/40 bg-primary-light/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-light"
           >
             {showExtendForm ? 'إغلاق' : '⏱ منح تمديد'}
           </button>

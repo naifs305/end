@@ -226,7 +226,7 @@ export default function CourseDetail() {
 
     return (
       <div key={el.id}
-        className={`relative rounded-2xl border overflow-hidden transition hover:-translate-y-0.5 min-h-[128px]
+        className={`rounded-2xl border overflow-visible transition hover:-translate-y-0.5 min-h-[128px]
           ${isRedAlert ? 'border-danger shadow-[0_0_0_2px_rgba(99,54,70,0.15)]' : 'border-border'}`}
         style={{ borderInlineStart: `5px solid ${isRedAlert ? '#633646' : palette.border}`, background: palette.bg, boxShadow: `0 10px 24px ${palette.glow}` }}>
 
@@ -252,8 +252,8 @@ export default function CourseDetail() {
         <div className="p-3 space-y-2.5">
 
           {/* رأس العنصر */}
-          <div className="pl-32">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <h4 className="font-extrabold text-[15px] text-text-main leading-snug">{el.element.name}</h4>
               <Badge meta={meta} small />
               {overdue && !isRedAlert && (
@@ -267,10 +267,10 @@ export default function CourseDetail() {
                 </span>
               )}
             </div>
-          </div>
-          <div className="absolute left-3 top-3 z-10 flex max-w-[150px] flex-wrap items-center justify-end gap-1.5">
-            <ElementRow element={{ ...el, course }} activeRole={activeRole} isOverdue={overdue} onUpdate={fetchCourse} />
-            {renderAction(el)}
+            <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1.5 sm:max-w-[62%]">
+              <ElementRow element={{ ...el, course }} activeRole={activeRole} isOverdue={overdue} onUpdate={fetchCourse} />
+              {renderAction(el)}
+            </div>
           </div>
 
           {/* المواعيد */}
