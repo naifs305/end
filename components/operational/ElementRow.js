@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
+import useAuth from '../../context/AuthContext';
 
 // ======================================================================
 // مكون صف عنصر الإقفال — المرحلة الرابعة
@@ -11,6 +12,7 @@ import toast from 'react-hot-toast';
 //   ٣. زر منح تمديد للمدير مع نموذج داخلي
 
 export default function ElementRow({ element, activeRole, onUpdate }) {
+  const { user } = useAuth();
   const [loading, setLoading]               = useState(false);
   const [reminding, setReminding]           = useState(false);
   const [showDelayReason, setShowDelayReason] = useState(false);
@@ -27,6 +29,8 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
   const solfUrl = process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-nif.vercel.app';
 
   const isEmployee = activeRole === 'EMPLOYEE';
+  const isCoordinator = user?.id && user.id === element?.course?.primaryEmployeeId;
+  const canExecute = isEmployee || isCoordinator;
   const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
   const isManager  = activeRole === 'MANAGER';
 
@@ -190,7 +194,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
     <div className="flex flex-col gap-2 w-full">
 
       {/* أزرار الموظف — تقديم / سحب */}
-      {isEmployee && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
+      {canExecute && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
         <button
           type="button"
           onClick={openSolfForCourse}
@@ -200,7 +204,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
         </button>
       )}
 
-      {isEmployee && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status) && (
+      {canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status) && (
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -239,7 +243,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
         </div>
       )}
 
-      {isEmployee && element.status === 'PENDING_APPROVAL' && (
+      {canExecute && element.status === 'PENDING_APPROVAL' && (
         <div className="flex flex-wrap gap-2">
           <button
             onClick={handleWithdraw}

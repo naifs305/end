@@ -76,7 +76,7 @@ function Badge({ meta, small }) {
 export default function CourseDetail() {
   const router = useRouter();
   const { id } = router.query;
-  const { activeRole } = useAuth();
+  const { activeRole, user } = useAuth();
 
   const [course,          setCourse]          = useState(null);
   const [loading,         setLoading]         = useState(true);
@@ -84,6 +84,7 @@ export default function CourseDetail() {
   const [showAll,         setShowAll]         = useState(false);
 
   const isEmployee   = activeRole === 'EMPLOYEE';
+  const isCoordinator = course?.primaryEmployeeId && user?.id === course.primaryEmployeeId;
   const isApprover   = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
   const isManager    = activeRole === 'MANAGER';
   const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
@@ -190,7 +191,7 @@ export default function CourseDetail() {
         </div>
       );
     }
-    if (isEmployee && el.element.isFormBased &&
+    if ((isEmployee || isCoordinator) && el.element.isFormBased &&
         !['APPROVED','PENDING_APPROVAL','NOT_APPLICABLE'].includes(el.status)) {
       return (
         <button onClick={() => setSelectedElement(el)}
