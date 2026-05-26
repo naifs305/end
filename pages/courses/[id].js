@@ -219,13 +219,13 @@ export default function CourseDetail() {
 
     return (
       <div key={el.id}
-        className={`rounded-2xl border bg-white shadow-card overflow-hidden transition hover:shadow-soft
+        className={`rounded-xl border bg-white overflow-hidden transition hover:shadow-soft
           ${isRedAlert ? 'border-danger shadow-[0_0_0_2px_rgba(99,54,70,0.15)]' : 'border-border'}`}
         style={{ borderInlineStart: `3px solid ${isRedAlert ? '#633646' : meta.border}` }}>
 
         {/* شريط الإنذار الأحمر للعناصر الحرجة المتأخرة */}
         {isRedAlert && (
-          <div className={`flex items-center gap-2 px-4 py-2 text-xs font-bold text-white
+          <div className={`flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold text-white
             ${isSettlement ? 'bg-danger' : 'bg-burgundy/80'}`}>
             <span className="animate-pulse">🚨</span>
             <span>إنذار {isSettlement ? 'حرج' : 'عاجل'}: {criticalMeta?.label} متأخر عن الموعد الأقصى</span>
@@ -242,12 +242,12 @@ export default function CourseDetail() {
           </div>
         )}
 
-        <div className="p-4 space-y-3">
+        <div className="p-3 space-y-2">
 
           {/* رأس العنصر */}
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <h4 className="font-extrabold text-sm text-text-main">{el.element.name}</h4>
+              <h4 className="font-extrabold text-sm text-text-main leading-snug">{el.element.name}</h4>
               <Badge meta={meta} small />
               {overdue && !isRedAlert && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-burgundy/10 px-2 py-0.5 text-[10px] font-bold text-danger border border-burgundy/20">
@@ -260,15 +260,15 @@ export default function CourseDetail() {
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <ElementRow element={{ ...el, course }} activeRole={activeRole} onUpdate={fetchCourse} />
+            <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+              <ElementRow element={{ ...el, course }} activeRole={activeRole} isOverdue={overdue} onUpdate={fetchCourse} />
               {renderAction(el)}
             </div>
           </div>
 
           {/* المواعيد */}
           {deadline && !['APPROVED','NOT_APPLICABLE'].includes(el.status) && (
-            <div className="flex flex-wrap gap-4 text-[11px]">
+            <div className="flex flex-wrap gap-3 text-[11px]">
               {idealDl && (
                 <span className="text-text-soft">
                   مثالي: <span className="font-bold text-accent">{fmt(idealDl)}</span>
@@ -498,53 +498,33 @@ export default function CourseDetail() {
           </div>
         </div>
 
-        {/* ── العناصر النشطة ──────────────────────────────────────────── */}
-        {activeElements.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
-                <h2 className="font-extrabold text-text-main">العناصر النشطة</h2>
-                <p className="text-[11px] text-text-soft mt-0.5">تحتاج إجراء أو معالجة</p>
+                <h2 className="font-extrabold text-text-main">العناصر غير المكتملة</h2>
+                <p className="text-[11px] text-text-soft mt-0.5">حسب تسلسل الإقفال</p>
               </div>
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-sand/20 text-sm font-extrabold text-warning border border-sand/40">
-                {activeElements.length}
-              </span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-sand/20 text-sm font-extrabold text-warning border border-sand/40">{activeElements.length}</span>
             </div>
-            <div className="p-4 grid gap-3 sm:grid-cols-2">
-              {activeElements.map(el => renderElementCard(el))}
+            <div className="p-3 space-y-2">
+              {activeElements.length > 0 ? activeElements.map(el => renderElementCard(el)) : <p className="py-8 text-center text-sm text-text-soft">لا توجد عناصر غير مكتملة</p>}
             </div>
           </div>
-        )}
 
-        {/* ── العناصر المكتملة ─────────────────────────────────────────── */}
-        {completedElements.length > 0 && (
           <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
-            <button
-              className="w-full flex items-center justify-between border-b border-border px-5 py-3.5 hover:bg-background transition"
-              onClick={() => setShowAll(v => !v)}>
-              <div className="text-right">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div>
                 <h2 className="font-extrabold text-text-main">العناصر المكتملة</h2>
                 <p className="text-[11px] text-text-soft mt-0.5">مرفوعة أو مُعتمدة</p>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-forest-50 text-sm font-extrabold text-accent border border-accent/20">
-                  {completedElements.length}
-                </span>
-                <span className="text-text-soft text-sm">{showAll ? '▲' : '▼'}</span>
-              </div>
-            </button>
-            {showAll && (
-              <div className="p-4 grid gap-3 sm:grid-cols-2">
-                {completedElements.map(el => renderElementCard(el))}
-              </div>
-            )}
-            {!showAll && (
-              <div className="px-5 py-3 text-center text-xs text-text-soft/60">
-                اضغط لعرض {completedElements.length} عنصر مكتمل
-              </div>
-            )}
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-forest-50 text-sm font-extrabold text-accent border border-accent/20">{completedElements.length}</span>
+            </div>
+            <div className="p-3 space-y-2">
+              {completedElements.length > 0 ? completedElements.map(el => renderElementCard(el)) : <p className="py-8 text-center text-sm text-text-soft">لا توجد عناصر مكتملة</p>}
+            </div>
           </div>
-        )}
+        </div>
 
         {/* ── لا توجد عناصر ────────────────────────────────────────────── */}
         {sortedElements.length === 0 && (

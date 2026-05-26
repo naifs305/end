@@ -11,7 +11,7 @@ import useAuth from '../../context/AuthContext';
 //   ٢. نموذج سبب الإعادة/الرفض inline بدلاً من prompt()
 //   ٣. زر منح تمديد للمدير مع نموذج داخلي
 
-export default function ElementRow({ element, activeRole, onUpdate }) {
+export default function ElementRow({ element, activeRole, isOverdue = false, onUpdate }) {
   const { user } = useAuth();
   const [loading, setLoading]               = useState(false);
   const [reminding, setReminding]           = useState(false);
@@ -218,17 +218,19 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
             >
               {loading
                 ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> جاري الرفع...</>
-                : element.status === 'RETURNED' ? '↩ إعادة تقديم' : '📤 رفع للاعتماد'}
+                : element.status === 'RETURNED' ? '↩ إعادة تقديم' : 'تقديم'}
             </button>
 
             {/* زر إضافة مبرر — مخفي بالافتراض */}
-            <button
-              type="button"
-              onClick={() => setShowDelayReason((v) => !v)}
-              className="text-xs text-text-soft underline hover:text-primary"
-            >
-              {showDelayReason ? 'إخفاء المبرر' : '+ أضف مبرراً للتأخر'}
-            </button>
+            {isOverdue && (
+              <button
+                type="button"
+                onClick={() => setShowDelayReason((v) => !v)}
+                className="text-xs text-text-soft underline hover:text-primary"
+              >
+                {showDelayReason ? 'إخفاء المبرر' : '+ أضف مبرراً للتأخر'}
+              </button>
+            )}
           </div>
 
           {showDelayReason && (
