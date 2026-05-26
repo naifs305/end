@@ -24,6 +24,7 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
   const [extReason, setExtReason]           = useState('');
   const [savingExt, setSavingExt]           = useState(false);
   const isFinancialElement = ['advance_req', 'settlement'].includes(element?.element?.key);
+  const solfUrl = process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-nif.vercel.app';
 
   const isEmployee = activeRole === 'EMPLOYEE';
   const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
@@ -124,6 +125,15 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
     }
   };
 
+  const openSolfForCourse = () => {
+    const params = new URLSearchParams({
+      courseId: element.courseId,
+      courseCode: element.course?.code || '',
+      courseName: element.course?.name || '',
+    });
+    window.open(`${solfUrl}/?${params.toString()}`, '_blank', 'noopener,noreferrer');
+  };
+
   // ---- تمديد الموعد (مدير فقط) ----
 
   const handleGrantExtension = async () => {
@@ -180,6 +190,16 @@ export default function ElementRow({ element, activeRole, onUpdate }) {
     <div className="flex flex-col gap-2 w-full">
 
       {/* أزرار الموظف — تقديم / سحب */}
+      {isEmployee && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
+        <button
+          type="button"
+          onClick={openSolfForCourse}
+          className="w-fit rounded-xl border border-primary bg-white px-3 py-2 text-xs font-bold text-primary hover:bg-primary-light"
+        >
+          فتح منصة السلف لهذه الدورة
+        </button>
+      )}
+
       {isEmployee && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status) && (
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
