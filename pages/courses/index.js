@@ -37,7 +37,6 @@ function empName(u) { return `${u?.firstName||''} ${u?.lastName||''}`.trim() || 
 
 function CourseCard({ course, role, user, onDelete, onArchive, onReassign, busy }) {
   const cfg = STATUS_CFG[course.status] || STATUS_CFG.PREPARATION;
-  const [actionsOpen, setActionsOpen] = useState(false);
 
   const isOwner     = course.primaryEmployeeId === user?.id;
   const canEdit     = role === 'MANAGER' || role === 'PROJECT_SUPERVISOR' || (isOwner && course.status === 'PREPARATION');
@@ -79,7 +78,7 @@ function CourseCard({ course, role, user, onDelete, onArchive, onReassign, busy 
       </div>
 
       {/* شريط الإجراءات */}
-      <div className="flex items-center gap-1.5 border-t border-border bg-background px-3 py-2">
+      <div className="flex flex-wrap items-center gap-1.5 border-t border-border bg-background px-3 py-2">
         <Link href={`/courses/${course.id}`}
           className="rounded-lg border border-border bg-white px-3 py-1.5 text-[11px] font-bold text-text-main hover:border-primary hover:text-primary transition">
           📂 فتح
@@ -91,43 +90,36 @@ function CourseCard({ course, role, user, onDelete, onArchive, onReassign, busy 
           </Link>
         )}
 
-        {/* قائمة إجراءات إضافية */}
+        {/* أزرار المدير / المشرف — مباشرة بدون dropdown */}
         {canManage && (
-          <div className="relative mr-auto">
-            <button onClick={() => setActionsOpen(v => !v)}
-              className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-[11px] font-bold text-text-soft hover:bg-background">
-              ⋯
+          <>
+            <button
+              onClick={() => onReassign(course.id)}
+              disabled={busy === course.id}
+              className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-[11px] font-bold text-text-main hover:border-primary hover:text-primary transition disabled:opacity-50">
+              🔄 نقل
             </button>
-            {actionsOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setActionsOpen(false)} />
-                <div className="absolute left-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-xl border border-border bg-white shadow-soft">
-                  <button onClick={() => { setActionsOpen(false); onReassign(course.id); }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-text-main hover:bg-background">
-                    🔄 نقل المسؤول
-                  </button>
-                  {course.status === 'CLOSED' && (
-                    <button onClick={() => { setActionsOpen(false); onArchive(course.id); }} disabled={busy === course.id}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-text-soft hover:bg-background">
-                      📁 أرشفة
-                    </button>
-                  )}
-                  {canDel && (
-                    <button onClick={() => { setActionsOpen(false); onDelete(course.id, course.name); }} disabled={busy === course.id}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-danger hover:bg-burgundy/5">
-                      🗑️ حذف
-                    </button>
-                  )}
-                </div>
-              </>
+            {course.status === 'CLOSED' && (
+              <button
+                onClick={() => onArchive(course.id)}
+                disabled={busy === course.id}
+                className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-[11px] font-bold text-text-soft hover:bg-background transition disabled:opacity-50">
+                📁 أرشفة
+              </button>
             )}
-          </div>
+            <button
+              onClick={() => onDelete(course.id, course.name)}
+              disabled={busy === course.id}
+              className="rounded-lg border border-burgundy/20 bg-white px-2.5 py-1.5 text-[11px] font-bold text-danger hover:bg-burgundy/5 transition disabled:opacity-50">
+              🗑️ حذف
+            </button>
+          </>
         )}
 
         {!canManage && canDel && (
-          <button onClick={() => onDelete(course.id)} disabled={busy === course.id}
-            className="me-auto rounded-xl border border-burgundy/20 px-2.5 py-1.5 text-[11px] font-bold text-danger hover:bg-burgundy/5 disabled:opacity-50">
-            حذف
+          <button onClick={() => onDelete(course.id, course.name)} disabled={busy === course.id}
+            className="rounded-lg border border-burgundy/20 px-2.5 py-1.5 text-[11px] font-bold text-danger hover:bg-burgundy/5 disabled:opacity-50">
+            🗑️ حذف
           </button>
         )}
       </div>
