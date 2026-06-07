@@ -48,7 +48,7 @@ function CourseCard({ course, role, user, onDelete, onArchive, onReassign, busy 
   const elCount = course._count?.closureElements ?? 0;
 
   return (
-    <div className={`group relative overflow-hidden rounded-2xl border border-r-4 bg-white shadow-card transition hover:-translate-y-0.5 hover:shadow-soft ${cfg.border}`}>
+    <div className={`group relative rounded-2xl border border-r-4 bg-white shadow-card transition hover:-translate-y-0.5 hover:shadow-soft ${cfg.border}`}>
       {/* رأس البطاقة */}
       <div className="p-4">
         <div className="mb-2 flex items-start justify-between gap-2">
