@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import MainLayout from '../../components/layout/MainLayout';
 import api from '../../lib/axios';
@@ -150,6 +150,16 @@ export default function CoursesPage() {
   const [page,    setPage]      = useState(1);
   const PAGE = 12;
 
+  // ── modal نقل المسؤول ──
+  const [reassignModal, setReassignModal] = useState(null); // { courseId, courseName }
+  const [allUsers,      setAllUsers]      = useState([]);
+  const [selUser,       setSelUser]       = useState('');
+  const [reassigning,   setReassigning]   = useState(false);
+
+  // ── modal تأكيد الحذف ──
+  const [deleteModal, setDeleteModal] = useState(null); // { courseId, courseName }
+  const [deleting,    setDeleting]    = useState(false);
+
   const load = async () => {
     setLoading(true);
     try {
@@ -195,30 +205,54 @@ export default function CoursesPage() {
     return m;
   }, [courses]);
 
-  // إجراءات
-  const handleDelete = async (id, name) => {
-    if (!window.confirm(`حذف الدورة "${name}"؟\nهذا الإجراء لا يمكن التراجع عنه.`)) return;
-    setBusyId(id);
-    try { await api.delete(`/courses/${id}`); toast.success('تم حذف الدورة'); await load(); }
-    catch (e) { toast.error(e?.response?.data?.message || 'تعذر الحذف'); }
-    finally { setBusyId(null); }
+  // ── جلب قائمة الموظفين عند فتح modal النقل ──
+  const openReassign = async (courseId, courseName) => {
+    setSelUser('');
+    setReassignModal({ courseId, courseName });
+    if (allUsers.length === 0) {
+      try {
+        const res = await api.get('/users', { params: { limit: 200 } });
+        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        setAllUsers(list.filter(u => u.isActive !== false));
+      } catch { toast.error('تعذر جلب قائمة الموظفين'); }
+    }
   };
 
+  const confirmReassign = async () => {
+    if (!selUser) { toast.error('يرجى اختيار موظف'); return; }
+    setReassigning(true);
+    try {
+      await api.put(`/courses/${reassignModal.courseId}/reassign`, { primaryEmployeeId: selUser });
+      toast.success('تم نقل الدورة بنجاح ✓');
+      setReassignModal(null);
+      await load();
+    } catch (e) { toast.error(e?.response?.data?.message || 'تعذر النقل'); }
+    finally { setReassigning(false); }
+  };
+
+  // ── حذف الدورة ──
+  const openDelete = (courseId, courseName) => setDeleteModal({ courseId, courseName });
+
+  const confirmDelete = async () => {
+    setDeleting(true);
+    try {
+      await api.delete(`/courses/${deleteModal.courseId}`);
+      toast.success('تم حذف الدورة');
+      setDeleteModal(null);
+      await load();
+    } catch (e) { toast.error(e?.response?.data?.message || 'تعذر الحذف'); }
+    finally { setDeleting(false); }
+  };
+
+  // إجراءات (للتوافق مع CourseCard)
+  const handleDelete  = (id, name) => openDelete(id, name);
   const handleArchive = async (id) => {
     setBusyId(id);
     try { await api.post(`/courses/${id}/archive`); toast.success('تم أرشفة الدورة'); await load(); }
     catch (e) { toast.error(e?.response?.data?.message || 'تعذر الأرشفة'); }
     finally { setBusyId(null); }
   };
-
-  const handleReassign = async (id) => {
-    const uid = window.prompt('معرّف الموظف الجديد (ID):');
-    if (!uid?.trim()) return;
-    setBusyId(id);
-    try { await api.put(`/courses/${id}/reassign`, { primaryEmployeeId: uid.trim() }); toast.success('تم نقل الدورة'); await load(); }
-    catch (e) { toast.error(e?.response?.data?.message || 'تعذر النقل'); }
-    finally { setBusyId(null); }
-  };
+  const handleReassign = (id, name) => openReassign(id, name);
 
   return (
     <MainLayout>
@@ -324,7 +358,8 @@ export default function CoursesPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {paginated.map(c => (
               <CourseCard key={c.id} course={c} role={role} user={user}
-                onDelete={handleDelete} onArchive={handleArchive} onReassign={handleReassign} busy={busyId} />
+                onDelete={handleDelete} onArchive={handleArchive}
+                onReassign={(id) => openReassign(id, c.name)} busy={busyId} />
             ))}
           </div>
         ) : (
@@ -374,6 +409,106 @@ export default function CoursesPage() {
         )}
 
       </div>
+
+      {/* ══ Modal نقل المسؤول ══════════════════════════════════════ */}
+      {reassignModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-white shadow-2xl">
+            <div className="border-b border-border px-5 py-4">
+              <h2 className="text-base font-extrabold text-primary">🔄 نقل المسؤول</h2>
+              <p className="mt-0.5 text-xs text-text-soft truncate">الدورة: {reassignModal.courseName}</p>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-text-main">
+                  اختر الموظف الجديد المسؤول <span className="text-danger">*</span>
+                </label>
+                {allUsers.length === 0 ? (
+                  <div className="flex items-center gap-2 text-sm text-text-soft py-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    جاري تحميل الموظفين...
+                  </div>
+                ) : (
+                  <select
+                    value={selUser}
+                    onChange={e => setSelUser(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none focus:border-primary"
+                  >
+                    <option value="">— اختر موظفاً —</option>
+                    {allUsers
+                      .filter(u => u.roles?.includes('EMPLOYEE') || u.roles?.includes('PROJECT_SUPERVISOR'))
+                      .map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.firstName} {u.lastName}
+                          {u.operationalProject?.name ? ` — ${u.operationalProject.name}` : ''}
+                        </option>
+                      ))
+                    }
+                  </select>
+                )}
+              </div>
+              <p className="rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-xs text-warning">
+                ⚠️ سيُنقل جميع مسؤوليات هذه الدورة للموظف المختار. تأكد من اختيارك قبل التأكيد.
+              </p>
+            </div>
+            <div className="flex gap-2 border-t border-border px-5 py-3">
+              <button
+                onClick={confirmReassign}
+                disabled={reassigning || !selUser}
+                className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-50"
+              >
+                {reassigning ? '...' : '✓ تأكيد النقل'}
+              </button>
+              <button
+                onClick={() => setReassignModal(null)}
+                disabled={reassigning}
+                className="rounded-xl border border-border px-5 py-2.5 text-sm font-bold text-text-soft hover:bg-background"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ Modal تأكيد الحذف ══════════════════════════════════════ */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-white shadow-2xl">
+            <div className="p-5 text-center space-y-3">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-burgundy/10 text-3xl">
+                🗑️
+              </div>
+              <h2 className="text-base font-extrabold text-text-main">حذف الدورة</h2>
+              <p className="text-sm text-text-soft">
+                سيتم حذف الدورة
+                <span className="mx-1 font-bold text-text-main">"{deleteModal.courseName}"</span>
+                وجميع بياناتها نهائياً.
+              </p>
+              <p className="rounded-xl border border-burgundy/20 bg-burgundy/5 px-3 py-2 text-xs font-bold text-danger">
+                هذا الإجراء لا يمكن التراجع عنه
+              </p>
+            </div>
+            <div className="flex gap-2 border-t border-border px-5 py-3">
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="flex-1 rounded-xl bg-danger py-2.5 text-sm font-bold text-white hover:bg-danger/90 disabled:opacity-50"
+              >
+                {deleting ? '...' : '🗑️ نعم، احذف'}
+              </button>
+              <button
+                onClick={() => setDeleteModal(null)}
+                disabled={deleting}
+                className="rounded-xl border border-border px-5 py-2.5 text-sm font-bold text-text-soft hover:bg-background"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </MainLayout>
   );
 }
