@@ -26,7 +26,50 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const [extReason, setExtReason]           = useState('');
   const [savingExt, setSavingExt]           = useState(false);
   const isFinancialElement = ['advance_req', 'settlement'].includes(element?.element?.key);
+  const isMedicalInsurance = element?.element?.key === 'medical_insurance';
   const solfUrl = process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-nif.vercel.app';
+
+  // ── نموذج التأمين الطبي ──
+  const [showInsuranceForm, setShowInsuranceForm] = useState(false);
+  const [insuranceForm, setInsuranceForm]         = useState({
+    issuedCount: '',
+    totalTrainees: element?.course?.numTrainees || '',
+    notInsuredReason: '',
+    note: '',
+  });
+
+  const handleInsuranceSubmit = async () => {
+    const issued = Number(insuranceForm.issuedCount);
+    const total  = Number(insuranceForm.totalTrainees);
+    if (!insuranceForm.issuedCount || isNaN(issued) || issued < 0) {
+      toast.error('يرجى إدخال عدد التأمينات الصادرة'); return;
+    }
+    if (issued < total && !insuranceForm.notInsuredReason.trim()) {
+      toast.error('يرجى ذكر سبب عدم تأمين بعض المتدربين'); return;
+    }
+    setLoading(true);
+    try {
+      await api.put(`/closure/${element.id}`, {
+        status: 'PENDING_APPROVAL',
+        formData: {
+          issuedCount:       issued,
+          totalTrainees:     total,
+          notInsuredCount:   Math.max(0, total - issued),
+          notInsuredReason:  insuranceForm.notInsuredReason.trim() || null,
+          note:              insuranceForm.note.trim() || null,
+        },
+        ...(delayReason.trim() ? { delayReason: delayReason.trim() } : {}),
+      });
+      toast.success('تم تقديم بيانات التأمين الطبي');
+      setShowInsuranceForm(false);
+      setDelayReason('');
+      onUpdate();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'حدث خطأ في التقديم');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const isEmployee = activeRole === 'EMPLOYEE';
   const isCoordinator = user?.id && user.id === element?.course?.primaryEmployeeId;
@@ -211,6 +254,16 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       {canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status) && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap items-center gap-2">
+            {/* زر التأمين الطبي — يفتح نموذجاً خاصاً */}
+            {isMedicalInsurance ? (
+              <button
+                onClick={() => setShowInsuranceForm((v) => !v)}
+                disabled={loading}
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-primary-dark disabled:opacity-50 transition"
+              >
+                🏥 {element.status === 'RETURNED' ? '↩ إعادة تقديم' : 'تقديم بيانات التأمين'}
+              </button>
+            ) : (
             <button
               onClick={handleSubmit}
               disabled={loading}
@@ -220,6 +273,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
                 ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> جاري الرفع...</>
                 : isFinancialElement ? 'تقديم خارج المنصة' : element.status === 'RETURNED' ? '↩ إعادة تقديم' : 'تقديم'}
             </button>
+            )}
 
             {/* زر إضافة مبرر — مخفي بالافتراض */}
             {isOverdue && (
@@ -244,6 +298,96 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
                 className="w-full resize-none rounded-lg border border-sand/30 bg-white p-2 text-xs text-text-main outline-none focus:border-primary"
               />
               <p className="mt-1 text-right text-[10px] text-text-soft">{delayReason.length}/400</p>
+            </div>
+          )}
+
+          {/* ── نموذج التأمين الطبي ─────────────────────────────── */}
+          {isMedicalInsurance && showInsuranceForm && (
+            <div className="w-full rounded-xl border border-primary/20 bg-primary-light p-4 space-y-3">
+              <p className="text-sm font-extrabold text-primary flex items-center gap-2">
+                🏥 بيانات التأمين الطبي للمتدربين
+              </p>
+
+              {/* عدد المتدربين الكلي */}
+              <div>
+                <label className="mb-1 block text-xs font-bold text-text-main">
+                  إجمالي عدد المتدربين <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="number" min="0"
+                  value={insuranceForm.totalTrainees}
+                  onChange={(e) => setInsuranceForm((p) => ({ ...p, totalTrainees: e.target.value }))}
+                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                  placeholder="مثال: 20"
+                />
+              </div>
+
+              {/* عدد التأمينات الصادرة */}
+              <div>
+                <label className="mb-1 block text-xs font-bold text-text-main">
+                  عدد التأمينات الطبية الصادرة <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="number" min="0"
+                  value={insuranceForm.issuedCount}
+                  onChange={(e) => setInsuranceForm((p) => ({ ...p, issuedCount: e.target.value }))}
+                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                  placeholder="مثال: 15"
+                />
+                {insuranceForm.issuedCount && insuranceForm.totalTrainees &&
+                  Number(insuranceForm.issuedCount) < Number(insuranceForm.totalTrainees) && (
+                  <p className="mt-1 text-[11px] text-warning font-bold">
+                    ⚠️ {Number(insuranceForm.totalTrainees) - Number(insuranceForm.issuedCount)} متدرب بدون تأمين — يرجى توضيح السبب
+                  </p>
+                )}
+              </div>
+
+              {/* سبب عدم التأمين — يظهر فقط إذا الرقم أقل */}
+              {insuranceForm.issuedCount && insuranceForm.totalTrainees &&
+                Number(insuranceForm.issuedCount) < Number(insuranceForm.totalTrainees) && (
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-text-main">
+                    سبب عدم تأمين {Number(insuranceForm.totalTrainees) - Number(insuranceForm.issuedCount)} متدرب <span className="text-danger">*</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    maxLength={500}
+                    value={insuranceForm.notInsuredReason}
+                    onChange={(e) => setInsuranceForm((p) => ({ ...p, notInsuredReason: e.target.value }))}
+                    placeholder="مثال: لديهم تأمين طبي خاص بجهاتهم"
+                    className="w-full resize-none rounded-lg border border-border bg-white px-3 py-2 text-xs outline-none focus:border-primary"
+                  />
+                </div>
+              )}
+
+              {/* ملاحظات إضافية */}
+              <div>
+                <label className="mb-1 block text-xs font-bold text-text-main">ملاحظات (اختياري)</label>
+                <textarea
+                  rows={2}
+                  maxLength={400}
+                  value={insuranceForm.note}
+                  onChange={(e) => setInsuranceForm((p) => ({ ...p, note: e.target.value }))}
+                  placeholder="أي معلومات إضافية..."
+                  className="w-full resize-none rounded-lg border border-border bg-white px-3 py-2 text-xs outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleInsuranceSubmit}
+                  disabled={loading}
+                  className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary-dark disabled:opacity-50"
+                >
+                  {loading ? '...' : '✓ تقديم للاعتماد'}
+                </button>
+                <button
+                  onClick={() => setShowInsuranceForm(false)}
+                  className="rounded-xl border border-border bg-white px-3 py-2 text-xs text-text-soft hover:bg-background"
+                >
+                  إلغاء
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -280,6 +424,39 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
         >
           تقفيل يدوي
         </button>
+      )}
+
+      {/* ── عرض بيانات التأمين للمعتمد ─────────────────────────── */}
+      {isApprover && isMedicalInsurance && element.status === 'PENDING_APPROVAL' && element.formData && (
+        <div className="w-full rounded-xl border border-primary/20 bg-primary-light px-4 py-3 mb-1 space-y-1.5">
+          <p className="text-xs font-extrabold text-primary">🏥 بيانات التأمين المقدمة</p>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="rounded-lg bg-white border border-border px-3 py-2 text-center">
+              <p className="text-text-soft mb-0.5">إجمالي المتدربين</p>
+              <p className="text-xl font-extrabold text-text-main">{element.formData.totalTrainees ?? '-'}</p>
+            </div>
+            <div className="rounded-lg bg-white border border-border px-3 py-2 text-center">
+              <p className="text-text-soft mb-0.5">تأمينات صادرة</p>
+              <p className="text-xl font-extrabold text-accent">{element.formData.issuedCount ?? '-'}</p>
+            </div>
+            <div className={`rounded-lg border px-3 py-2 text-center ${element.formData.notInsuredCount > 0 ? 'border-burgundy/20 bg-burgundy/5' : 'border-border bg-white'}`}>
+              <p className="text-text-soft mb-0.5">بدون تأمين</p>
+              <p className={`text-xl font-extrabold ${element.formData.notInsuredCount > 0 ? 'text-danger' : 'text-accent'}`}>
+                {element.formData.notInsuredCount ?? 0}
+              </p>
+            </div>
+          </div>
+          {element.formData.notInsuredReason && (
+            <div className="rounded-lg border border-burgundy/20 bg-burgundy/5 px-3 py-2 text-xs text-danger">
+              <span className="font-bold">سبب عدم التأمين: </span>{element.formData.notInsuredReason}
+            </div>
+          )}
+          {element.formData.note && (
+            <div className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-text-soft">
+              <span className="font-bold text-text-main">ملاحظة: </span>{element.formData.note}
+            </div>
+          )}
+        </div>
       )}
 
       {isApprover && element.status === 'PENDING_APPROVAL' && (

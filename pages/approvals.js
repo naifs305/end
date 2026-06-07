@@ -35,6 +35,7 @@ const ELEMENT_ICON = {
   trainee_registration:  '👥',
   registration_message:  '📨',
   reaction_evaluation:   '⭐',
+  medical_insurance:     '🏥',
 };
 
 export default function ApprovalsQueue() {

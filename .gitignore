@@ -37,3 +37,4 @@ Thumbs.db
 # بريزما
 prisma/migrations/dev/
 .vercel
+.env*.local

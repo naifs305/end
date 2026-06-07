@@ -108,6 +108,13 @@ async function main() {
       key: 'settlement', name: 'تسوية السلفة المؤقتة', isFormBased: true,
       deadlineRefPoint: 'END', deadlineIdealHours: 120, deadlineMaxHours: 240, isDeadlineWorkingDays: true,
     },
+    // ── التأمين الطبي: دورات خارجية فقط ─────────────────────────────────
+    // المثالي: قبل بداية الدورة بـ 72 ساعة (3 أيام) → idealHours = -72
+    // الأقصى:  بعد بداية الدورة بـ 72 ساعة (3 أيام) → maxHours  = +72
+    {
+      key: 'medical_insurance', name: 'استخراج التأمين الطبي للمتدربين', isFormBased: true,
+      deadlineRefPoint: 'START', deadlineIdealHours: -72, deadlineMaxHours: 72, isDeadlineWorkingDays: false,
+    },
   ];
 
   for (const el of elements) {
@@ -157,6 +164,12 @@ async function main() {
       type: 'CUSTOM' as const,
       intervalHours: 4,
       payload: { handler: 'RETURNED_ELEMENT_REMINDER' },
+    },
+    {
+      name: 'تذكير التأمين الطبي للدورات الخارجية كل 6 ساعات',
+      type: 'CUSTOM' as const,
+      intervalHours: 6,
+      payload: { handler: 'MEDICAL_INSURANCE_REMINDER' },
     },
   ];
 
