@@ -119,6 +119,7 @@ model User {
 
   courseAssignments    CourseAssignmentRegister[] @relation("AssignmentUser")
   grantedExtensions    CourseClosureTracking[]    @relation("ExtensionGranter")
+  optionalReports      CourseOptionalReport[]     @relation("OptionalReportAuthor")
 
   // ----- علاقة الإشراف على مشاريع تشغيلية -----
   supervisedProjects   ProjectSupervisor[]        @relation("SupervisorUser")
@@ -172,7 +173,10 @@ model Course {
   requiresTrainerCompensation    Boolean      @default(false)
   requiresPreTest                Boolean      @default(false)
   requiresPostTest               Boolean      @default(false)
-  isCrossProject                 Boolean      @default(false)  // دورة خارج مشروع المنسق
+  isCrossProject                 Boolean      @default(false)
+  // التقارير — مشروطة (خارجية = إجبارية، داخلية = اختيارية)
+  requiresOpeningReport          Boolean      @default(false)
+  requiresClosingReport          Boolean      @default(false)
   status                         CourseStatus @default(PREPARATION)
 
   operationalProjectId           String
@@ -183,11 +187,25 @@ model Course {
 
   supportingTeam                 CourseSupport[]
   closureElements                CourseClosureTracking[]
+  optionalReports                CourseOptionalReport[]
   auditLogs                      AuditLog[]
   messages                       Message[]
 
   createdAt                      DateTime @default(now())
   updatedAt                      DateTime @updatedAt
+}
+
+// تقارير اختيارية — متعددة لكل دورة، لا تؤثر على KPI سلباً
+model CourseOptionalReport {
+  id        String   @id @default(uuid())
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("OptionalReportAuthor", fields: [authorId], references: [id])
+  title     String?
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model CourseSupport {
@@ -390,6 +408,7 @@ model EmployeeKpiSnapshot {
   criticalScore                    Float               @default(0)
   speedScore                       Float               @default(0)
   disciplineScore                  Float               @default(0)
+  reportBonusScore                 Float               @default(0)  // مكافأة تقديم التقارير (+0 إلى +5)
   finalScore                       Float               @default(0)
   performanceLevel                 PerformanceLevel    @default(GOOD)
 
