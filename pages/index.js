@@ -394,22 +394,58 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── آخر الدورات ── */}
+        {/* ── آخر الدورات المضافة — مع الموظف المسؤول ── */}
         <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <div>
-              <h3 className="font-extrabold text-text-main">آخر الدورات</h3>
-              <p className="mt-0.5 text-xs text-text-soft">أحدث الدورات المسجلة في النظام</p>
+              <h3 className="font-extrabold text-text-main">آخر الدورات المضافة</h3>
+              <p className="mt-0.5 text-xs text-text-soft">أحدث 8 دورات — مع الموظف المسؤول وحالة الإقفال</p>
             </div>
-            <Link href="/courses" className="text-xs font-bold text-primary hover:text-primary-dark">
-              عرض الكل ←
-            </Link>
+            <Link href="/courses" className="text-xs font-bold text-primary hover:text-primary-dark">عرض الكل ←</Link>
           </div>
           {!dash.latestCourses?.length ? (
             <div className="px-5 py-10 text-center text-sm text-text-soft">لا توجد دورات مسجلة بعد</div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
-              {dash.latestCourses.map((c) => <CourseCard key={c.id} course={c} />)}
+            <div className="divide-y divide-border">
+              {dash.latestCourses.map((c) => {
+                const s = STATUS_MAP[c.status] || { label: c.status, cls: 'bg-background text-text-soft' };
+                const employeeName = c.primaryEmployee
+                  ? `${c.primaryEmployee.firstName} ${c.primaryEmployee.lastName}`
+                  : '-';
+                const pending  = c.closureElements?.filter(e => e.status === 'PENDING_APPROVAL').length || 0;
+                const approved = c.closureElements?.filter(e => e.status === 'APPROVED').length || 0;
+                const total    = c.closureElements?.filter(e => e.status !== 'NOT_APPLICABLE').length || 0;
+                const pct      = total > 0 ? Math.round((approved / total) * 100) : 0;
+                return (
+                  <Link key={c.id} href={`/courses/${c.id}`}>
+                    <div className="flex items-center gap-3 px-5 py-3 hover:bg-background transition">
+                      {/* حالة */}
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${s.cls}`}>{s.label}</span>
+                      {/* اسم + موظف */}
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate font-bold text-sm text-text-main">{c.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5 text-xs text-text-soft">
+                          <span>👤 {employeeName}</span>
+                          <span>·</span>
+                          <span>📅 {fmtDate(c.startDate)} — {fmtDate(c.endDate)}</span>
+                        </div>
+                      </div>
+                      {/* شريط إنجاز الإقفال */}
+                      {total > 0 && (
+                        <div className="shrink-0 w-28 space-y-1 hidden sm:block">
+                          <div className="flex justify-between text-[10px] text-text-soft">
+                            <span>{approved}/{total} عنصر</span>
+                            {pending > 0 && <span className="text-warning font-bold">{pending} منتظر</span>}
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-forest-50">
+                            <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

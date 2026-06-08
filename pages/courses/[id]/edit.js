@@ -142,7 +142,7 @@ export default function EditCoursePage() {
         endDate:                     form.endDate,
         numTrainees:                 Number(form.numTrainees),
         operationalProjectId:        form.operationalProjectId,
-        courseType:                  form.locationType === 'INTERNAL' ? 'internal' : 'external',
+        courseType:                  form.locationType === 'INTERNAL' ? 'internal' : form.locationType === 'REMOTE' ? 'remote' : 'external',
         requiresAdvance:             form.requiresAdvance,
         requiresAdvanceSettlement:   form.requiresAdvanceSettlement,
         requiresRevenue:             form.requiresRevenue,

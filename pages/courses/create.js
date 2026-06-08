@@ -133,7 +133,7 @@ export default function CreateCoursePage() {
         numTrainees: Number(form.numTrainees),
         operationalProjectId: form.operationalProjectId,
         primaryEmployeeId: user.id,
-        courseType: form.locationType === 'INTERNAL' ? 'internal' : 'external',
+        courseType: form.locationType === 'INTERNAL' ? 'internal' : form.locationType === 'REMOTE' ? 'remote' : 'external',
         requiresAdvance:               form.requiresAdvance,
         requiresAdvanceSettlement:     form.requiresAdvanceSettlement,
         requiresRevenue:               form.requiresRevenue,
