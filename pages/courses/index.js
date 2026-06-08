@@ -137,7 +137,8 @@ export default function CoursesPage() {
   const [courses, setCourses]   = useState([]);
   const [loading, setLoading]   = useState(true);
   const [busyId,  setBusyId]    = useState(null);
-  const [filters, setFilters]   = useState({ search:'', status:'ALL', project:'', employee:'' });
+  const [filters, setFilters]   = useState({ search:'', status:'ALL', project:'', employee:'', courseType:'', hasAdvance:'', incomplete:'' });
+  const [sortBy,  setSortBy]    = useState('priority'); // 'priority' | 'newest' | 'oldest'
   const [view,    setView]      = useState('grid');  // 'grid' | 'list'
   const [page,    setPage]      = useState(1);
   const PAGE = 12;
@@ -173,17 +174,25 @@ export default function CoursesPage() {
     const q = filters.search.trim().toLowerCase();
     return courses
       .filter(c => {
-        const ms = !q || [c.name, c.code, c.city, c.operationalProject?.name, empName(c.primaryEmployee)].some(v => v?.toLowerCase().includes(q));
+        const ms  = !q || [c.name, c.code, c.city, c.operationalProject?.name, empName(c.primaryEmployee)].some(v => v?.toLowerCase().includes(q));
         const mst = filters.status === 'ALL' || c.status === filters.status;
         const mp  = !filters.project  || c.operationalProject?.name === filters.project;
         const me  = !filters.employee || empName(c.primaryEmployee) === filters.employee;
-        return ms && mst && mp && me;
+        // فلاتر جديدة
+        const mct = !filters.courseType || c.courseType === filters.courseType;
+        const mha = !filters.hasAdvance || (filters.hasAdvance === 'yes' ? c.requiresAdvance : !c.requiresAdvance);
+        const hasIncomplete = c.closureElements?.some(el => el.status !== 'APPROVED' && el.status !== 'NOT_APPLICABLE');
+        const mic = !filters.incomplete || (filters.incomplete === 'yes' ? hasIncomplete : !hasIncomplete);
+        return ms && mst && mp && me && mct && mha && mic;
       })
       .sort((a, b) => {
+        if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+        if (sortBy === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt);
+        // priority (افتراضي)
         const order = { AWAITING_CLOSURE: 0, EXECUTION: 1, PREPARATION: 2, CLOSED: 3, ARCHIVED: 4 };
         return (order[a.status] ?? 9) - (order[b.status] ?? 9);
       });
-  }, [courses, filters]);
+  }, [courses, filters, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE));
   const paginated  = filtered.slice((page-1)*PAGE, page*PAGE);
@@ -313,14 +322,58 @@ export default function CoursesPage() {
             </select>
           )}
 
+          {/* ── فلاتر سريعة: نوع الدورة ── */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {[
+              { val:'',         label:'كل الأنواع' },
+              { val:'internal', label:'🏛️ داخلية' },
+              { val:'external', label:'✈️ خارجية' },
+            ].map(o => (
+              <button key={o.val}
+                onClick={() => setFilters(p => ({...p, courseType: p.courseType === o.val ? '' : o.val}))}
+                className={`rounded-xl border px-2.5 py-1.5 text-xs font-bold transition
+                  ${filters.courseType === o.val && o.val !== ''
+                    ? 'border-primary bg-primary-light text-primary'
+                    : 'border-border bg-white text-text-soft hover:border-primary/40'}`}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── فلاتر سريعة: السلفة والعناصر ── */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => setFilters(p => ({...p, hasAdvance: p.hasAdvance === 'yes' ? '' : 'yes'}))}
+              className={`rounded-xl border px-2.5 py-1.5 text-xs font-bold transition
+                ${filters.hasAdvance === 'yes' ? 'border-warning bg-sand/20 text-warning' : 'border-border bg-white text-text-soft hover:border-warning/40'}`}>
+              💰 بها سلفة
+            </button>
+            <button
+              onClick={() => setFilters(p => ({...p, incomplete: p.incomplete === 'yes' ? '' : 'yes'}))}
+              className={`rounded-xl border px-2.5 py-1.5 text-xs font-bold transition
+                ${filters.incomplete === 'yes' ? 'border-danger bg-burgundy/10 text-danger' : 'border-border bg-white text-text-soft hover:border-danger/40'}`}>
+              ⚠️ عناصر ناقصة
+            </button>
+          </div>
+
+          {/* ── مسح الفلاتر ── */}
           {Object.values(filters).some(Boolean) && (
-            <button onClick={() => setFilters({ search:'', status:'ALL', project:'', employee:'' })}
+            <button onClick={() => setFilters({ search:'', status:'ALL', project:'', employee:'', courseType:'', hasAdvance:'', incomplete:'' })}
               className="rounded-xl border border-border px-3 py-2 text-sm text-text-soft hover:bg-background">✕</button>
           )}
 
-          <div className="mr-auto flex rounded-xl border border-border overflow-hidden">
-            <button onClick={() => setView('grid')} className={`px-3 py-2 text-xs font-bold transition ${view === 'grid' ? 'bg-primary text-white' : 'bg-white text-text-soft hover:bg-background'}`}>⊞</button>
-            <button onClick={() => setView('list')} className={`px-3 py-2 text-xs font-bold transition ${view === 'list' ? 'bg-primary text-white' : 'bg-white text-text-soft hover:bg-background'}`}>≡</button>
+          {/* ── ترتيب + عرض ── */}
+          <div className="mr-auto flex items-center gap-2">
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+              className="rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-text-main outline-none focus:border-primary">
+              <option value="priority">🔺 حسب الأولوية</option>
+              <option value="newest">🕐 الأحدث إدخالاً</option>
+              <option value="oldest">🕐 الأقدم إدخالاً</option>
+            </select>
+            <div className="flex rounded-xl border border-border overflow-hidden">
+              <button onClick={() => setView('grid')} className={`px-3 py-2 text-xs font-bold transition ${view === 'grid' ? 'bg-primary text-white' : 'bg-white text-text-soft hover:bg-background'}`}>⊞</button>
+              <button onClick={() => setView('list')} className={`px-3 py-2 text-xs font-bold transition ${view === 'list' ? 'bg-primary text-white' : 'bg-white text-text-soft hover:bg-background'}`}>≡</button>
+            </div>
           </div>
         </div>
 
