@@ -4,6 +4,7 @@ import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
 import MainLayout from '../../components/layout/MainLayout';
 import ElementRow from '../../components/operational/ElementRow';
+import CourseNotesReportForm from '../../components/operational/CourseNotesReportForm';
 import toast from 'react-hot-toast';
 
 // ── ثوابت الحالات ─────────────────────────────────────────────────────
@@ -78,6 +79,7 @@ export default function CourseDetail() {
   const [course,          setCourse]          = useState(null);
   const [loading,         setLoading]         = useState(true);
   const [showAll,         setShowAll]         = useState(false);
+  const [showNotesReport, setShowNotesReport] = useState(false);
 
   const isEmployee   = activeRole === 'EMPLOYEE';
   const isCoordinator = course?.primaryEmployeeId && user?.id === course.primaryEmployeeId;
@@ -424,6 +426,11 @@ export default function CourseDetail() {
                 )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setShowNotesReport(true)}
+                  className="flex items-center gap-1.5 rounded-xl border border-accent/30 bg-forest-50 px-3 py-2 text-xs font-extrabold text-accent hover:bg-accent hover:text-white transition shadow-sm">
+                  📝 تقرير عام
+                </button>
                 {(isManager || isSupervisor) && (
                   <button
                     onClick={() => router.push(`/courses/${id}/edit`)}
@@ -527,6 +534,14 @@ export default function CourseDetail() {
           </div>
         )}
       </div>
+
+      {showNotesReport && (
+        <CourseNotesReportForm
+          courseId={id}
+          course={course}
+          onClose={() => setShowNotesReport(false)}
+        />
+      )}
     </MainLayout>
   );
 }

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
 
@@ -425,7 +426,7 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
   return (
     <>
     {/* نافذة تذكير الصور */}
-    {showPhotoReminder && (
+    {showPhotoReminder && typeof document !== 'undefined' && createPortal(
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
         <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-border bg-white shadow-deep">
           <div className="bg-sand/20 px-5 py-4 border-b border-sand/30">
@@ -459,7 +460,8 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
             </button>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     )}
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="rounded-3xl border border-border bg-white p-5 shadow-card">

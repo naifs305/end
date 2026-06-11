@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
 import useAuth from '../../context/AuthContext';
@@ -602,7 +603,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       )}
 
       {/* ── نموذج تقرير الافتتاح/الاختتام ─────────────────────────── */}
-      {isCourseReport && showReportForm && (
+      {isCourseReport && showReportForm && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
           <div className="my-8 w-full max-w-5xl rounded-3xl border border-border bg-background p-4 shadow-deep">
             <CourseReportForm
@@ -614,7 +615,8 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               onSuccess={onUpdate}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
