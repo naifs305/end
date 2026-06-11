@@ -2,6 +2,7 @@ import { useState } from 'react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
 import useAuth from '../../context/AuthContext';
+import CourseReportForm from './CourseReportForm';
 
 // ======================================================================
 // مكون صف عنصر الإقفال — المرحلة الرابعة
@@ -27,6 +28,10 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const [savingExt, setSavingExt]           = useState(false);
   const isFinancialElement = ['advance_req', 'settlement'].includes(element?.element?.key);
   const isMedicalInsurance = element?.element?.key === 'medical_insurance';
+  const isOpeningReport = element?.element?.key === 'opening_report';
+  const isClosingReport = element?.element?.key === 'closing_report';
+  const isCourseReport = isOpeningReport || isClosingReport;
+  const [showReportForm, setShowReportForm] = useState(false);
   const solfUrl = process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-nif.vercel.app';
 
   // ── نموذج التأمين الطبي ──
@@ -263,6 +268,14 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               >
                 🏥 {element.status === 'RETURNED' ? '↩ إعادة تقديم' : 'تقديم بيانات التأمين'}
               </button>
+            ) : isCourseReport ? (
+            <button
+              onClick={() => setShowReportForm(true)}
+              disabled={loading}
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-primary-dark disabled:opacity-50 transition"
+            >
+              📋 {element.status === 'RETURNED' ? '↩ إعادة تقديم' : 'تقديم'}
+            </button>
             ) : (
             <button
               onClick={handleSubmit}
@@ -585,6 +598,22 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── نموذج تقرير الافتتاح/الاختتام ─────────────────────────── */}
+      {isCourseReport && showReportForm && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
+          <div className="my-8 w-full max-w-5xl rounded-3xl border border-border bg-background p-4 shadow-deep">
+            <CourseReportForm
+              trackingId={element.id}
+              course={element.course}
+              reportType={element.element.key}
+              delayReason={delayReason}
+              onClose={() => setShowReportForm(false)}
+              onSuccess={onUpdate}
+            />
+          </div>
         </div>
       )}
     </div>

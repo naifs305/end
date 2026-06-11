@@ -236,7 +236,7 @@ function formatLocationType(value) {
   return map[value] || value || '-';
 }
 
-export default function CourseReportForm({ trackingId, onClose, onSuccess, course, reportType = 'closing_report' }) {
+export default function CourseReportForm({ trackingId, onClose, onSuccess, course, reportType = 'closing_report', delayReason = '' }) {
   const normalizedType = reportType === 'opening_report' ? 'opening_report' : 'closing_report';
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState(getInitialForm(normalizedType));
@@ -405,6 +405,7 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
         attendance_rate: attendanceRate,
         passing_rate: passingRate,
         generatedCourseInfo: courseInfo,
+        ...(delayReason.trim() ? { delayReason: delayReason.trim() } : {}),
       });
       toast.success('تم تقديم التقرير');
       onSuccess();
@@ -488,7 +489,7 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
       </div>
 
       <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
-        <div className="mb-4"><h4 className="text-base font-extrabold text-text-main">إحصائيات ${normalizedType === 'opening_report' ? 'الافتتاح والحضور الأولي' : 'المشاركة والنتائج النهائية'}</h4></div>
+        <div className="mb-4"><h4 className="text-base font-extrabold text-text-main">إحصائيات {normalizedType === 'opening_report' ? 'الافتتاح والحضور الأولي' : 'المشاركة والنتائج النهائية'}</h4></div>
         <div className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${normalizedType === 'opening_report' ? 'xl:grid-cols-4' : 'xl:grid-cols-4'}`}>
           <TextField label="عدد المشاركين المسجلين" name="registered_trainees_count" value={form.registered_trainees_count} onChange={handleChange} placeholder="مثال: 14" type="number" min="0" required />
           {normalizedType === 'opening_report' ? (
