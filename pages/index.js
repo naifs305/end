@@ -126,6 +126,7 @@ export default function Home() {
   const [dash, setDash]           = useState(null);
   const [kpiSnaps, setKpiSnaps]   = useState([]);
   const [pageLoad, setPageLoad]   = useState(true);
+  const [teamPeriod, setTeamPeriod] = useState('current'); // 'previous' | 'current' | 'year'
 
   useEffect(() => { if (!loading && !user) router.replace('/login'); }, [loading, user, router]);
 
@@ -133,16 +134,40 @@ export default function Home() {
     if (!user || !activeRole) return;
     setPageLoad(true);
     const ep = (isAdmin || isSupervisor) ? '/analytics/manager' : '/analytics/employee';
-    Promise.all([
-      api.get(ep).catch(() => null),
-      (isAdmin || isSupervisor)
-        ? api.get('/kpis', { params: { periodType: 'MONTHLY', periodLabel: `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}` } }).catch(() => null)
-        : Promise.resolve(null),
-    ]).then(([dashRes, kpiRes]) => {
-      setDash(dashRes?.data || null);
-      setKpiSnaps(kpiRes?.data || []);
-    }).finally(() => setPageLoad(false));
+    api.get(ep).catch(() => null)
+      .then((dashRes) => setDash(dashRes?.data || null))
+      .finally(() => setPageLoad(false));
   }, [user, activeRole, isAdmin, isSupervisor]);
+
+  // ── معايير فترة مقارنة أداء الفريق ──
+  const teamPeriodParams = useMemo(() => {
+    const now = new Date();
+    if (teamPeriod === 'year') {
+      return { periodType: 'YEARLY', periodLabel: String(now.getFullYear()) };
+    }
+    if (teamPeriod === 'previous') {
+      const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      return { periodType: 'MONTHLY', periodLabel: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` };
+    }
+    return { periodType: 'MONTHLY', periodLabel: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}` };
+  }, [teamPeriod]);
+
+  const teamPeriodLabel = useMemo(() => {
+    const now = new Date();
+    if (teamPeriod === 'year') return `سنة ${now.getFullYear()}`;
+    if (teamPeriod === 'previous') {
+      const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      return `${d.toLocaleString('ar-SA', { month: 'long' })} ${d.getFullYear()}`;
+    }
+    return `${now.toLocaleString('ar-SA', { month: 'long' })} ${now.getFullYear()}`;
+  }, [teamPeriod]);
+
+  useEffect(() => {
+    if (!user || !activeRole || !(isAdmin || isSupervisor)) return;
+    api.get('/kpis', { params: teamPeriodParams })
+      .then((res) => setKpiSnaps(res?.data || []))
+      .catch(() => setKpiSnaps([]));
+  }, [user, activeRole, isAdmin, isSupervisor, teamPeriodParams]);
 
   const donutData = useMemo(() => {
     if (!dash) return [];
@@ -263,14 +288,31 @@ export default function Home() {
             {/* مقارنة أداء الفريق */}
             <ChartCard
               title="مقارنة أداء الفريق"
-              sub={`مؤشرات الأداء — ${month} ${year}`}
+              sub={`مؤشرات الأداء — ${teamPeriodLabel}`}
               action={
-                <Link href="/kpis" className="text-xs font-bold text-primary hover:text-primary-dark">
-                  التفاصيل ←
-                </Link>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={teamPeriod}
+                    onChange={(e) => setTeamPeriod(e.target.value)}
+                    className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-bold text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="previous">الشهر السابق</option>
+                    <option value="current">الشهر الحالي</option>
+                    <option value="year">السنة</option>
+                  </select>
+                  <Link href="/kpis" className="text-xs font-bold text-primary hover:text-primary-dark">
+                    التفاصيل ←
+                  </Link>
+                </div>
               }
             >
-              <TeamBarChart data={teamBarData} />
+              {teamBarData.length ? (
+                <TeamBarChart data={teamBarData} />
+              ) : (
+                <p className="py-6 text-center text-sm text-text-soft">
+                  لا توجد بيانات لهذه الفترة{teamPeriod === 'year' ? ' — قد تحتاج لحساب مؤشرات السنة أولاً من صفحة مؤشرات الأداء' : ''}
+                </p>
+              )}
             </ChartCard>
           </div>
         )}
