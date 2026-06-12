@@ -91,6 +91,8 @@ model User {
   lastName             String
   mobileNumber         String
   extensionNumber      String?
+  profileImage         String?
+  signatureImage       String?
   roles                Role[]
   isActive             Boolean  @default(true)
   operationalProjectId String

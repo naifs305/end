@@ -16,6 +16,8 @@ async function handler(req, res) {
     lastName: user.lastName,
     mobileNumber: user.mobileNumber,
     extensionNumber: user.extensionNumber,
+    profileImage: user.profileImage,
+    signatureImage: user.signatureImage,
     roles: user.roles,
     project: user.operationalProject,
     isActive: user.isActive,

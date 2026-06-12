@@ -86,12 +86,40 @@ export default function Header({ onMenuClick }) {
           {/* محوّل الدور */}
           {user && user.roles?.length > 1 && <RoleSwitcher />}
 
-          {/* اسم المستخدم — سطح مكتب */}
+          {/* الملف الشخصي — سطح مكتب */}
           {user && (
-            <div className="hidden max-w-[200px] flex-col items-end md:flex">
-              <span className="truncate text-sm font-bold text-text-main">{user.firstName} {user.lastName}</span>
-              <span className="truncate text-[11px] text-text-soft">{user.email}</span>
-            </div>
+            <Link href="/profile" className="hidden items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-background md:flex">
+              <div className="flex max-w-[200px] flex-col items-end">
+                <span className="truncate text-sm font-bold text-text-main">{user.firstName} {user.lastName}</span>
+                <span className="truncate text-[11px] text-text-soft">{user.email}</span>
+              </div>
+              <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-border bg-background">
+                {user.profileImage ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={user.profileImage} alt="الصورة الشخصية" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs font-extrabold text-text-soft">
+                    {(user.firstName?.[0] || '') + (user.lastName?.[0] || '')}
+                  </div>
+                )}
+              </div>
+            </Link>
+          )}
+
+          {/* رابط الملف الشخصي — جوال */}
+          {user && (
+            <Link href="/profile" className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-white text-text-main transition hover:bg-background md:hidden">
+              <div className="relative h-7 w-7 overflow-hidden rounded-full bg-background">
+                {user.profileImage ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={user.profileImage} alt="الصورة الشخصية" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[10px] font-extrabold text-text-soft">
+                    {(user.firstName?.[0] || '') + (user.lastName?.[0] || '')}
+                  </div>
+                )}
+              </div>
+            </Link>
           )}
 
           {/* خروج */}
