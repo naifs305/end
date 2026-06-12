@@ -4,7 +4,7 @@
   "buildCommand": "prisma generate && npm run seed && next build",
   "devCommand": "next dev -p 3010",
   "installCommand": "npm install",
-  "regions": ["fra1"],
+  "regions": ["bom1"],
   "crons": [
     {
       "path": "/api/cron/run",
