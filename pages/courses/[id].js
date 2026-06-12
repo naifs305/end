@@ -140,7 +140,9 @@ export default function CourseDetail() {
   const activeElements    = useMemo(() => sortedElements.filter(el =>
     ['NOT_STARTED','RETURNED','REJECTED'].includes(el.status)), [sortedElements]);
   const completedElements = useMemo(() => sortedElements.filter(el =>
-    ['PENDING_APPROVAL','APPROVED','NOT_APPLICABLE'].includes(el.status)), [sortedElements]);
+    ['PENDING_APPROVAL','APPROVED'].includes(el.status)), [sortedElements]);
+  const notApplicableElements = useMemo(() => sortedElements.filter(el =>
+    el.status === 'NOT_APPLICABLE'), [sortedElements]);
 
   const progress = useMemo(() => {
     const rel  = sortedElements.filter(el => el.status !== 'NOT_APPLICABLE');
@@ -507,7 +509,7 @@ export default function CourseDetail() {
                 <span className="font-extrabold text-text-main">تقدم الإغلاق</span>
                 <div className="flex items-center gap-3">
                   <span className="text-text-soft">
-                    <span className="font-bold text-accent">{completedElements.filter(e=>e.status!=='NOT_APPLICABLE').length}</span>
+                    <span className="font-bold text-accent">{completedElements.length}</span>
                     <span className="text-text-soft/60"> / {sortedElements.filter(e=>e.status!=='NOT_APPLICABLE').length} عنصر</span>
                   </span>
                   <span className="font-extrabold text-primary">{progress}%</span>
@@ -567,6 +569,22 @@ export default function CourseDetail() {
             </div>
           </div>
         </div>
+
+        {/* ── عناصر غير منطبقة على هذه الدورة ──────────────────────────── */}
+        {notApplicableElements.length > 0 && (
+          <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div>
+                <h2 className="font-extrabold text-text-main">عناصر غير منطبقة</h2>
+                <p className="text-[11px] text-text-soft mt-0.5">لا تُحسب ضمن متطلبات إغلاق هذه الدورة</p>
+              </div>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-border/40 text-sm font-extrabold text-text-soft/60 border border-border/40">{notApplicableElements.length}</span>
+            </div>
+            <div className="p-3 space-y-2">
+              {notApplicableElements.map(el => renderElementCard(el))}
+            </div>
+          </div>
+        )}
 
         {/* ── عناصر اختيارية لهذه الدورة ──────────────────────────────── */}
         {optionalElements.length > 0 && (isCoordinator || isApprover) && (

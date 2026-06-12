@@ -905,10 +905,10 @@ export default function KpisPage() {
     return { counts, avg, total: activeSnaps.length, noData: inactiveSnaps.length };
   }, [activeSnaps, inactiveSnaps]);
 
-  const filteredSnaps = useMemo(
-    () => levelFilter ? activeSnaps.filter(x => x.performanceLevel === levelFilter) : activeSnaps,
-    [activeSnaps, levelFilter],
-  );
+  const filteredSnaps = useMemo(() => {
+    if (levelFilter) return activeSnaps.filter(x => x.performanceLevel === levelFilter);
+    return [...activeSnaps, ...inactiveSnaps];
+  }, [activeSnaps, inactiveSnaps, levelFilter]);
 
   const teamBarData = useMemo(
     () => activeSnaps
@@ -1212,34 +1212,6 @@ export default function KpisPage() {
               />
             ) : null}
           </div>
-        )}
-
-        {/* ══════ موظفون بدون نشاط ══════ */}
-        {!loading && inactiveSnaps.length > 0 && !isEmployee && (
-          <details className="overflow-hidden rounded-2xl border border-dashed border-forest-200 bg-forest-50/30">
-            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3.5 text-sm font-bold text-text-soft hover:text-primary transition">
-              <span>⏸ موظفون بدون نشاط في {AR_MONTHS[month - 1]} {year} <span className="text-[11px]">({inactiveSnaps.length} موظف)</span></span>
-              <span className="text-xs">▼</span>
-            </summary>
-            <div className="border-t border-forest-100 px-5 py-4">
-              <p className="mb-3 text-xs text-text-soft">
-                هؤلاء الموظفون لا تُحسَب لهم مؤشرات هذه الفترة لأن دوراتهم تقع خارج نطاقها الزمني.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {inactiveSnaps.map(s => (
-                  <div key={s.userId} className="flex items-center gap-2 rounded-xl border border-forest-100 bg-white px-3 py-2">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-forest-100 text-[11px] font-extrabold text-primary">
-                      {initials(s.user?.firstName, s.user?.lastName)}
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-text-main">{s.user?.firstName} {s.user?.lastName}</p>
-                      <p className="text-[10px] text-text-soft">{s.user?.operationalProject?.name || '—'}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </details>
         )}
 
         {/* ══════ تقرير المشرفين + سجل الإسناد — مدير فقط ══════ */}
