@@ -172,6 +172,47 @@ export default function CourseDetail() {
     return Math.round((Date.now() - new Date(el.executionAt).getTime()) / 3600000);
   };
 
+  // ── عناصر اختيارية وتحكم المدير ──────────────────────────────────────
+  const optionalElements = useMemo(() =>
+    sortedElements.filter(el => el.element?.elementType === 'OPTIONAL'), [sortedElements]);
+
+  const approvedElements = useMemo(() =>
+    sortedElements.filter(el => el.status === 'APPROVED'), [sortedElements]);
+
+  const exemptableElements = useMemo(() =>
+    sortedElements.filter(el => el.status !== 'NOT_APPLICABLE'), [sortedElements]);
+
+  const exemptedByManager = useMemo(() =>
+    sortedElements.filter(el => el.status === 'NOT_APPLICABLE' && el.overriddenById), [sortedElements]);
+
+  const toggleOptionalElement = async (trackingId, enabled) => {
+    try {
+      await api.post(`/courses/${id}/toggle-element`, { trackingId, enabled });
+      toast.success(enabled ? 'تم تفعيل العنصر' : 'تم إلغاء تفعيل العنصر');
+      fetchCourse();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذر التحديث');
+    }
+  };
+
+  const overrideElement = async (trackingId, action, needsReason) => {
+    let reason;
+    if (needsReason) {
+      reason = window.prompt(action === 'revert' ? 'سبب استرجاع العنصر (إلزامي):' : 'سبب الاستثناء (إلزامي):');
+      if (!reason || !reason.trim()) {
+        if (reason !== null) toast.error('السبب مطلوب');
+        return;
+      }
+    }
+    try {
+      await api.post(`/courses/${id}/override-element`, { trackingId, action, reason });
+      toast.success('تم تنفيذ الإجراء');
+      fetchCourse();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذر التنفيذ');
+    }
+  };
+
   const isReportKey = (key) => key === 'opening_report' || key === 'closing_report' || key === 'report';
 
   const renderAction = (el) => {
@@ -526,6 +567,112 @@ export default function CourseDetail() {
             </div>
           </div>
         </div>
+
+        {/* ── عناصر اختيارية لهذه الدورة ──────────────────────────────── */}
+        {optionalElements.length > 0 && (isCoordinator || isApprover) && (
+          <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
+            <div className="border-b border-border px-4 py-3">
+              <h2 className="font-extrabold text-text-main">عناصر اختيارية لهذه الدورة</h2>
+              <p className="text-[11px] text-text-soft mt-0.5">فعّل العناصر التي تنطبق على هذه الدورة فقط</p>
+            </div>
+            <div className="p-3 space-y-2">
+              {optionalElements.map((el) => {
+                const enabled = el.status !== 'NOT_APPLICABLE';
+                const locked = ['APPROVED', 'PENDING_APPROVAL'].includes(el.status);
+                return (
+                  <label key={el.id}
+                    className={`flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2.5 ${locked ? '' : 'cursor-pointer hover:bg-background'}`}>
+                    <div className="flex items-center gap-3">
+                      <input type="checkbox" checked={enabled} disabled={locked}
+                        onChange={(e) => toggleOptionalElement(el.id, e.target.checked)}
+                        className="h-4 w-4 accent-primary" />
+                      <span className="text-sm font-bold text-text-main">{el.element.name}</span>
+                    </div>
+                    <Badge meta={EL_STATUS_META[el.status] || EL_STATUS_META.NOT_STARTED} small />
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── تحكم المدير في عناصر الإقفال ─────────────────────────────── */}
+        {isManager && (
+          <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
+            <div className="border-b border-border px-4 py-3">
+              <h2 className="font-extrabold text-text-main">تحكم المدير في عناصر الإقفال</h2>
+              <p className="text-[11px] text-text-soft mt-0.5">استرجاع عناصر معتمدة أو استثناء عناصر من متطلبات الدورة — يتطلب سبباً ويُسجّل في سجل المراجعة</p>
+            </div>
+            <div className="p-3 space-y-4">
+
+              {/* استرجاع عنصر معتمد */}
+              <div>
+                <h4 className="mb-2 text-xs font-extrabold text-text-soft">عناصر معتمدة (يمكن استرجاعها)</h4>
+                {approvedElements.length === 0 ? (
+                  <p className="text-xs text-text-soft">لا توجد عناصر معتمدة</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {approvedElements.map((el) => (
+                      <div key={el.id} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2">
+                        <span className="text-sm font-bold text-text-main">{el.element.name}</span>
+                        <button onClick={() => overrideElement(el.id, 'revert', true)}
+                          className="rounded-lg border border-burgundy/20 px-2 py-1 text-[11px] font-bold text-danger hover:bg-burgundy/5">
+                          ↩️ استرجاع
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* استثناء عنصر */}
+              <div>
+                <h4 className="mb-2 text-xs font-extrabold text-text-soft">استثناء عنصر من هذه الدورة</h4>
+                {exemptableElements.length === 0 ? (
+                  <p className="text-xs text-text-soft">لا توجد عناصر يمكن استثناؤها</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {exemptableElements.map((el) => (
+                      <div key={el.id} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-text-main">{el.element.name}</span>
+                          <Badge meta={EL_STATUS_META[el.status] || EL_STATUS_META.NOT_STARTED} small />
+                        </div>
+                        <button onClick={() => overrideElement(el.id, 'exempt', true)}
+                          className="rounded-lg border border-border px-2 py-1 text-[11px] font-bold text-text-soft hover:bg-white">
+                          استثناء
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* عناصر مُستثناة من المدير */}
+              {exemptedByManager.length > 0 && (
+                <div>
+                  <h4 className="mb-2 text-xs font-extrabold text-text-soft">عناصر مُستثناة من المدير</h4>
+                  <div className="space-y-1.5">
+                    {exemptedByManager.map((el) => (
+                      <div key={el.id} className="rounded-xl border border-border bg-background px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-bold text-text-main">{el.element.name}</span>
+                          <button onClick={() => overrideElement(el.id, 'restore', false)}
+                            className="rounded-lg border border-border px-2 py-1 text-[11px] font-bold text-text-soft hover:bg-white">
+                            إلغاء الاستثناء
+                          </button>
+                        </div>
+                        {el.overrideReason && (
+                          <p className="mt-1 text-[11px] text-text-soft">السبب: {el.overrideReason}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── لا توجد عناصر ────────────────────────────────────────────── */}
         {sortedElements.length === 0 && (

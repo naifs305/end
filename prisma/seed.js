@@ -28,6 +28,15 @@ async function main() {
     `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "extensionGrantedById" TEXT`,
     `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "extensionHours"       INTEGER`,
     `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "extensionReason"      TEXT`,
+    `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "elementType"    TEXT NOT NULL DEFAULT 'MANDATORY'`,
+    `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "conditionField" TEXT`,
+    `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "isActive"       BOOLEAN NOT NULL DEFAULT true`,
+    `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "isCustom"       BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "createdById"    UUID`,
+    `ALTER TABLE "ClosureElement" ADD COLUMN IF NOT EXISTS "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+    `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "overrideReason"  TEXT`,
+    `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "overriddenAt"    TIMESTAMP(3)`,
+    `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "overriddenById"  UUID`,
   ];
 
   for (const sql of schemaMigrations) {
@@ -187,21 +196,23 @@ async function main() {
   });
 
   // --- عناصر الإقفال مع مواعيدها ---
+  // elementType: MANDATORY (إجباري دائماً) | CONDITIONAL (حسب حقل في الدورة) | OPTIONAL (يفعّله الموظف)
   const elements = [
-    { key: 'trainee_registration', name: 'تسجيل المتدربين في المنصة',  isFormBased: false, deadlineRefPoint: 'START', deadlineIdealHours: -72,  deadlineMaxHours: -24, isDeadlineWorkingDays: false },
-    { key: 'registration_message', name: 'إرسال رسالة للمتدربين',       isFormBased: false, deadlineRefPoint: 'START', deadlineIdealHours: -48,  deadlineMaxHours:   0, isDeadlineWorkingDays: false },
-    { key: 'advance_req',          name: 'طلب السلفة المؤقتة',          isFormBased: true,  deadlineRefPoint: 'START', deadlineIdealHours: -120, deadlineMaxHours: -72, isDeadlineWorkingDays: true  },
-    { key: 'pre_test',             name: 'تقديم الاختبار القبلي',        isFormBased: false, deadlineRefPoint: 'START', deadlineIdealHours:   0,  deadlineMaxHours:  24, isDeadlineWorkingDays: false },
-    { key: 'opening_report',       name: 'تقرير افتتاح الدورة',         isFormBased: true,  deadlineRefPoint: 'START', deadlineIdealHours:   0,  deadlineMaxHours:  24, isDeadlineWorkingDays: false },
-    { key: 'reaction_evaluation',  name: 'تقديم تقييم الدورة',          isFormBased: false, deadlineRefPoint: 'END',   deadlineIdealHours:   0,  deadlineMaxHours:  24, isDeadlineWorkingDays: false },
-    { key: 'post_test',            name: 'تقديم الاختبار البعدي',        isFormBased: false, deadlineRefPoint: 'END',   deadlineIdealHours:   0,  deadlineMaxHours:  24, isDeadlineWorkingDays: false },
-    { key: 'certificates',         name: 'إصدار الشهادات',              isFormBased: false, deadlineRefPoint: 'END',   deadlineIdealHours:  72,  deadlineMaxHours: 120, isDeadlineWorkingDays: true  },
-    { key: 'closing_report',       name: 'تقرير اختتام الدورة',         isFormBased: true,  deadlineRefPoint: 'END',   deadlineIdealHours:  24,  deadlineMaxHours:  72, isDeadlineWorkingDays: false },
-    { key: 'supervisor_compensation', name: 'رفع مستحقات المشرف',       isFormBased: false, deadlineRefPoint: 'END',   deadlineIdealHours:  72,  deadlineMaxHours: 120, isDeadlineWorkingDays: true  },
-    { key: 'trainer_compensation', name: 'رفع مستحقات المدرب',          isFormBased: false, deadlineRefPoint: 'END',   deadlineIdealHours:  72,  deadlineMaxHours: 120, isDeadlineWorkingDays: true  },
-    { key: 'revenues',             name: 'رفع الإيرادات المالية',        isFormBased: false, deadlineRefPoint: 'END',   deadlineIdealHours:  72,  deadlineMaxHours: 120, isDeadlineWorkingDays: false },
-    { key: 'materials',            name: 'إعادة المواد التدريبية المعارة', isFormBased: false, deadlineRefPoint: 'END', deadlineIdealHours:  24,  deadlineMaxHours:  72, isDeadlineWorkingDays: false },
-    { key: 'settlement',           name: 'تسوية السلفة المؤقتة',        isFormBased: true,  deadlineRefPoint: 'END',   deadlineIdealHours: 120,  deadlineMaxHours: 240, isDeadlineWorkingDays: true  },
+    { key: 'trainee_registration', name: 'تسجيل المتدربين في المنصة',  isFormBased: false, deadlineRefPoint: 'START', deadlineIdealHours: -72,  deadlineMaxHours: -24, isDeadlineWorkingDays: false, elementType: 'MANDATORY',   conditionField: null },
+    { key: 'registration_message', name: 'إرسال رسالة للمتدربين',       isFormBased: false, deadlineRefPoint: 'START', deadlineIdealHours: -48,  deadlineMaxHours:   0, isDeadlineWorkingDays: false, elementType: 'MANDATORY',   conditionField: null },
+    { key: 'advance_req',          name: 'طلب السلفة المؤقتة',          isFormBased: true,  deadlineRefPoint: 'START', deadlineIdealHours: -120, deadlineMaxHours: -72, isDeadlineWorkingDays: true,  elementType: 'CONDITIONAL', conditionField: 'requiresAdvance' },
+    { key: 'pre_test',             name: 'تقديم الاختبار القبلي',        isFormBased: false, deadlineRefPoint: 'START', deadlineIdealHours:   0,  deadlineMaxHours:  24, isDeadlineWorkingDays: false, elementType: 'CONDITIONAL', conditionField: 'requiresPreTest' },
+    { key: 'opening_report',       name: 'تقرير افتتاح الدورة',         isFormBased: true,  deadlineRefPoint: 'START', deadlineIdealHours:   0,  deadlineMaxHours:  24, isDeadlineWorkingDays: false, elementType: 'CONDITIONAL', conditionField: 'requiresOpeningReport' },
+    { key: 'reaction_evaluation',  name: 'تقديم تقييم الدورة',          isFormBased: false, deadlineRefPoint: 'END',   deadlineIdealHours:   0,  deadlineMaxHours:  24, isDeadlineWorkingDays: false, elementType: 'MANDATORY',   conditionField: null },
+    { key: 'post_test',            name: 'تقديم الاختبار البعدي',        isFormBased: false, deadlineRefPoint: 'END',   deadlineIdealHours:   0,  deadlineMaxHours:  24, isDeadlineWorkingDays: false, elementType: 'CONDITIONAL', conditionField: 'requiresPostTest' },
+    { key: 'certificates',         name: 'إصدار الشهادات',              isFormBased: false, deadlineRefPoint: 'END',   deadlineIdealHours:  72,  deadlineMaxHours: 120, isDeadlineWorkingDays: true,  elementType: 'MANDATORY',   conditionField: null },
+    { key: 'closing_report',       name: 'تقرير اختتام الدورة',         isFormBased: true,  deadlineRefPoint: 'END',   deadlineIdealHours:  24,  deadlineMaxHours:  72, isDeadlineWorkingDays: false, elementType: 'CONDITIONAL', conditionField: 'requiresClosingReport' },
+    { key: 'supervisor_compensation', name: 'رفع مستحقات المشرف',       isFormBased: false, deadlineRefPoint: 'END',   deadlineIdealHours:  72,  deadlineMaxHours: 120, isDeadlineWorkingDays: true,  elementType: 'CONDITIONAL', conditionField: 'requiresSupervisorCompensation' },
+    { key: 'trainer_compensation', name: 'رفع مستحقات المدرب',          isFormBased: false, deadlineRefPoint: 'END',   deadlineIdealHours:  72,  deadlineMaxHours: 120, isDeadlineWorkingDays: true,  elementType: 'CONDITIONAL', conditionField: 'requiresTrainerCompensation' },
+    { key: 'revenues',             name: 'رفع الإيرادات المالية',        isFormBased: false, deadlineRefPoint: 'END',   deadlineIdealHours:  72,  deadlineMaxHours: 120, isDeadlineWorkingDays: false, elementType: 'CONDITIONAL', conditionField: 'requiresRevenue' },
+    { key: 'materials',            name: 'إعادة المواد التدريبية المعارة', isFormBased: false, deadlineRefPoint: 'END', deadlineIdealHours:  24,  deadlineMaxHours:  72, isDeadlineWorkingDays: false, elementType: 'CONDITIONAL', conditionField: 'materialsIssued' },
+    { key: 'settlement',           name: 'تسوية السلفة المؤقتة',        isFormBased: true,  deadlineRefPoint: 'END',   deadlineIdealHours: 120,  deadlineMaxHours: 240, isDeadlineWorkingDays: true,  elementType: 'CONDITIONAL', conditionField: 'requiresAdvanceSettlement' },
+    { key: 'medical_insurance',    name: 'استخراج التأمين الطبي للمتدربين', isFormBased: true, deadlineRefPoint: 'START', deadlineIdealHours: -72, deadlineMaxHours:  72, isDeadlineWorkingDays: false, elementType: 'CONDITIONAL', conditionField: 'courseType=external' },
   ];
 
   // الخطوة 1: upsert الحقول الأساسية فقط (آمنة دائماً)
@@ -213,15 +224,15 @@ async function main() {
     });
   }
 
-  // الخطوة 2: تحديث حقول المواعيد بعد التأكد من وجود الأعمدة
+  // الخطوة 2: تحديث حقول المواعيد ونوع العنصر بعد التأكد من وجود الأعمدة
   try {
     for (const el of elements) {
       await directPrisma.$executeRawUnsafe(
-        `UPDATE "ClosureElement" SET "deadlineRefPoint"=$1, "deadlineIdealHours"=$2, "deadlineMaxHours"=$3, "isDeadlineWorkingDays"=$4 WHERE key=$5`,
-        el.deadlineRefPoint, el.deadlineIdealHours, el.deadlineMaxHours, el.isDeadlineWorkingDays, el.key
+        `UPDATE "ClosureElement" SET "deadlineRefPoint"=$1, "deadlineIdealHours"=$2, "deadlineMaxHours"=$3, "isDeadlineWorkingDays"=$4, "elementType"=$5, "conditionField"=$6 WHERE key=$7`,
+        el.deadlineRefPoint, el.deadlineIdealHours, el.deadlineMaxHours, el.isDeadlineWorkingDays, el.elementType, el.conditionField, el.key
       );
     }
-    console.log('Deadline data populated for', elements.length, 'elements.');
+    console.log('Deadline/type data populated for', elements.length, 'elements.');
   } catch (e) {
     console.log('Deadline update skipped:', e.message.slice(0, 80));
   }

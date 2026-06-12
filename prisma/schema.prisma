@@ -119,6 +119,8 @@ model User {
 
   courseAssignments    CourseAssignmentRegister[] @relation("AssignmentUser")
   grantedExtensions    CourseClosureTracking[]    @relation("ExtensionGranter")
+  overriddenElements   CourseClosureTracking[]    @relation("ElementOverrider")
+  createdClosureElements ClosureElement[]         @relation("ClosureElementCreator")
   optionalReports      CourseOptionalReport[]     @relation("OptionalReportAuthor")
   fieldReports         FieldReport[]              @relation("FieldReportAuthor")
 
@@ -245,6 +247,16 @@ model ClosureElement {
   deadlineIdealHours     Int?
   deadlineMaxHours       Int?
   isDeadlineWorkingDays  Boolean  @default(false)
+
+  // نوع العنصر وضوابط تطبيقه
+  elementType            String   @default("MANDATORY") // MANDATORY | CONDITIONAL | OPTIONAL
+  conditionField         String?  // اسم حقل boolean في Course (للنوع CONDITIONAL)، أو "field=value"
+  isActive               Boolean  @default(true)
+  isCustom               Boolean  @default(false)
+  createdById            String?
+  createdBy              User?    @relation("ClosureElementCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt              DateTime @default(now())
+
   courseClosureTrackings CourseClosureTracking[]
 }
 
@@ -272,6 +284,12 @@ model CourseClosureTracking {
   extensionGrantedBy   User?     @relation("ExtensionGranter", fields: [extensionGrantedById], references: [id], onDelete: SetNull)
   extensionHours       Int?
   extensionReason      String?
+
+  // استثناءات/استرجاع المدير
+  overrideReason       String?
+  overriddenAt         DateTime?
+  overriddenById       String?
+  overriddenBy         User?     @relation("ElementOverrider", fields: [overriddenById], references: [id], onDelete: SetNull)
 
   course          Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   element         ClosureElement @relation(fields: [elementId], references: [id])
