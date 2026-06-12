@@ -120,6 +120,7 @@ model User {
   courseAssignments    CourseAssignmentRegister[] @relation("AssignmentUser")
   grantedExtensions    CourseClosureTracking[]    @relation("ExtensionGranter")
   optionalReports      CourseOptionalReport[]     @relation("OptionalReportAuthor")
+  fieldReports         FieldReport[]              @relation("FieldReportAuthor")
 
   // ----- علاقة الإشراف على مشاريع تشغيلية -----
   supervisedProjects   ProjectSupervisor[]        @relation("SupervisorUser")
@@ -188,6 +189,7 @@ model Course {
   supportingTeam                 CourseSupport[]
   closureElements                CourseClosureTracking[]
   optionalReports                CourseOptionalReport[]
+  fieldReports                   FieldReport[]
   auditLogs                      AuditLog[]
   messages                       Message[]
 
@@ -216,6 +218,22 @@ model CourseSupport {
   user     User   @relation("SupportingMember", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([courseId, userId])
+}
+
+// =============================================================
+// تقارير الملاحظات الميدانية — سجل أرشيفي (مفتوح، غير قابل للتعديل بعد الإرسال)
+// =============================================================
+model FieldReport {
+  id        String   @id @default(uuid())
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("FieldReportAuthor", fields: [authorId], references: [id])
+  formData  Json
+  createdAt DateTime @default(now())
+
+  @@index([courseId])
+  @@index([authorId])
 }
 
 model ClosureElement {

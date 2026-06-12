@@ -12,11 +12,13 @@ const REPORT_META = {
   opening_report: { label: 'تقرير الافتتاح', short: 'افتتاح', color: '#253C32', bg: 'bg-primary-light', border: 'border-primary/20', text: 'text-primary',   dot: 'bg-primary',  icon: '📋' },
   closing_report: { label: 'تقرير الاختتام', short: 'اختتام', color: '#5D8A70', bg: 'bg-forest-50',     border: 'border-accent/20',   text: 'text-accent',    dot: 'bg-accent',   icon: '📝' },
   report:         { label: 'تقرير',           short: 'تقرير',  color: '#4B5952', bg: 'bg-background',    border: 'border-border',      text: 'text-text-soft', dot: 'bg-text-soft',icon: '📄' },
+  notes_report:   { label: 'تقرير ملاحظات',   short: 'ملاحظات', color: '#8B7D6B', bg: 'bg-sand/10',       border: 'border-sand/30',     text: 'text-warning',   dot: 'bg-sand',     icon: '🗒️' },
 };
 
 const STATUS_META = {
   APPROVED:         { label: 'معتمد',             cls: 'bg-forest-50 text-accent border-accent/20',      icon: '✓' },
   PENDING_APPROVAL: { label: 'بانتظار الاعتماد',  cls: 'bg-sand/20 text-warning border-sand/40',         icon: '⏳' },
+  ARCHIVED:         { label: 'مؤرشف',             cls: 'bg-border text-text-soft border-border',        icon: '🗄️' },
 };
 
 function fmtDate(v) {
@@ -83,7 +85,7 @@ function ReportCard({ row, onPrint, onEml, printing, downloading }) {
       {/* أزرار الإجراء */}
       <div className="flex gap-2 border-t border-border bg-background px-4 py-2.5">
         <button
-          onClick={() => onPrint(row.id)}
+          onClick={() => onPrint(row.id, row.reportKey)}
           disabled={busy}
           className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-text-main hover:border-primary hover:text-primary disabled:opacity-50 transition"
         >
@@ -145,6 +147,7 @@ export default function ReportsPage() {
     pending:  rows.filter(r => r.status === 'PENDING_APPROVAL').length,
     opening:  rows.filter(r => r.reportKey === 'opening_report').length,
     closing:  rows.filter(r => r.reportKey === 'closing_report').length,
+    notes:    rows.filter(r => r.reportKey === 'notes_report').length,
   }), [rows]);
 
   // تجميع حسب الدورة
@@ -160,10 +163,12 @@ export default function ReportsPage() {
   }, [filtered, groupBy]);
 
   // ── إجراءات ──────────────────────────────────────────────────────────────
-  const handlePrint = async (id) => {
+  const exportBase = (id, key) => key === 'notes_report' ? `/field-reports/${id}` : `/closure/${id}`;
+
+  const handlePrint = async (id, key) => {
     setPrinting(id);
     try {
-      const res = await api.get(`/closure/${id}/export`, { responseType: 'text', headers: { Accept: 'text/html' } });
+      const res = await api.get(`${exportBase(id, key)}/export`, { responseType: 'text', headers: { Accept: 'text/html' } });
       const w = window.open('', '_blank');
       if (!w) return toast.error('تعذر فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة');
       w.document.open(); w.document.write(res.data); w.document.close();
@@ -174,12 +179,12 @@ export default function ReportsPage() {
   const handleEml = async (id, key) => {
     setDownloading(id);
     try {
-      const res = await api.get(`/closure/${id}/export-eml`, { responseType: 'blob', headers: { Accept: 'message/rfc822' } });
+      const res = await api.get(`${exportBase(id, key)}/export-eml`, { responseType: 'blob', headers: { Accept: 'message/rfc822' } });
       const url = URL.createObjectURL(res.data);
       const a = document.createElement('a');
       const m = (res.headers['content-disposition'] || '').match(/filename="?([^";]+)"?/i);
       a.href = url;
-      a.download = m?.[1] || (key === 'opening_report' ? 'opening-report.eml' : 'closing-report.eml');
+      a.download = m?.[1] || (key === 'opening_report' ? 'opening-report.eml' : key === 'closing_report' ? 'closing-report.eml' : 'notes-report.eml');
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
       toast.success('تم تنزيل الملف ✓');
     } catch { toast.error('تعذر تنزيل ملف EML'); }
@@ -263,6 +268,12 @@ export default function ReportsPage() {
                     ${filters.type === 'closing_report' ? 'border-accent/40 bg-forest-50 text-accent' : 'border-accent/20 bg-forest-50/60 text-accent hover:border-accent/30'}`}>
                   <span>📝</span>
                   <span>{stats.closing} اختتام</span>
+                </button>
+                <button onClick={() => setFilters(p => ({...p, type: p.type === 'notes_report' ? '' : 'notes_report'}))}
+                  className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition
+                    ${filters.type === 'notes_report' ? 'border-sand/60 bg-sand/20 text-warning' : 'border-sand/30 bg-sand/10 text-warning hover:border-sand/50'}`}>
+                  <span>🗒️</span>
+                  <span>{stats.notes} ملاحظات</span>
                 </button>
               </div>
             )}
@@ -390,7 +401,7 @@ export default function ReportsPage() {
                       )}
                     </div>
                     <div className="w-24 flex justify-center gap-1.5">
-                      <button onClick={() => handlePrint(row.id)} disabled={printing === row.id || downloading === row.id}
+                      <button onClick={() => handlePrint(row.id, row.reportKey)} disabled={printing === row.id || downloading === row.id}
                         className="rounded-lg border border-border bg-white p-1.5 text-text-soft hover:border-primary hover:text-primary disabled:opacity-40 transition"
                         title="طباعة">
                         {printing === row.id
@@ -488,7 +499,7 @@ function CourseGroup({ group, onPrint, onEml, printing, downloading, view }) {
                     </div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
-                    <button onClick={() => onPrint(row.id)} disabled={busy}
+                    <button onClick={() => onPrint(row.id, row.reportKey)} disabled={busy}
                       className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-[11px] font-bold text-text-soft hover:border-primary hover:text-primary disabled:opacity-40 transition">
                       {printing === row.id ? '...' : '🖨️'}
                     </button>
@@ -508,7 +519,7 @@ function CourseGroup({ group, onPrint, onEml, printing, downloading, view }) {
                 <span className="flex-1 text-xs text-text-soft">{row.presenterName}</span>
                 {sm && <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${sm.cls}`}>{sm.label}</span>}
                 <div className="flex gap-1.5">
-                  <button onClick={() => onPrint(row.id)} disabled={busy}
+                  <button onClick={() => onPrint(row.id, row.reportKey)} disabled={busy}
                     className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-[11px] font-bold hover:border-primary hover:text-primary disabled:opacity-40 transition">
                     🖨️
                   </button>

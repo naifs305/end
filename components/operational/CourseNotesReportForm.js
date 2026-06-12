@@ -3,8 +3,58 @@ import { createPortal } from 'react-dom';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
 
+const CATEGORY_OPTIONS = [
+  { value: '', label: 'بدون تصنيف' },
+  { value: 'operational', label: 'تشغيلية' },
+  { value: 'technical', label: 'فنية' },
+  { value: 'financial', label: 'مالية' },
+  { value: 'administrative', label: 'إدارية' },
+  { value: 'trainees', label: 'تتعلق بالمتدربين' },
+  { value: 'trainer', label: 'تتعلق بالمدرب' },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: '', label: 'بدون أولوية' },
+  { value: 'urgent', label: '🔴 عاجلة' },
+  { value: 'medium', label: '🟡 متوسطة' },
+  { value: 'low', label: '🟢 منخفضة' },
+];
+
 function ReadOnlyField({ label, value }) {
   return <div className="rounded-2xl border border-border bg-white p-3"><div className="mb-1 text-[11px] font-bold text-text-soft">{label}</div><div className="break-words text-sm font-bold text-text-main">{value || '-'}</div></div>;
+}
+
+function TextField({ label, value, onChange, placeholder, type = 'text', hint, disabled }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-extrabold text-text-main">{label}</label>
+      {hint && <p className="mb-1.5 text-[11px] text-text-soft">{hint}</p>}
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:bg-background disabled:text-text-soft"
+      />
+    </div>
+  );
+}
+
+function SelectField({ label, value, onChange, options, disabled }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-extrabold text-text-main">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:bg-background disabled:text-text-soft"
+      >
+        {options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+      </select>
+    </div>
+  );
 }
 
 function AttachmentCard({ file, index, onRemove }) {
@@ -13,7 +63,7 @@ function AttachmentCard({ file, index, onRemove }) {
       <img src={file.content} alt={file.name} className="mb-2 h-28 w-full rounded-xl object-cover" />
       <div className="mb-1 truncate text-xs font-medium text-text-main">{file.name}</div>
       <div className="mb-2 text-[11px] text-text-soft">{file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : ''}</div>
-      <button type="button" onClick={() => onRemove(index)} className="text-xs font-bold text-danger hover:underline">حذف</button>
+      {onRemove && <button type="button" onClick={() => onRemove(index)} className="text-xs font-bold text-danger hover:underline">حذف</button>}
     </div>
   );
 }
@@ -25,9 +75,21 @@ function formatLocationType(value) {
 
 export default function CourseNotesReportForm({ courseId, course, onClose }) {
   const [notes, setNotes] = useState('');
+  const [attendanceCount, setAttendanceCount] = useState(course?.numTrainees != null ? String(course.numTrainees) : '');
+  const [beneficiaryEntity, setBeneficiaryEntity] = useState(course?.beneficiaryEntity || '');
+  const [executingPartner, setExecutingPartner] = useState('');
+  const [additionalTrainers, setAdditionalTrainers] = useState('');
+  const [category, setCategory] = useState('');
+  const [priority, setPriority] = useState('');
+  const [suggestedAction, setSuggestedAction] = useState('');
   const [attachments, setAttachments] = useState([]);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submittedId, setSubmittedId] = useState(null);
   const [printing, setPrinting] = useState(false);
   const [downloading, setDownloading] = useState(false);
+
+  const isArchived = !!submittedId;
 
   const courseInfo = useMemo(() => {
     if (!course) return null;
@@ -101,21 +163,40 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
 
   const handleRemoveAttachment = (index) => setAttachments((prev) => prev.filter((_, i) => i !== index));
 
-  const validate = () => {
+  const buildPayload = () => ({
+    notes: notes.trim(),
+    attendanceCount: attendanceCount !== '' ? Number(attendanceCount) : null,
+    beneficiaryEntity: beneficiaryEntity.trim(),
+    executingPartner: executingPartner.trim(),
+    additionalTrainers: additionalTrainers.trim(),
+    category,
+    priority,
+    suggestedAction: suggestedAction.trim(),
+    attachments,
+  });
+
+  const handleSubmit = async () => {
     if (!notes.trim()) {
-      toast.error('يرجى كتابة الملاحظات قبل المتابعة');
-      return false;
+      toast.error('يرجى كتابة الملاحظات قبل الإرسال');
+      return;
     }
-    return true;
+    setSubmitting(true);
+    try {
+      const res = await api.post(`/courses/${courseId}/notes-report`, buildPayload());
+      setSubmittedId(res.data?.id);
+      toast.success('تم إرسال التقرير وأرشفته بنجاح ✓');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'تعذر إرسال التقرير');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const buildPayload = () => ({ notes: notes.trim(), attachments });
-
   const handlePrint = async () => {
-    if (!validate()) return;
+    if (!submittedId) return;
     setPrinting(true);
     try {
-      const res = await api.post(`/courses/${courseId}/notes-report/print`, buildPayload(), {
+      const res = await api.get(`/field-reports/${submittedId}/export`, {
         responseType: 'text', headers: { Accept: 'text/html' },
       });
       const w = window.open('', '_blank');
@@ -129,10 +210,10 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
   };
 
   const handleDownloadEml = async () => {
-    if (!validate()) return;
+    if (!submittedId) return;
     setDownloading(true);
     try {
-      const res = await api.post(`/courses/${courseId}/notes-report/eml`, buildPayload(), {
+      const res = await api.get(`/field-reports/${submittedId}/export-eml`, {
         responseType: 'blob', headers: { Accept: 'message/rfc822' },
       });
       const disposition = res.headers['content-disposition'] || '';
@@ -162,9 +243,14 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
               <div>
                 <h3 className="text-base font-extrabold text-primary">📝 تقرير ملاحظات عامة على الدورة</h3>
                 <p className="mt-1 text-sm text-text-soft">
-                  نموذج مفتوح لتسجيل أي ملاحظات أو مستجدات ميدانية أثناء تنفيذ الدورة، يمكن طباعته أو تنزيله كرسالة بريدية موجّهة لسعادة وكيل التدريب.
+                  نموذج مفتوح لتسجيل أي ملاحظات أو مستجدات ميدانية أثناء تنفيذ الدورة، يُحفظ كأرشيف ضمن "التقارير الميدانية" ويمكن طباعته أو تنزيله كرسالة بريدية موجّهة لسعادة وكيل التدريب.
                 </p>
               </div>
+              {isArchived && (
+                <span className="shrink-0 rounded-2xl border border-accent/30 bg-forest-50 px-3 py-1.5 text-xs font-extrabold text-accent">
+                  ✓ تم الإرسال والأرشفة
+                </span>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -179,6 +265,18 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
             </div>
           </div>
 
+          {/* بيانات إضافية مهمة لاتخاذ القرار */}
+          <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
+            <h4 className="mb-1 text-base font-extrabold text-text-main">بيانات إضافية</h4>
+            <p className="mb-4 text-[11px] text-text-soft">معلومات قد لا تكون متوفرة مسبقاً في بيانات الدورة، خاصة عند وجود شريك تنفيذ أو مدربين خارجيين.</p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <TextField label="عدد الحضور الفعلي" type="number" value={attendanceCount} onChange={setAttendanceCount} placeholder="مثال: 22" disabled={isArchived} />
+              <TextField label="الجهة المستفيدة" value={beneficiaryEntity} onChange={setBeneficiaryEntity} placeholder="اسم الجهة المستفيدة من الدورة" disabled={isArchived} />
+              <TextField label="الجهة المنفذة / شريك التنفيذ" value={executingPartner} onChange={setExecutingPartner} placeholder="في حال وجود شريك تنفيذ خارجي" hint="اتركه فارغاً إن كانت الدورة تُنفَّذ ذاتياً" disabled={isArchived} />
+              <TextField label="مدربون إضافيون / خارجيون" value={additionalTrainers} onChange={setAdditionalTrainers} placeholder="أسماء المدربين الإضافيين أو الخارجيين" hint="في حال تعدد المدربين أو وجود مدرب خارجي" disabled={isArchived} />
+            </div>
+          </div>
+
           <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
             <label className="mb-1.5 block text-sm font-extrabold text-text-main">
               الملاحظات والمستجدات <span className="text-danger">*</span>
@@ -188,8 +286,29 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder={'مثال:\nتأخر وصول المواد التدريبية يوم الثلاثاء\nملاحظة على جاهزية القاعة...\nطلب من الجهة المستفيدة بخصوص...'}
-              className="min-h-[220px] w-full resize-y rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+              disabled={isArchived}
+              className="min-h-[180px] w-full resize-y rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:bg-background disabled:text-text-soft"
             />
+          </div>
+
+          {/* تصنيف الملاحظة والإجراء المقترح */}
+          <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
+            <h4 className="mb-1 text-base font-extrabold text-text-main">تصنيف الملاحظة والإجراء المقترح</h4>
+            <p className="mb-4 text-[11px] text-text-soft">تساعد متخذ القرار على تحديد جهة المعالجة وأولويتها بسرعة.</p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <SelectField label="تصنيف الملاحظة" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} disabled={isArchived} />
+              <SelectField label="مستوى الأولوية" value={priority} onChange={setPriority} options={PRIORITY_OPTIONS} disabled={isArchived} />
+            </div>
+            <div className="mt-4">
+              <label className="mb-1.5 block text-sm font-extrabold text-text-main">الإجراء المقترح / الجهة المقترح تحويل الملاحظة لها</label>
+              <textarea
+                value={suggestedAction}
+                onChange={(e) => setSuggestedAction(e.target.value)}
+                placeholder="مثال: التواصل مع الإدارة المالية لمعالجة تأخر صرف السلفة"
+                disabled={isArchived}
+                className="min-h-[90px] w-full resize-y rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:bg-background disabled:text-text-soft"
+              />
+            </div>
           </div>
 
           <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
@@ -197,29 +316,39 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
               <h4 className="text-base font-extrabold text-text-main">صور وملاحظات مصورة</h4>
               <span className="text-xs text-text-soft">اختياري — حتى 6 صور</span>
             </div>
-            <div className="mb-4 flex flex-wrap gap-2">
-              <label className="flex cursor-pointer items-center gap-1.5 rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-white hover:opacity-90 transition">
-                📷 تصوير مباشر
-                <input type="file" accept="image/*" capture="environment" multiple onChange={handleAttachmentsChange} className="hidden" />
-              </label>
-              <label className="flex cursor-pointer items-center gap-1.5 rounded-2xl border border-primary/30 bg-white px-4 py-2 text-sm font-bold text-primary hover:bg-primary-light transition">
-                🖼️ اختيار من المعرض
-                <input type="file" accept="image/*" multiple onChange={handleAttachmentsChange} className="hidden" />
-              </label>
-            </div>
+            {!isArchived && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                <label className="flex cursor-pointer items-center gap-1.5 rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-white hover:opacity-90 transition">
+                  📷 تصوير مباشر
+                  <input type="file" accept="image/*" capture="environment" multiple onChange={handleAttachmentsChange} className="hidden" />
+                </label>
+                <label className="flex cursor-pointer items-center gap-1.5 rounded-2xl border border-primary/30 bg-white px-4 py-2 text-sm font-bold text-primary hover:bg-primary-light transition">
+                  🖼️ اختيار من المعرض
+                  <input type="file" accept="image/*" multiple onChange={handleAttachmentsChange} className="hidden" />
+                </label>
+              </div>
+            )}
             {attachments.length > 0
-              ? <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{attachments.map((file, index) => <AttachmentCard key={`${file.name}-${index}`} file={file} index={index} onRemove={handleRemoveAttachment} />)}</div>
+              ? <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{attachments.map((file, index) => <AttachmentCard key={`${file.name}-${index}`} file={file} index={index} onRemove={isArchived ? null : handleRemoveAttachment} />)}</div>
               : <div className="rounded-2xl border border-dashed border-border bg-background p-4 text-sm text-text-soft">لم يتم إرفاق أي صور حتى الآن</div>}
           </div>
 
           <div className="flex flex-col-reverse gap-3 pt-2 md:flex-row md:justify-end">
             <button type="button" onClick={onClose} className="rounded-2xl border border-border bg-white px-5 py-3 text-sm font-bold text-text-main transition hover:bg-background">إغلاق</button>
-            <button type="button" onClick={handlePrint} disabled={printing} className="rounded-2xl border border-primary/30 bg-white px-6 py-3 text-sm font-bold text-primary transition hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-60">
-              {printing ? 'جاري التحضير...' : '🖨️ طباعة'}
-            </button>
-            <button type="button" onClick={handleDownloadEml} disabled={downloading} className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
-              {downloading ? 'جاري التحضير...' : '📧 تنزيل كرسالة بريد (EML)'}
-            </button>
+            {isArchived ? (
+              <>
+                <button type="button" onClick={handlePrint} disabled={printing} className="rounded-2xl border border-primary/30 bg-white px-6 py-3 text-sm font-bold text-primary transition hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-60">
+                  {printing ? 'جاري التحضير...' : '🖨️ طباعة'}
+                </button>
+                <button type="button" onClick={handleDownloadEml} disabled={downloading} className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
+                  {downloading ? 'جاري التحضير...' : '📧 تنزيل كرسالة بريد (EML)'}
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={handleSubmit} disabled={submitting} className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
+                {submitting ? 'جاري الإرسال...' : '✅ إرسال وأرشفة التقرير'}
+              </button>
+            )}
           </div>
         </div>
       </div>
