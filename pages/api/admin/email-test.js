@@ -26,3 +26,4 @@ async function handler(req, res) {
 }
 
 module.exports = withManager(withMethods(['GET', 'POST'], handler));
+module.exports.default = module.exports;
