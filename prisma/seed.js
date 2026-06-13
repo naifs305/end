@@ -37,6 +37,8 @@ async function main() {
     `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "overrideReason"  TEXT`,
     `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "overriddenAt"    TIMESTAMP(3)`,
     `ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "overriddenById"  UUID`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "profileImage"   TEXT`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "signatureImage" TEXT`,
   ];
 
   for (const sql of schemaMigrations) {
