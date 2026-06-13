@@ -39,6 +39,10 @@ export default function Profile() {
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [pwSaving, setPwSaving] = useState(false);
 
+  const [testEmail, setTestEmail] = useState('');
+  const [testSending, setTestSending] = useState(false);
+  const isManager = (user?.roles || []).includes('MANAGER');
+
   const profileInputRef = useRef(null);
   const signatureInputRef = useRef(null);
 
@@ -124,6 +128,23 @@ export default function Profile() {
   const handlePasswordChange = (e) => {
     const { name, value } = e.target;
     setPwForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSendTestEmail = async () => {
+    setTestSending(true);
+    try {
+      const payload = testEmail.trim() ? { to: testEmail.trim() } : {};
+      const res = await api.post('/admin/email-test', payload);
+      if (res.data?.sent) {
+        toast.success(`تم إرسال رسالة الاختبار إلى ${res.data.to}`);
+      } else {
+        toast.error('تعذر إرسال رسالة الاختبار — تحقق من إعدادات البريد');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشل في إرسال رسالة الاختبار');
+    } finally {
+      setTestSending(false);
+    }
   };
 
   const handlePasswordSubmit = async (e) => {
@@ -349,6 +370,36 @@ export default function Profile() {
                 </button>
               </div>
             </form>
+
+            {/* اختبار البريد الإلكتروني — للمدير فقط */}
+            {isManager && (
+              <div className="space-y-4 rounded-3xl border border-border bg-white p-5 sm:p-6">
+                <h2 className="text-lg font-extrabold text-text-main">اختبار البريد الإلكتروني</h2>
+                <p className="text-sm text-text-soft">
+                  أرسل رسالة اختبار للتأكد من وصول البريد وظهور شعار الجامعة بشكل صحيح. اتركه فارغاً للإرسال إلى بريدك الحالي.
+                </p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex-1">
+                    <label className={labelClass}>البريد الإلكتروني المستهدف</label>
+                    <input
+                      type="email"
+                      value={testEmail}
+                      onChange={(e) => setTestEmail(e.target.value)}
+                      placeholder={user?.email || 'example@nauss.edu.sa'}
+                      className={inputClass}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSendTestEmail}
+                    disabled={testSending}
+                    className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
+                  >
+                    {testSending ? 'جاري الإرسال...' : 'إرسال رسالة اختبار'}
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
