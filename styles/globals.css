@@ -1,0 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary:       #253C32;
+  --color-primary-dark:  #14221D;
+  --color-primary-light: #EBF3EE;
+  --color-accent:        #5D8A70;
+  --color-background:    #FAFBFB;
+  --color-card:          #FFFFFF;
+  --color-border:        #D7DBDA;
+  --color-text-main:     #14221D;
+  --color-text-soft:     #4B5952;
+  --color-success:       #5D8A70;
+  --color-warning:       #8B7D6B;
+  --color-danger:        #633646;
+  --color-sand:          #C3B39F;
+  --color-linen:         #D1C8B6;
+  --color-forest-50:     #EBF3EE;
+  --color-forest-100:    #D7DBDA;
+  --color-forest-200:    #BAC7C8;
+  --color-forest-300:    #9DA3A1;
+  --color-forest-500:    #394F49;
+  --color-forest-800:    #192922;
+  --color-forest-900:    #14221D;
+}
+
+html {
+  direction: rtl;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-background);
+  color: var(--color-text-main);
+  font-family: 'Cairo', sans-serif;
+  overflow-x: hidden;
+}
+
+#__next {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+input,
+button,
+select,
+textarea {
+  font-family: inherit;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas,
+iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+/* ── Scrollbar مخصص ── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: #FAFBFB; }
+::-webkit-scrollbar-thumb  { background: #BAC7C8; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #5D8A70; }
+
+/* ── أنيميشن ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn .25s ease both; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin { animation: spin 1s linear infinite; }
+
+/* ── Recharts RTL ── */
+.recharts-wrapper { direction: ltr; }
+.recharts-legend-wrapper { direction: rtl; }
