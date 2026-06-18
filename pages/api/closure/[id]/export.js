@@ -7,8 +7,8 @@
 //   - closing_report / report → قالب الاختتام
 // =============================================================
 
-const prisma = require('../../../../lib/db/prisma');
-const { withAuth, withMethods } = require('../../../../lib/middleware/auth');
+const { withMethods, withAuth } = require('../../../../lib/server/http');
+const svc = require('../../../../lib/modules/closure/closure.service');
 const permissions = require('../../../../lib/services/permissions');
 const { renderOpeningReport } = require('../../../../lib/reports/openingReport');
 const { renderClosingReport } = require('../../../../lib/reports/closingReport');
@@ -16,27 +16,16 @@ const { renderClosingReport } = require('../../../../lib/reports/closingReport')
 async function handler(req, res) {
   const { id } = req.query;
 
-  const element = await prisma.courseClosureTracking.findUnique({
-    where: { id },
-    include: {
-      course: {
-        include: {
-          primaryEmployee: true,
-          operationalProject: true,
-        },
-      },
-      element: true,
-    },
-  });
+  const element = await svc.getElementDetails(id);
 
   if (!element) {
-    return res.status(404).json({ message: 'العنصر غير موجود' });
+    return res.status(404).json({ message: 'العنصر غير موجود', code: 'serverErrors.closureElements.notFound' });
   }
 
   // التحقق من صلاحية رؤية الدورة
   const canView = await permissions.canViewCourse(req.user, req.activeRole, element.course);
   if (!canView) {
-    return res.status(403).json({ message: 'غير مصرح لك بعرض هذا التقرير' });
+    return res.status(403).json({ message: 'غير مصرح لك بعرض هذا التقرير', code: 'serverErrors.closure.viewReportForbidden' });
   }
 
   const data = element.formData || {};

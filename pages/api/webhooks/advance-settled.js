@@ -19,26 +19,44 @@
  *   referenceNumber: string  // رقم مرجعي (اختياري)
  * }
  */
+const crypto = require('crypto');
 const prisma = require('../../../lib/db/prisma');
+const { logAudit } = require('../../../lib/services/audit');
 
 function withMethods(methods, handler) {
   return async (req, res) => {
-    if (!methods.includes(req.method)) return res.status(405).json({ message: 'Method Not Allowed' });
+    if (!methods.includes(req.method)) return res.status(405).json({ message: 'Method Not Allowed', code: 'serverErrors.common.methodNotAllowed' });
     return handler(req, res);
   };
 }
 
-async function handler(req, res) {
-  const { secret, courseId, employeeId, amount, settledAt, referenceNumber } = req.body || {};
+// مقارنة بزمن ثابت لمنع هجمات التوقيت
+function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
-  // التحقق من السر
+// قراءة السر من ترويسة Authorization أو x-webhook-secret (وليس من جسم الطلب)
+function readSecret(req) {
+  const auth = req.headers.authorization || '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7);
+  return req.headers['x-webhook-secret'] || '';
+}
+
+async function handler(req, res) {
+  const { courseId, employeeId, amount, settledAt, referenceNumber } = req.body || {};
+
+  // التحقق من السر (مقارنة بزمن ثابت + من الترويسة)
   const expectedSecret = process.env.WEBHOOK_SECRET;
-  if (!expectedSecret || secret !== expectedSecret) {
-    return res.status(401).json({ message: 'Unauthorized' });
+  if (!expectedSecret || !safeEqual(readSecret(req), expectedSecret)) {
+    return res.status(401).json({ message: 'Unauthorized', code: 'serverErrors.common.unauthorized' });
   }
 
   if (!courseId || !employeeId) {
-    return res.status(400).json({ message: 'courseId و employeeId مطلوبان' });
+    return res.status(400).json({ message: 'courseId و employeeId مطلوبان', code: 'serverErrors.webhooks.courseEmployeeRequired' });
   }
 
   try {
@@ -69,6 +87,14 @@ async function handler(req, res) {
       },
     });
 
+    // تسجيل في سجل التدقيق على مسار النجاح (logAudit يبتلع أخطاءه بنفسه)
+    await logAudit(employeeId, 'WEBHOOK', 'WEBHOOK_ELEMENT_ADVANCED', {
+      elementKey: tracking.element.key,
+      source: 'advance-settled',
+      referenceNumber: referenceNumber || null,
+      amount: amount ?? null,
+    }, courseId);
+
     console.log(`[Webhook] advance-settled: updated settlement for course ${courseId}`);
 
     return res.status(200).json({
@@ -79,7 +105,7 @@ async function handler(req, res) {
 
   } catch (err) {
     console.error('[Webhook] advance-settled error:', err.message);
-    return res.status(500).json({ message: 'خطأ داخلي' });
+    return res.status(500).json({ message: 'خطأ داخلي', code: 'serverErrors.common.serverError' });
   }
 }
 

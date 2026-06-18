@@ -4,6 +4,8 @@ export default function Document() {
   return (
     <Html lang="ar" dir="rtl">
       <Head>
+        <link rel="icon" type="image/jpeg" href="/channels4_profile.jpg" />
+        <link rel="apple-touch-icon" href="/channels4_profile.jpg" />
         <link
           rel="preconnect"
           href="https://fonts.googleapis.com"

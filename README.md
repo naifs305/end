@@ -1,223 +1,187 @@
-# منصة إقفال الدورات التدريبية
+# Training Course Closure Platform — NAUSS
 
-منصة متكاملة لإدارة الدورات التدريبية في وكالة التدريب بجامعة نايف العربية للعلوم الأمنية، تغطي دورة حياة الدورة من التحضير حتى الإقفال النهائي، مع نظام مؤشرات أداء تفصيلي ونظام مراسلات داخلية، ومهام مجدولة مرنة.
+An internal platform for the Training Agency at **Naif Arab University for Security Sciences (NAUSS)** that manages the full lifecycle of training courses — from preparation through final closure — with a detailed performance (KPI) engine, internal messaging, gamification, scheduled automation, and bilingual (Arabic/English) UI.
 
 ---
 
-## البنية التقنية
+## Tech stack
 
-| الطبقة | التقنية |
+| Layer | Technology |
 |---|---|
-| الإطار الشامل | نكست جي إس ١٣ (واجهة + إيه بي آي في مشروع واحد) |
-| قاعدة البيانات | بوستجرس على سوبابيس |
-| طبقة الوصول للبيانات | بريزما ٥ |
-| المصادقة | جي دبليو تي (توقيع بالخادم) |
-| الاستضافة | فرسيل (واجهة + إيه بي آي + كرون) |
-| كلمات المرور | بي كريبت |
-| الأنماط | تيلويند |
+| Framework | Next.js 13 (pages router — UI + API in one app) |
+| Database | PostgreSQL (Supabase) |
+| ORM / data access | Prisma 5 |
+| Auth | JWT (HS256), bcrypt, DB-driven authorization |
+| Validation | Zod |
+| Styling | Tailwind CSS (RTL/LTR), Cairo font, teal/gold glass design system |
+| Icons | lucide-react |
+| Charts / docs | recharts · jsPDF · xlsx |
+| Email | Resend (+ `.eml` draft export) |
+| i18n | DB-backed translations (Arabic/English) with bundled-JSON fallback |
+| Testing / CI | Vitest · GitHub Actions |
+| Hosting | Vercel (UI + API + cron) |
 
 ---
 
-## الأدوار والصلاحيات
+## Key features
 
-ثلاثة أدوار هرمية. يمكن لأي شخص حمل أي مجموعة منها:
-
-**الموظف** — يُسند إليه دورات، يقوم بتنفيذ عناصر الإقفال (التقارير، السلف، الاختبارات، إلخ).
-
-**مشرف المشروع** — مرتبط بمشروع تشغيلي واحد، يعتمد عناصر الإقفال لدورات مشروعه، يملك جميع صلاحيات المدير لمشروعه ما عدا تقييم الأداء.
-
-**المدير** — أعلى صلاحية، يُدير كل شيء، ويملك صلاحية حصرية لتقييم أداء الموظفين والمشرفين.
-
-الأدوار الأعلى تؤدي مهام الأدوار الأدنى عند إسناد دورات لها شخصياً.
+- **Course closure workflow** — courses move through `PREPARATION → EXECUTION → AWAITING_CLOSURE → CLOSED → ARCHIVED`; each applicable *closure element* (reports, advances, settlements, tests, …) runs a state machine (`NOT_STARTED → PENDING_APPROVAL → APPROVED / REJECTED / RETURNED / NOT_APPLICABLE`) with deadlines, extensions, manager overrides, separation of duties, and automatic closure.
+- **KPI engine** — periodic (monthly/quarterly/yearly) per-employee performance snapshots, weighted scores, leaderboards, and trends.
+- **Motivation** — badges, an improvement-ideas bank, team challenges, and monthly pledges.
+- **Communication** — internal messaging and notifications.
+- **Reports** — opening / closing / field reports, exported as print-to-PDF or `.eml` drafts.
+- **Scheduled jobs** — a single daily cron dispatches unlimited DB-defined jobs (delay checks, stale-element checks, KPI snapshots, lifecycle auto-advance, reminders) with retry/backoff.
+- **Audit log**, **SOLF (advances) webhook integration**, and a fully **bilingual, RBAC-aware** interface.
 
 ---
 
-## هيكل المشروع
+## Roles & access control
+
+Multi-role users (a person may hold any combination); the active role can be switched in the header.
+
+- **Employee** — assigned to courses; executes closure elements.
+- **Project Supervisor** — bound to one operational project; approves closure elements and oversees that project (manager powers scoped to their project, except performance evaluation).
+- **Manager** — full access; exclusive right to evaluate performance and manage users/projects/closure-elements/jobs.
+- **Quality Viewer** — read-only access to quality dashboards and reports.
+
+Authorization is enforced **server-side** on every request (the user and active role are re-loaded from the DB, not trusted from the token).
+
+---
+
+## Architecture
+
+A **modular monolith**: one Next.js deployment with a thin-handler / fat-service backend.
 
 ```
-training-ops-platform/
-├── pages/
-│   ├── api/                  مسارات إيه بي آي
-│   │   ├── auth/             المصادقة (دخول، تسجيل)
-│   │   ├── users/            المستخدمون
-│   │   ├── projects/         المشاريع التشغيلية
-│   │   ├── supervisors/      مشرفو المشاريع
-│   │   ├── courses/          الدورات
-│   │   ├── closure/          عناصر الإقفال + تصدير تقارير
-│   │   ├── messages/         المراسلات
-│   │   ├── notifications/    الإشعارات
-│   │   ├── analytics/        التحليلات
-│   │   ├── audit/            سجل التدقيق
-│   │   ├── kpis/             مؤشرات الأداء
-│   │   ├── scheduled-jobs/   إدارة المهام المجدولة
-│   │   └── cron/             نقطة دخول الكرون
-│   └── [صفحات الواجهة]
-│
-├── lib/
-│   ├── db/                   عميل بريزما
-│   ├── auth/                 توقيع والتحقق من الرموز
-│   ├── middleware/           وسيطيات المسارات
-│   ├── services/             منطق الأعمال
-│   │   ├── permissions.js    خدمة الصلاحيات المركزية
-│   │   ├── courses.js        الدورات
-│   │   ├── closure.js        عناصر الإقفال
-│   │   ├── messages.js       الرسائل
-│   │   ├── notifications.js  الإشعارات
-│   │   ├── analytics.js      التحليلات
-│   │   ├── kpis.js           مؤشرات الأداء
-│   │   ├── projects.js       المشاريع والمشرفون
-│   │   ├── scheduler.js      محرك المهام المجدولة
-│   │   └── audit.js          سجل التدقيق
-│   └── reports/              قوالب التقارير القيادية
-│       ├── helpers.js
-│       ├── openingReport.js  قالب تقرير الافتتاح
-│       └── closingReport.js  قالب تقرير الاختتام
-│
-├── prisma/
-│   ├── schema.prisma         مخطط قاعدة البيانات
-│   └── seed.ts               البيانات الأولية
-│
-├── components/               مكونات رياكت المشتركة
-├── context/                  سياقات رياكت (المصادقة)
-├── styles/                   الأنماط العامة
-├── public/                   الأصول الثابتة
-└── vercel.json               إعدادات النشر والكرون
+pages/api/*                 thin HTTP handlers (route + compose middleware)
+  └─ lib/server/http        shared layer: withMethods/withAuth/withManager,
+                            withValidation (zod), ok/created/fail (responses)
+       └─ lib/modules/<x>   bounded feature modules:
+            <x>.schema.js     zod input validation
+            <x>.policy.js     RBAC rules
+            <x>.service.js    use cases (orchestrate repo + policy + audit)
+            <x>.repo.js       the only place that touches Prisma for <x>
+       └─ lib/shared         AppError (statusCode + i18n code), helpers
+  └─ lib/db/prisma.js        single Prisma client
+PostgreSQL
+```
+
+Server errors return a stable `{ code, message }`; the client axios interceptor translates `code` into the active locale. See **`docs/ARCHITECTURE.md`** for the module pattern, rules, and migration playbook.
+
+### Project layout
+```
+pages/            UI pages + pages/api/* routes
+lib/
+  server/http/    shared HTTP layer (auth/validation/response helpers)
+  modules/        bounded modules (projects, config, identity, kpi, courses, closure, …)
+  shared/         AppError + cross-cutting helpers
+  services/       shared cross-cutting services (audit, permissions, emailService, notifications)
+  db/ auth/ middleware/ reports/ email/ i18n/ hooks/
+components/        React components (layout, charts, operational, shared)
+context/           AuthContext
+styles/            globals.css (design tokens + glass utilities)
+prisma/            schema.prisma + seed scripts
+docs/              ARCHITECTURE.md
+public/            static assets (logo, images)
 ```
 
 ---
 
-## التشغيل المحلي
+## Local setup
 
-### ١. تثبيت الحزم
+> **Note:** the dev server runs on **port 3010**. Use Node 20+.
 
+### 1. Install
 ```bash
 npm install
 ```
 
-### ٢. إعداد قاعدة البيانات
-
-أنشئ مشروعاً على [supabase.com](https://supabase.com) واحصل على رابطي الاتصال.
-
-### ٣. متغيرات البيئة
-
+### 2. Configure environment
 ```bash
 cp .env.example .env
 ```
-
-حدّث `.env` بقيم سوبابيس:
-
+Set at least:
 ```
-DATABASE_URL="postgresql://..."
-DIRECT_URL="postgresql://..."
-JWT_SECRET="نص_طويل_عشوائي"
-CRON_SECRET="نص_آخر_طويل_عشوائي"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/<db>"
+DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/<db>"
+JWT_SECRET="<random string, 32+ chars — required in every environment>"
+CRON_SECRET="<random string>"
+WEBHOOK_SECRET="<random string>"
+# optional
+RESEND_API_KEY="re_..."          # omit → email runs in mock/log mode
+NEXT_PUBLIC_SITE_URL="http://localhost:3010"
+OFFICIAL_KPI_START="2026-06"
 ```
+Generate a secret: `openssl rand -base64 32`.
 
-### ٤. إنشاء الجداول
-
+### 3. Create the schema & seed
 ```bash
-npx prisma migrate dev --name init
-npm run seed
+npx prisma db push      # creates all tables/indexes from schema.prisma
+npm run seed            # base data (projects, closure elements, default jobs, admin)
+npm run seed:config     # translations + option lists + system settings
+npm run seed:demo       # rich demo data for every page (optional)
 ```
+> Use `prisma db push` (not `migrate`) — the migration history has no baseline yet.
 
-### ٥. تشغيل المشروع
-
+### 4. Run
 ```bash
 npm run dev
 ```
+Open **http://localhost:3010**.
 
-الموقع على: `http://localhost:3010`
+### Demo login (after `seed:demo`)
+- Manager: `mgr@demo.nauss.local` / `Demo@1234`
+- Other roles: `sup1@demo.nauss.local`, `emp1@demo.nauss.local`, `qa@demo.nauss.local` (same password).
+
+> ⚠️ The base seed also creates an initial admin with credentials defined in `prisma/seed.js` — **change its password after first login** (or move it to env vars) before any real deployment.
 
 ---
 
-## النشر على فرسيل
+## Scripts
 
-### الخطوة الأولى: ربط المستودع
-
-١. ادخل [vercel.com](https://vercel.com) وسجّل الدخول بـ«جيت هاب».
-٢. اضغط **New Project** واختر المستودع.
-٣. اتركه يكتشف «نكست جي إس» تلقائياً (لا تحتاج إعدادات إضافية).
-
-### الخطوة الثانية: متغيرات البيئة
-
-في **Settings → Environment Variables** أضف:
-
-| المتغير | القيمة |
+| Script | Purpose |
 |---|---|
-| `DATABASE_URL` | رابط سوبابيس (منفذ ٦٥٤٣) |
-| `DIRECT_URL` | رابط سوبابيس المباشر (منفذ ٥٤٣٢) |
-| `JWT_SECRET` | مفتاح سري طويل عشوائي |
-| `CRON_SECRET` | مفتاح سري للكرون |
-
-### الخطوة الثالثة: النشر
-
-اضغط **Deploy**. سيتم:
-- تثبيت الحزم
-- توليد عميل بريزما
-- تطبيق الترحيلات على سوبابيس
-- بناء الواجهة
-
-### الخطوة الرابعة: البيانات الأولية
-
-بعد أول نشر، افتح **Deployments → Functions → Logs** ونفّذ مرة واحدة:
-
-```bash
-npx prisma db seed
-```
-
-أو من جهازك محلياً (مع `.env` الإنتاج):
-
-```bash
-npm run seed
-```
-
-### الخطوة الخامسة: الكرون
-
-الكرون مُعَدّ تلقائياً في `vercel.json` ليعمل يومياً الساعة ٩ صباحاً بتوقيت الرياض. يستدعي مسار `/api/cron/run` الذي ينفّذ جميع المهام المستحقة.
+| `npm run dev` | Dev server on :3010 |
+| `npm run build` / `npm start` | Production build / serve |
+| `npm run lint` | ESLint (next lint) |
+| `npm test` / `npm run test:watch` | Vitest unit tests |
+| `npm run seed` / `seed:config` / `seed:demo` | Base data / config & translations / demo data |
+| `npx prisma db push` / `prisma studio` | Sync schema / DB GUI |
 
 ---
 
-## المهام المجدولة
+## Internationalization
 
-نظام مرن يدعم **عدداً غير محدود** من المهام المجدولة رغم أن فرسيل المجانية تسمح بمهمة كرون واحدة فقط. السر: جدول مهام في قاعدة البيانات، ومسار كرون واحد يستيقظ يومياً ويُشغّل كل المستحق.
+Fully bilingual (Arabic default/RTL, English/LTR). UI strings resolve through `t()` (`lib/i18n`), which fetches translations from the DB `Translation` table and merges them over the bundled JSON dictionaries (instant fallback). Dropdown option lists come from the `OptionItem` table (`useOptions`) and system settings from `AppSetting` (`useSettings`). Switch language from the header globe — text **and** direction flip live.
 
-### أنواع المهام الجاهزة
+---
 
-- **فحص الدورات المتأخرة** — يخطر المسؤولين عند التأخير بيومين/أربعة/سبعة/أربعة عشر يوماً
-- **فحص العناصر الراكدة** — يتنبّه للعناصر التي لم تُحرَّك لأكثر من ٣ أيام
-- **لقطات مؤشرات الأداء الدورية** — تُلتقط تلقائياً حسب الجدولة
+## Scheduled jobs
 
-### إضافة مهمة جديدة
-
-من لوحة المدير (قسم المهام المجدولة)، أو عبر إيه بي آي:
-
+A single daily Vercel cron (`/api/cron/run`, secured by `CRON_SECRET`) wakes once a day and runs every due `ScheduledJob`, so an unlimited number of jobs work on the free single-cron tier. Built-in types: course-delay checks, stale-element checks, KPI snapshots, course-lifecycle auto-advance, and reminders. Add jobs from the manager UI or:
 ```
-POST /api/scheduled-jobs
-{
-  "name": "اسم المهمة",
-  "type": "COURSE_DELAY_CHECK",
-  "intervalHours": 24
-}
+POST /api/scheduled-jobs   { "name": "...", "type": "COURSE_DELAY_CHECK", "intervalHours": 24 }
 ```
 
 ---
 
-## التقارير القيادية
+## Reports
 
-تقريران منفصلان بتصميم رسمي قيادي:
-
-**تقرير الافتتاح** — عنصر إقفال `opening_report`، يُقدَّم بعد بدء الدورة، يعرض الجاهزية التشغيلية والحضور الأولي.
-
-**تقرير الاختتام** — عنصر إقفال `closing_report`، يُقدَّم بعد انتهاء الدورة، يعرض المخرجات النهائية والتقييمات.
-
-كلاهما يُصدَّر كصفحة إتش تي إم إل قابلة للطباعة عبر:
-
-```
-GET /api/closure/[trackingId]/export
-```
+- **Opening report** (`opening_report`) and **closing report** (`closing_report`) — formal templates submitted as closure elements.
+- **Field/notes report** — an archival report.
+- Export: `GET /api/closure/[trackingId]/export` (print-to-PDF HTML) or `/export-eml` (`.eml` draft; recipients configurable via `AppSetting`).
 
 ---
 
-## الترخيص
+## Deployment (Vercel)
 
-حقوق الملكية محفوظة لجامعة نايف العربية للعلوم الأمنية — وكالة التدريب.
+1. Import the GitHub repo — Next.js is auto-detected.
+2. Add the env vars from the local setup (Supabase `:6543` pooled URL for `DATABASE_URL`, `:5432` for `DIRECT_URL`, plus `JWT_SECRET`, `CRON_SECRET`, `WEBHOOK_SECRET`, optionally `RESEND_API_KEY`).
+3. Deploy. Run `npx prisma db push` + the seed scripts against the production database once.
+4. The daily cron is preconfigured in `vercel.json`.
+
+---
+
+## License
+
+© Naif Arab University for Security Sciences — Training Agency. All rights reserved.

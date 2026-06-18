@@ -1,34 +1,14 @@
-const prisma = require('../../../../lib/db/prisma');
-const { hashPassword } = require('../../../../lib/auth/jwt');
-const { withAuth, withMethods } = require('../../../../lib/middleware/auth');
-const { canResetUserPassword } = require('../../../../lib/services/permissions');
-const { validatePasswordReset } = require('../../../../lib/middleware/validate');
+const { withAuth, withMethods, ok, fail } = require('../../../../lib/server/http');
+const identity = require('../../../../lib/modules/identity/identity.service');
 
 async function handler(req, res) {
   const { id } = req.query;
-  const { password } = req.body || {};
-
-  const v = validatePasswordReset({ password });
-  if (!v.valid) return res.status(400).json({ message: v.message });
-
-  const targetUser = await prisma.user.findUnique({
-    where: { id },
-    select: { id: true, roles: true, operationalProjectId: true },
-  });
-
-  if (!targetUser) {
-    return res.status(404).json({ message: 'المستخدم غير موجود' });
+  const actor = { userId: req.user.id, activeRole: req.activeRole, user: req.user };
+  try {
+    return ok(res, await identity.adminResetPassword(id, req.body || {}, actor));
+  } catch (e) {
+    return fail(res, e);
   }
-
-  const allowed = await canResetUserPassword(req.user, req.activeRole, targetUser);
-  if (!allowed) {
-    return res.status(403).json({ message: 'لا تملك صلاحية إعادة التعيين' });
-  }
-
-  const passwordHash = await hashPassword(password);
-  await prisma.user.update({ where: { id }, data: { passwordHash } });
-
-  return res.status(200).json({ message: 'تمت إعادة تعيين كلمة المرور' });
 }
 
 module.exports = withMethods(['PUT'], withAuth(handler));

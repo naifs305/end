@@ -4,18 +4,22 @@ import MainLayout from '../../components/layout/MainLayout';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
 import useAuth from '../../context/AuthContext';
+import { ArrowLeft, User, Search, Star, BarChart3, KeyRound, ChevronUp, ChevronDown } from 'lucide-react';
+import { useTranslation } from '../../lib/i18n';
 
+// تكوين الأدوار — الأيقونات هنا، التسميات من roles.* والأوصاف من admin.users.*
 const ROLE_CFG = [
-  { key:'EMPLOYEE',           label:'منسق (موظف)',        icon:'👤', desc:'ينفّذ الدورات ويرفع العناصر' },
-  { key:'PROJECT_SUPERVISOR', label:'مشرف مشروع',          icon:'🔍', desc:'يعتمد عناصر دورات مشروعه' },
-  { key:'MANAGER',            label:'مدير',                icon:'⭐', desc:'صلاحيات كاملة + KPI' },
-  { key:'QUALITY_VIEWER',     label:'مراقب الجودة',        icon:'📊', desc:'قراءة التقارير فقط' },
+  { key: 'EMPLOYEE',           Icon: User,      descKey: 'admin.users.roleEmployeeDesc' },
+  { key: 'PROJECT_SUPERVISOR', Icon: Search,    descKey: 'admin.users.roleSupervisorDesc' },
+  { key: 'MANAGER',            Icon: Star,      descKey: 'admin.users.roleManagerDesc' },
+  { key: 'QUALITY_VIEWER',     Icon: BarChart3, descKey: 'admin.users.roleQualityDesc' },
 ];
 
 export default function EditUser() {
   const router = useRouter();
   const { id }  = router.query;
   const { user: currentUser } = useAuth();
+  const { t } = useTranslation();
 
   const [user,     setUser]     = useState(null);
   const [projects, setProjects] = useState([]);
@@ -33,7 +37,7 @@ export default function EditUser() {
         const d = pr.data;
         setProjects(Array.isArray(d) ? d : d?.data || []);
       })
-      .catch(() => toast.error('تعذر التحميل'))
+      .catch(() => toast.error(t('admin.users.loadFailed')))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -55,30 +59,30 @@ export default function EditUser() {
             const store = localStorage.getItem('token') ? localStorage : sessionStorage;
             store.setItem('token', r.data.access_token);
             store.setItem('cachedUser', JSON.stringify(r.data.user));
-            toast.success('تم الحفظ — الأدوار محدَّثة ✓');
+            toast.success(t('admin.users.savedRolesUpdated'));
             setTimeout(() => window.location.reload(), 1200);
             return;
           }
         } catch {}
       }
-      toast.success('تم حفظ التعديلات ✓');
+      toast.success(t('admin.users.savedChanges'));
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'حدث خطأ');
+      toast.error(err?.response?.data?.message || t('common.error'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleResetPassword = async () => {
-    if (!newPass.trim() || newPass.length < 6) { toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); return; }
+    if (!newPass.trim() || newPass.length < 6) { toast.error(t('admin.users.passwordTooShort')); return; }
     setSavingPw(true);
     try {
       await api.put(`/users/${id}/reset-password`, { password: newPass });
-      toast.success('تم تغيير كلمة المرور ✓');
+      toast.success(t('admin.users.passwordChanged'));
       setNewPass('');
       setShowPw(false);
     } catch (e) {
-      toast.error(e?.response?.data?.message || 'فشل التغيير');
+      toast.error(e?.response?.data?.message || t('admin.users.passwordChangeFailed'));
     } finally { setSavingPw(false); }
   };
 
@@ -102,7 +106,7 @@ export default function EditUser() {
   if (!user) return (
     <MainLayout>
       <div className="rounded-2xl border border-danger/20 bg-white p-6 text-danger shadow-card">
-        المستخدم غير موجود
+        {t('admin.users.userNotFound')}
       </div>
     </MainLayout>
   );
@@ -124,8 +128,8 @@ export default function EditUser() {
               </div>
             </div>
             <button onClick={() => router.back()}
-              className="rounded-xl border border-border px-3 py-2 text-sm text-text-soft hover:bg-background">
-              ← رجوع
+              className="inline-flex items-center gap-1 rounded-xl border border-border px-3 py-2 text-sm text-text-soft hover:bg-background">
+              <ArrowLeft size={15} aria-hidden="true" /> {t('common.back')}
             </button>
           </div>
         </div>
@@ -134,27 +138,27 @@ export default function EditUser() {
 
           {/* البيانات الشخصية */}
           <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
-            <h2 className="mb-4 font-extrabold text-text-main">البيانات الشخصية</h2>
+            <h2 className="mb-4 font-extrabold text-text-main">{t('admin.users.personalInfo')}</h2>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1.5 block text-xs font-bold text-text-main">الاسم الأول</label>
+                <label className="mb-1.5 block text-xs font-bold text-text-main">{t('admin.users.firstName')}</label>
                 <input className={inputCls} value={user.firstName||''} onChange={e=>setUser({...user,firstName:e.target.value})} />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-bold text-text-main">الاسم الأخير</label>
+                <label className="mb-1.5 block text-xs font-bold text-text-main">{t('admin.users.lastName')}</label>
                 <input className={inputCls} value={user.lastName||''} onChange={e=>setUser({...user,lastName:e.target.value})} />
               </div>
               <div className="col-span-2">
-                <label className="mb-1.5 block text-xs font-bold text-text-main">المشروع التشغيلي</label>
+                <label className="mb-1.5 block text-xs font-bold text-text-main">{t('admin.users.operationalProject')}</label>
                 <select className={inputCls} value={user.operationalProjectId||''} onChange={e=>setUser({...user,operationalProjectId:e.target.value})}>
-                  <option value="">اختر المشروع</option>
+                  <option value="">{t('admin.users.selectProject')}</option>
                   {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               <div className="col-span-2">
-                <label className="mb-1.5 block text-xs font-bold text-text-main">الحالة</label>
+                <label className="mb-1.5 block text-xs font-bold text-text-main">{t('admin.users.statusLabel')}</label>
                 <div className="flex gap-2">
-                  {[{v:true,l:'نشط',c:'border-accent/40 bg-forest-50 text-accent'},{v:false,l:'معطل',c:'border-burgundy/30 bg-burgundy/5 text-danger'}].map(o=>(
+                  {[{v:true,l:t('admin.common.active'),c:'border-accent/40 bg-forest-50 text-accent'},{v:false,l:t('admin.common.inactive'),c:'border-burgundy/30 bg-burgundy/5 text-danger'}].map(o=>(
                     <button key={String(o.v)} type="button" onClick={()=>setUser({...user,isActive:o.v})}
                       className={`flex-1 rounded-xl border py-2.5 text-sm font-bold transition ${user.isActive===o.v ? o.c : 'border-border bg-background text-text-soft hover:bg-background'}`}>
                       {o.l}
@@ -167,21 +171,22 @@ export default function EditUser() {
 
           {/* الأدوار */}
           <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
-            <h2 className="mb-1 font-extrabold text-text-main">الأدوار والصلاحيات</h2>
-            <p className="mb-3 text-[11px] text-text-soft">المستخدم يمكن أن يحمل أكثر من دور — المدير هو من يمنح الأدوار</p>
+            <h2 className="mb-1 font-extrabold text-text-main">{t('admin.users.rolesTitle')}</h2>
+            <p className="mb-3 text-[11px] text-text-soft">{t('admin.users.rolesHint')}</p>
             <div className="space-y-2">
               {ROLE_CFG.map(r => {
                 const active = (user.roles||[]).includes(r.key);
+                const RIcon = r.Icon;
                 return (
                   <label key={r.key}
                     className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition
                       ${active ? 'border-primary/30 bg-primary-light/50' : 'border-border bg-background hover:border-primary/20'}`}>
                     <input type="checkbox" checked={active} onChange={e=>toggleRole(r.key,e.target.checked)}
                       className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
-                    <span className="text-lg">{r.icon}</span>
+                    <RIcon size={20} aria-hidden="true" className={active ? 'text-primary' : 'text-text-soft'} />
                     <div>
-                      <div className={`text-sm font-bold ${active?'text-primary':'text-text-main'}`}>{r.label}</div>
-                      <div className="text-[10px] text-text-soft">{r.desc}</div>
+                      <div className={`text-sm font-bold ${active?'text-primary':'text-text-main'}`}>{t(`roles.${r.key}`)}</div>
+                      <div className="text-[10px] text-text-soft">{t(r.descKey)}</div>
                     </div>
                   </label>
                 );
@@ -192,7 +197,7 @@ export default function EditUser() {
           {/* حفظ */}
           <button type="submit" disabled={saving}
             className="w-full rounded-2xl bg-primary py-3 font-extrabold text-white hover:bg-primary-dark disabled:opacity-60">
-            {saving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+            {saving ? t('common.saving') : t('admin.users.saveChanges')}
           </button>
         </form>
 
@@ -200,17 +205,19 @@ export default function EditUser() {
         <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
           <button type="button" onClick={()=>setShowPw(v=>!v)}
             className="flex w-full items-center justify-between text-sm font-bold text-text-main">
-            <span>🔑 تغيير كلمة المرور</span>
-            <span className="text-text-soft">{showPw?'▲':'▼'}</span>
+            <span className="inline-flex items-center gap-1.5"><KeyRound size={16} aria-hidden="true" /> {t('admin.users.changePassword')}</span>
+            {showPw
+              ? <ChevronUp size={16} aria-hidden="true" className="text-text-soft" />
+              : <ChevronDown size={16} aria-hidden="true" className="text-text-soft" />}
           </button>
           {showPw && (
             <div className="mt-3 space-y-2">
               <input type="password" value={newPass} onChange={e=>setNewPass(e.target.value)}
-                placeholder="كلمة المرور الجديدة (6 أحرف على الأقل)"
+                placeholder={t('admin.users.newPasswordPlaceholder')}
                 className="w-full rounded-xl border border-border px-4 py-3 text-sm outline-none focus:border-primary" />
               <button type="button" onClick={handleResetPassword} disabled={savingPw||!newPass.trim()}
                 className="w-full rounded-xl bg-forest-700 py-2.5 text-sm font-bold text-white hover:bg-forest-800 disabled:opacity-50">
-                {savingPw ? 'جاري التغيير...' : 'تغيير كلمة المرور'}
+                {savingPw ? t('admin.users.changingPassword') : t('admin.users.changePassword')}
               </button>
             </div>
           )}

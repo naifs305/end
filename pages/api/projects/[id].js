@@ -1,21 +1,25 @@
-const { withManager, withMethods } = require('../../../lib/middleware/auth');
-const projectsService = require('../../../lib/services/projects');
+// GET / PUT / DELETE  /api/projects/[id]  — تفاصيل/تعديل/حذف مشروع (مدير فقط)
+const { withMethods, withManager, withValidation, ok, fail } = require('../../../lib/server/http');
+const projects = require('../../../lib/modules/projects/projects.service');
+const { updateProjectSchema } = require('../../../lib/modules/projects/projects.schema');
 
 async function handler(req, res) {
   const { id } = req.query;
+  const actor = { userId: req.user.id, activeRole: req.activeRole };
 
   try {
     if (req.method === 'GET') {
-      return res.status(200).json(await projectsService.getProject(id));
+      return ok(res, await projects.getById(id));
     }
-
     if (req.method === 'PUT') {
-      return res.status(200).json(await projectsService.updateProject(id, req.body?.name, req.user.id));
+      return await withValidation(updateProjectSchema, (r, s) =>
+        projects.update(id, r.valid, actor).then((p) => ok(s, p))
+      )(req, res);
     }
-
-    return res.status(200).json(await projectsService.deleteProject(id, req.user.id));
-  } catch (error) {
-    return res.status(error.statusCode || 500).json({ message: error.message });
+    // DELETE
+    return ok(res, await projects.remove(id, actor));
+  } catch (e) {
+    return fail(res, e);
   }
 }
 

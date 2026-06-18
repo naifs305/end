@@ -1,24 +1,12 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { FileText, CheckCircle2, Camera, Image as ImageIcon, Trash2, Printer, Mail, Check } from 'lucide-react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
+import { useTranslation } from '../../lib/i18n';
 
-const CATEGORY_OPTIONS = [
-  { value: '', label: 'بدون تصنيف' },
-  { value: 'operational', label: 'تشغيلية' },
-  { value: 'technical', label: 'فنية' },
-  { value: 'financial', label: 'مالية' },
-  { value: 'administrative', label: 'إدارية' },
-  { value: 'trainees', label: 'تتعلق بالمتدربين' },
-  { value: 'trainer', label: 'تتعلق بالمدرب' },
-];
-
-const PRIORITY_OPTIONS = [
-  { value: '', label: 'بدون أولوية' },
-  { value: 'urgent', label: '🔴 عاجلة' },
-  { value: 'medium', label: '🟡 متوسطة' },
-  { value: 'low', label: '🟢 منخفضة' },
-];
+const CATEGORY_KEYS = ['', 'operational', 'technical', 'financial', 'administrative', 'trainees', 'trainer'];
+const PRIORITY_KEYS = ['', 'urgent', 'medium', 'low'];
 
 function ReadOnlyField({ label, value }) {
   return <div className="rounded-2xl border border-border bg-white p-3"><div className="mb-1 text-[11px] font-bold text-text-soft">{label}</div><div className="break-words text-sm font-bold text-text-main">{value || '-'}</div></div>;
@@ -57,23 +45,25 @@ function SelectField({ label, value, onChange, options, disabled }) {
   );
 }
 
-function AttachmentCard({ file, index, onRemove }) {
+function AttachmentCard({ file, index, onRemove, t }) {
   return (
     <div className="rounded-2xl border border-border bg-background p-2">
       <img src={file.content} alt={file.name} className="mb-2 h-28 w-full rounded-xl object-cover" />
       <div className="mb-1 truncate text-xs font-medium text-text-main">{file.name}</div>
       <div className="mb-2 text-[11px] text-text-soft">{file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : ''}</div>
-      {onRemove && <button type="button" onClick={() => onRemove(index)} className="text-xs font-bold text-danger hover:underline">حذف</button>}
+      {onRemove && (
+        <button type="button" onClick={() => onRemove(index)} className="inline-flex items-center gap-1 text-xs font-bold text-danger hover:underline">
+          <Trash2 size={12} aria-hidden="true" /> {t('common.delete')}
+        </button>
+      )}
     </div>
   );
 }
 
-function formatLocationType(value) {
-  const map = { INTERNAL: 'داخلي', EXTERNAL: 'خارجي', REMOTE: 'عن بُعد' };
-  return map[value] || value || '-';
-}
-
 export default function CourseNotesReportForm({ courseId, course, onClose }) {
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory';
+
   const [notes, setNotes] = useState('');
   const [attendanceCount, setAttendanceCount] = useState(course?.numTrainees != null ? String(course.numTrainees) : '');
   const [beneficiaryEntity, setBeneficiaryEntity] = useState(course?.beneficiaryEntity || '');
@@ -91,6 +81,24 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
 
   const isArchived = !!submittedId;
 
+  const categoryOptions = useMemo(
+    () => CATEGORY_KEYS.map((value) => ({ value, label: t(`notesForm.categories.${value || 'none'}`) })),
+    [t]
+  );
+  const priorityOptions = useMemo(
+    () => PRIORITY_KEYS.map((value) => ({ value, label: t(`notesForm.priorities.${value || 'none'}`) })),
+    [t]
+  );
+
+  const formatLocationType = (value) => {
+    const map = {
+      INTERNAL: t('notesForm.locationType.INTERNAL'),
+      EXTERNAL: t('notesForm.locationType.EXTERNAL'),
+      REMOTE: t('notesForm.locationType.REMOTE'),
+    };
+    return map[value] || value || '-';
+  };
+
   const courseInfo = useMemo(() => {
     if (!course) return null;
     return {
@@ -99,11 +107,11 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
       project: course.operationalProject?.name || '-',
       city: course.city || '-',
       locationType: course.locationType || '-',
-      startDate: course.startDate ? new Date(course.startDate).toLocaleDateString('ar-SA') : '-',
-      endDate: course.endDate ? new Date(course.endDate).toLocaleDateString('ar-SA') : '-',
+      startDate: course.startDate ? new Date(course.startDate).toLocaleDateString(dateLocale) : '-',
+      endDate: course.endDate ? new Date(course.endDate).toLocaleDateString(dateLocale) : '-',
       supervisor: `${course.primaryEmployee?.firstName || ''} ${course.primaryEmployee?.lastName || ''}`.trim() || '-',
     };
-  }, [course]);
+  }, [course, dateLocale]);
 
   const compressImage = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -137,19 +145,19 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
       const files = Array.from(e.target.files || []);
       if (!files.length) return;
       if (attachments.length + files.length > 6) {
-        toast.error('الحد الأقصى 6 صور فقط');
+        toast.error(t('notesForm.maxImages'));
         e.target.value = '';
         return;
       }
       const invalidFile = files.find((file) => !file.type.startsWith('image/'));
       if (invalidFile) {
-        toast.error('يسمح فقط برفع الصور');
+        toast.error(t('notesForm.imagesOnly'));
         e.target.value = '';
         return;
       }
       const oversized = files.find((file) => file.size > 4 * 1024 * 1024);
       if (oversized) {
-        toast.error('حجم الصورة الواحدة يجب ألا يتجاوز 4MB');
+        toast.error(t('notesForm.imageTooLarge'));
         e.target.value = '';
         return;
       }
@@ -157,7 +165,7 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
       setAttachments((prev) => [...prev, ...convertedFiles]);
       e.target.value = '';
     } catch {
-      toast.error('تعذر رفع الصور');
+      toast.error(t('notesForm.uploadFailed'));
     }
   };
 
@@ -177,16 +185,16 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
 
   const handleSubmit = async () => {
     if (!notes.trim()) {
-      toast.error('يرجى كتابة الملاحظات قبل الإرسال');
+      toast.error(t('notesForm.notesRequired'));
       return;
     }
     setSubmitting(true);
     try {
       const res = await api.post(`/courses/${courseId}/notes-report`, buildPayload());
       setSubmittedId(res.data?.id);
-      toast.success('تم إرسال التقرير وأرشفته بنجاح ✓');
+      toast.success(t('notesForm.submitSuccess'));
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'تعذر إرسال التقرير');
+      toast.error(err?.response?.data?.message || t('notesForm.submitFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -200,10 +208,10 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
         responseType: 'text', headers: { Accept: 'text/html' },
       });
       const w = window.open('', '_blank');
-      if (!w) { toast.error('تعذر فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة'); return; }
+      if (!w) { toast.error(t('notesForm.popupBlocked')); return; }
       w.document.open(); w.document.write(res.data); w.document.close();
     } catch {
-      toast.error('تعذر إنشاء التقرير');
+      toast.error(t('notesForm.exportFailed'));
     } finally {
       setPrinting(false);
     }
@@ -223,9 +231,9 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
       a.href = url; a.download = match?.[1] || 'notes-report.eml';
       document.body.appendChild(a); a.click(); a.remove();
       window.URL.revokeObjectURL(url);
-      toast.success('تم تنزيل ملف التقرير');
+      toast.success(t('notesForm.downloadSuccess'));
     } catch {
-      toast.error('تعذر تنزيل ملف EML');
+      toast.error(t('notesForm.emlFailed'));
     } finally {
       setDownloading(false);
     }
@@ -234,58 +242,60 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
       <div className="my-8 w-full max-w-5xl rounded-3xl border border-border bg-background p-4 shadow-deep">
         <div className="space-y-5">
 
           <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
             <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <h3 className="text-base font-extrabold text-primary">📝 تقرير ملاحظات عامة على الدورة</h3>
+                <h3 className="inline-flex items-center gap-2 text-base font-extrabold text-primary">
+                  <FileText size={18} aria-hidden="true" /> {t('notesForm.title')}
+                </h3>
                 <p className="mt-1 text-sm text-text-soft">
-                  نموذج مفتوح لتسجيل أي ملاحظات أو مستجدات ميدانية أثناء تنفيذ الدورة، يُحفظ كأرشيف ضمن "التقارير الميدانية" ويمكن طباعته أو تنزيله كرسالة بريدية موجّهة لسعادة وكيل التدريب.
+                  {t('notesForm.subtitle')}
                 </p>
               </div>
               {isArchived && (
-                <span className="shrink-0 rounded-2xl border border-accent/30 bg-forest-50 px-3 py-1.5 text-xs font-extrabold text-accent">
-                  ✓ تم الإرسال والأرشفة
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-accent/30 bg-forest-50 px-3 py-1.5 text-xs font-extrabold text-accent">
+                  <CheckCircle2 size={14} aria-hidden="true" /> {t('notesForm.archivedBadge')}
                 </span>
               )}
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <ReadOnlyField label="اسم الدورة" value={courseInfo?.name} />
-              <ReadOnlyField label="كود الدورة" value={courseInfo?.code} />
-              <ReadOnlyField label="المشروع التشغيلي" value={courseInfo?.project} />
-              <ReadOnlyField label="المدينة" value={courseInfo?.city} />
-              <ReadOnlyField label="مقر التنفيذ" value={formatLocationType(courseInfo?.locationType)} />
-              <ReadOnlyField label="تاريخ البداية" value={courseInfo?.startDate} />
-              <ReadOnlyField label="تاريخ النهاية" value={courseInfo?.endDate} />
-              <ReadOnlyField label="المشرف / المنسق" value={courseInfo?.supervisor} />
+              <ReadOnlyField label={t('notesForm.courseName')} value={courseInfo?.name} />
+              <ReadOnlyField label={t('notesForm.courseCode')} value={courseInfo?.code} />
+              <ReadOnlyField label={t('notesForm.project')} value={courseInfo?.project} />
+              <ReadOnlyField label={t('notesForm.city')} value={courseInfo?.city} />
+              <ReadOnlyField label={t('notesForm.location')} value={formatLocationType(courseInfo?.locationType)} />
+              <ReadOnlyField label={t('notesForm.startDate')} value={courseInfo?.startDate} />
+              <ReadOnlyField label={t('notesForm.endDate')} value={courseInfo?.endDate} />
+              <ReadOnlyField label={t('notesForm.supervisor')} value={courseInfo?.supervisor} />
             </div>
           </div>
 
           {/* بيانات إضافية مهمة لاتخاذ القرار */}
           <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
-            <h4 className="mb-1 text-base font-extrabold text-text-main">بيانات إضافية</h4>
-            <p className="mb-4 text-[11px] text-text-soft">معلومات قد لا تكون متوفرة مسبقاً في بيانات الدورة، خاصة عند وجود شريك تنفيذ أو مدربين خارجيين.</p>
+            <h4 className="mb-1 text-base font-extrabold text-text-main">{t('notesForm.additionalDataTitle')}</h4>
+            <p className="mb-4 text-[11px] text-text-soft">{t('notesForm.additionalDataHint')}</p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <TextField label="عدد الحضور الفعلي" type="number" value={attendanceCount} onChange={setAttendanceCount} placeholder="مثال: 22" disabled={isArchived} />
-              <TextField label="الجهة المستفيدة" value={beneficiaryEntity} onChange={setBeneficiaryEntity} placeholder="اسم الجهة المستفيدة من الدورة" disabled={isArchived} />
-              <TextField label="الجهة المنفذة / شريك التنفيذ" value={executingPartner} onChange={setExecutingPartner} placeholder="في حال وجود شريك تنفيذ خارجي" hint="اتركه فارغاً إن كانت الدورة تُنفَّذ ذاتياً" disabled={isArchived} />
-              <TextField label="مدربون إضافيون / خارجيون" value={additionalTrainers} onChange={setAdditionalTrainers} placeholder="أسماء المدربين الإضافيين أو الخارجيين" hint="في حال تعدد المدربين أو وجود مدرب خارجي" disabled={isArchived} />
+              <TextField label={t('notesForm.actualAttendance')} type="number" value={attendanceCount} onChange={setAttendanceCount} placeholder={t('notesForm.attendancePlaceholder')} disabled={isArchived} />
+              <TextField label={t('notesForm.beneficiaryEntity')} value={beneficiaryEntity} onChange={setBeneficiaryEntity} placeholder={t('notesForm.beneficiaryPlaceholder')} disabled={isArchived} />
+              <TextField label={t('notesForm.executingPartner')} value={executingPartner} onChange={setExecutingPartner} placeholder={t('notesForm.partnerPlaceholder')} hint={t('notesForm.partnerHint')} disabled={isArchived} />
+              <TextField label={t('notesForm.additionalTrainers')} value={additionalTrainers} onChange={setAdditionalTrainers} placeholder={t('notesForm.trainersPlaceholder')} hint={t('notesForm.trainersHint')} disabled={isArchived} />
             </div>
           </div>
 
           <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
             <label className="mb-1.5 block text-sm font-extrabold text-text-main">
-              الملاحظات والمستجدات <span className="text-danger">*</span>
+              {t('notesForm.notesLabel')} <span className="text-danger">*</span>
             </label>
-            <p className="mb-2 text-[11px] text-text-soft">اكتب كل ملاحظة في سطر مستقل ليتم عرضها كنقاط منظمة في التقرير.</p>
+            <p className="mb-2 text-[11px] text-text-soft">{t('notesForm.notesHint')}</p>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder={'مثال:\nتأخر وصول المواد التدريبية يوم الثلاثاء\nملاحظة على جاهزية القاعة...\nطلب من الجهة المستفيدة بخصوص...'}
+              placeholder={t('notesForm.notesPlaceholder')}
               disabled={isArchived}
               className="min-h-[180px] w-full resize-y rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:bg-background disabled:text-text-soft"
             />
@@ -293,18 +303,18 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
 
           {/* تصنيف الملاحظة والإجراء المقترح */}
           <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
-            <h4 className="mb-1 text-base font-extrabold text-text-main">تصنيف الملاحظة والإجراء المقترح</h4>
-            <p className="mb-4 text-[11px] text-text-soft">تساعد متخذ القرار على تحديد جهة المعالجة وأولويتها بسرعة.</p>
+            <h4 className="mb-1 text-base font-extrabold text-text-main">{t('notesForm.classificationTitle')}</h4>
+            <p className="mb-4 text-[11px] text-text-soft">{t('notesForm.classificationHint')}</p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <SelectField label="تصنيف الملاحظة" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} disabled={isArchived} />
-              <SelectField label="مستوى الأولوية" value={priority} onChange={setPriority} options={PRIORITY_OPTIONS} disabled={isArchived} />
+              <SelectField label={t('notesForm.categoryLabel')} value={category} onChange={setCategory} options={categoryOptions} disabled={isArchived} />
+              <SelectField label={t('notesForm.priorityLabel')} value={priority} onChange={setPriority} options={priorityOptions} disabled={isArchived} />
             </div>
             <div className="mt-4">
-              <label className="mb-1.5 block text-sm font-extrabold text-text-main">الإجراء المقترح / الجهة المقترح تحويل الملاحظة لها</label>
+              <label className="mb-1.5 block text-sm font-extrabold text-text-main">{t('notesForm.suggestedActionLabel')}</label>
               <textarea
                 value={suggestedAction}
                 onChange={(e) => setSuggestedAction(e.target.value)}
-                placeholder="مثال: التواصل مع الإدارة المالية لمعالجة تأخر صرف السلفة"
+                placeholder={t('notesForm.suggestedActionPlaceholder')}
                 disabled={isArchived}
                 className="min-h-[90px] w-full resize-y rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:bg-background disabled:text-text-soft"
               />
@@ -313,40 +323,40 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
 
           <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
             <div className="mb-4 flex items-center justify-between">
-              <h4 className="text-base font-extrabold text-text-main">صور وملاحظات مصورة</h4>
-              <span className="text-xs text-text-soft">اختياري — حتى 6 صور</span>
+              <h4 className="text-base font-extrabold text-text-main">{t('notesForm.photosTitle')}</h4>
+              <span className="text-xs text-text-soft">{t('notesForm.photosHint')}</span>
             </div>
             {!isArchived && (
               <div className="mb-4 flex flex-wrap gap-2">
                 <label className="flex cursor-pointer items-center gap-1.5 rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-white hover:opacity-90 transition">
-                  📷 تصوير مباشر
+                  <Camera size={16} aria-hidden="true" /> {t('notesForm.captureDirect')}
                   <input type="file" accept="image/*" capture="environment" multiple onChange={handleAttachmentsChange} className="hidden" />
                 </label>
                 <label className="flex cursor-pointer items-center gap-1.5 rounded-2xl border border-primary/30 bg-white px-4 py-2 text-sm font-bold text-primary hover:bg-primary-light transition">
-                  🖼️ اختيار من المعرض
+                  <ImageIcon size={16} aria-hidden="true" /> {t('notesForm.chooseFromGallery')}
                   <input type="file" accept="image/*" multiple onChange={handleAttachmentsChange} className="hidden" />
                 </label>
               </div>
             )}
             {attachments.length > 0
-              ? <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{attachments.map((file, index) => <AttachmentCard key={`${file.name}-${index}`} file={file} index={index} onRemove={isArchived ? null : handleRemoveAttachment} />)}</div>
-              : <div className="rounded-2xl border border-dashed border-border bg-background p-4 text-sm text-text-soft">لم يتم إرفاق أي صور حتى الآن</div>}
+              ? <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{attachments.map((file, index) => <AttachmentCard key={`${file.name}-${index}`} file={file} index={index} onRemove={isArchived ? null : handleRemoveAttachment} t={t} />)}</div>
+              : <div className="rounded-2xl border border-dashed border-border bg-background p-4 text-sm text-text-soft">{t('notesForm.noAttachments')}</div>}
           </div>
 
           <div className="flex flex-col-reverse gap-3 pt-2 md:flex-row md:justify-end">
-            <button type="button" onClick={onClose} className="rounded-2xl border border-border bg-white px-5 py-3 text-sm font-bold text-text-main transition hover:bg-background">إغلاق</button>
+            <button type="button" onClick={onClose} className="rounded-2xl border border-border bg-white px-5 py-3 text-sm font-bold text-text-main transition hover:bg-background">{t('common.close')}</button>
             {isArchived ? (
               <>
-                <button type="button" onClick={handlePrint} disabled={printing} className="rounded-2xl border border-primary/30 bg-white px-6 py-3 text-sm font-bold text-primary transition hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-60">
-                  {printing ? 'جاري التحضير...' : '🖨️ طباعة'}
+                <button type="button" onClick={handlePrint} disabled={printing} className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-primary/30 bg-white px-6 py-3 text-sm font-bold text-primary transition hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-60">
+                  {printing ? t('notesForm.preparing') : (<><Printer size={16} aria-hidden="true" /> {t('common.print')}</>)}
                 </button>
-                <button type="button" onClick={handleDownloadEml} disabled={downloading} className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
-                  {downloading ? 'جاري التحضير...' : '📧 تنزيل كرسالة بريد (EML)'}
+                <button type="button" onClick={handleDownloadEml} disabled={downloading} className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
+                  {downloading ? t('notesForm.preparing') : (<><Mail size={16} aria-hidden="true" /> {t('notesForm.downloadEml')}</>)}
                 </button>
               </>
             ) : (
-              <button type="button" onClick={handleSubmit} disabled={submitting} className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
-                {submitting ? 'جاري الإرسال...' : '✅ إرسال وأرشفة التقرير'}
+              <button type="button" onClick={handleSubmit} disabled={submitting} className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
+                {submitting ? t('notesForm.sending') : (<><Check size={16} aria-hidden="true" /> {t('notesForm.submitArchive')}</>)}
               </button>
             )}
           </div>

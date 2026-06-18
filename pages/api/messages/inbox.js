@@ -1,10 +1,14 @@
 // GET /api/messages/inbox
-const { withAuth, withMethods } = require('../../../lib/middleware/auth');
-const messagesService = require('../../../lib/services/messages');
+const { withAuth, withMethods, ok, fail } = require('../../../lib/server/http');
+const messagingService = require('../../../lib/modules/messaging/messaging.service');
 
 async function handler(req, res) {
-  const inbox = await messagesService.getInbox(req.user.id);
-  return res.status(200).json(inbox);
+  const actor = { userId: req.user.id, activeRole: req.activeRole };
+  try {
+    return ok(res, await messagingService.getInbox(actor));
+  } catch (err) {
+    return fail(res, err);
+  }
 }
 
 module.exports = withMethods(['GET'], withAuth(handler));

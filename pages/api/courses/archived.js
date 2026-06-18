@@ -1,11 +1,14 @@
 // GET /api/courses/archived
-const { withAuth, withMethods } = require('../../../lib/middleware/auth');
-const coursesService = require('../../../lib/services/courses');
+const { withMethods, withAuth, ok, fail } = require('../../../lib/server/http');
+const svc = require('../../../lib/modules/courses/courses.service');
 
 async function handler(req, res) {
-  const { search } = req.query;
-  const courses = await coursesService.findArchivedCourses(search, req.user, req.activeRole);
-  return res.status(200).json(courses);
+  try {
+    const { search } = req.query;
+    return ok(res, await svc.findArchivedCourses(search, req.user, req.activeRole));
+  } catch (error) {
+    return fail(res, error);
+  }
 }
 
 module.exports = withMethods(['GET'], withAuth(handler));

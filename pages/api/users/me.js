@@ -4,24 +4,16 @@
 // يرجع بيانات المستخدم الحالي (يستدعيه سياق المصادقة في الواجهة)
 // =============================================================
 
-const { withAuth, withMethods } = require('../../../lib/middleware/auth');
+const { withAuth, withMethods, ok, fail } = require('../../../lib/server/http');
+const identity = require('../../../lib/modules/identity/identity.service');
 
 async function handler(req, res) {
-  const user = req.user;
-
-  return res.status(200).json({
-    id: user.id,
-    email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    mobileNumber: user.mobileNumber,
-    extensionNumber: user.extensionNumber,
-    profileImage: user.profileImage,
-    signatureImage: user.signatureImage,
-    roles: user.roles,
-    project: user.operationalProject,
-    isActive: user.isActive,
-  });
+  const actor = { userId: req.user.id, activeRole: req.activeRole, user: req.user };
+  try {
+    return ok(res, await identity.getMe(actor));
+  } catch (e) {
+    return fail(res, e);
+  }
 }
 
 module.exports = withMethods(['GET'], withAuth(handler));

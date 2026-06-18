@@ -1,13 +1,15 @@
 import { useState } from 'react';
+import { Check } from 'lucide-react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
+import { useTranslation } from '../../lib/i18n';
 
 function Field({ label, required = false, children }) {
   return (
     <div>
       <label className="mb-2 block text-sm font-bold text-text-main">
         {label}
-        {required ? <span className="mr-1 text-danger">*</span> : null}
+        {required ? <span className="ms-1 text-danger">*</span> : null}
       </label>
       {children}
     </div>
@@ -15,6 +17,7 @@ function Field({ label, required = false, children }) {
 }
 
 export default function FinancialForm({ type, trackingId, onClose, onSuccess }) {
+  const { t } = useTranslation();
   const isAdvance = type === 'advance';
 
   const [loading, setLoading] = useState(false);
@@ -36,7 +39,7 @@ export default function FinancialForm({ type, trackingId, onClose, onSuccess }) 
   const validateForm = () => {
     if (isAdvance) {
       if (!form.totalAmount || !form.requestDate || !form.receiptDate) {
-        toast.error('يرجى استكمال الحقول الإلزامية');
+        toast.error(t('financialForm.completeRequired'));
         return false;
       }
     } else {
@@ -46,7 +49,7 @@ export default function FinancialForm({ type, trackingId, onClose, onSuccess }) 
         !form.deliveredToAuditorDate ||
         !form.invoicesUploadedDate
       ) {
-        toast.error('يرجى استكمال الحقول الإلزامية');
+        toast.error(t('financialForm.completeRequired'));
         return false;
       }
     }
@@ -81,11 +84,11 @@ export default function FinancialForm({ type, trackingId, onClose, onSuccess }) 
 
       await api.post(`/closure/${trackingId}/${endpoint}`, payload);
 
-      toast.success('تم التقديم بنجاح');
+      toast.success(t('financialForm.submitSuccess'));
       onSuccess();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'حدث خطأ');
+      toast.error(err.response?.data?.message || t('common.error'));
     } finally {
       setLoading(false);
     }
@@ -98,13 +101,13 @@ export default function FinancialForm({ type, trackingId, onClose, onSuccess }) 
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="rounded-3xl border border-border bg-background p-4">
         <h3 className="text-base font-extrabold text-primary">
-          {isAdvance ? 'نموذج طلب السلفة' : 'نموذج تسوية السلفة'}
+          {isAdvance ? t('financialForm.advanceTitle') : t('financialForm.settlementTitle')}
         </h3>
       </div>
 
       {isAdvance ? (
         <>
-          <Field label="إجمالي المبلغ المطلوب" required>
+          <Field label={t('financialForm.totalRequested')} required>
             <input
               type="number"
               min="0"
@@ -116,7 +119,7 @@ export default function FinancialForm({ type, trackingId, onClose, onSuccess }) 
             />
           </Field>
 
-          <Field label="تاريخ الطلب" required>
+          <Field label={t('financialForm.requestDate')} required>
             <input
               type="date"
               required
@@ -126,7 +129,7 @@ export default function FinancialForm({ type, trackingId, onClose, onSuccess }) 
             />
           </Field>
 
-          <Field label="تاريخ الاستلام" required>
+          <Field label={t('financialForm.receiptDate')} required>
             <input
               type="date"
               required
@@ -138,7 +141,7 @@ export default function FinancialForm({ type, trackingId, onClose, onSuccess }) 
         </>
       ) : (
         <>
-          <Field label="إجمالي مبلغ السلفة" required>
+          <Field label={t('financialForm.advanceAmount')} required>
             <input
               type="number"
               min="0"
@@ -150,7 +153,7 @@ export default function FinancialForm({ type, trackingId, onClose, onSuccess }) 
             />
           </Field>
 
-          <Field label="إجمالي المبلغ المصروف" required>
+          <Field label={t('financialForm.spentAmount')} required>
             <input
               type="number"
               min="0"
@@ -162,7 +165,7 @@ export default function FinancialForm({ type, trackingId, onClose, onSuccess }) 
             />
           </Field>
 
-          <Field label="تاريخ تقديم السلفة للمراقب المالي" required>
+          <Field label={t('financialForm.deliveredToAuditorDate')} required>
             <input
               type="date"
               required
@@ -172,7 +175,7 @@ export default function FinancialForm({ type, trackingId, onClose, onSuccess }) 
             />
           </Field>
 
-          <Field label="تاريخ رفع الفواتير على ALLSYS" required>
+          <Field label={t('financialForm.invoicesUploadedDate')} required>
             <input
               type="date"
               required
@@ -184,13 +187,13 @@ export default function FinancialForm({ type, trackingId, onClose, onSuccess }) 
         </>
       )}
 
-      <Field label="ملاحظات إضافية">
+      <Field label={t('financialForm.additionalNotes')}>
         <textarea
           className={`${inputClass} min-h-[120px]`}
           rows={4}
           value={form.note}
           onChange={(e) => handleChange('note', e.target.value)}
-          placeholder="ملاحظات إضافية"
+          placeholder={t('financialForm.additionalNotes')}
         />
       </Field>
 
@@ -200,15 +203,21 @@ export default function FinancialForm({ type, trackingId, onClose, onSuccess }) 
           onClick={onClose}
           className="rounded-2xl border border-border bg-white px-5 py-2.5 font-bold text-text-main transition hover:bg-background"
         >
-          إلغاء
+          {t('common.cancel')}
         </button>
 
         <button
           type="submit"
           disabled={loading}
-          className="rounded-2xl bg-primary px-6 py-2.5 font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-2xl bg-primary px-6 py-2.5 font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
         >
-          {loading ? 'جاري الحفظ...' : 'تقديم'}
+          {loading ? (
+            t('common.saving')
+          ) : (
+            <>
+              <Check size={16} aria-hidden="true" /> {t('common.submit')}
+            </>
+          )}
         </button>
       </div>
     </form>

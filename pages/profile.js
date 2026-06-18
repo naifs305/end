@@ -4,13 +4,8 @@ import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
-
-const ROLE_LABELS = {
-  EMPLOYEE: 'موظف',
-  PROJECT_SUPERVISOR: 'مشرف مشروع',
-  MANAGER: 'مدير',
-  QUALITY_VIEWER: 'مراقب جودة',
-};
+import { Upload, Trash2, Save, KeyRound, Mail, MailCheck, User } from 'lucide-react';
+import { useTranslation } from '../lib/i18n';
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB
 
@@ -25,6 +20,7 @@ function readFileAsDataUrl(file) {
 
 export default function Profile() {
   const { user, setUser } = useAuth();
+  const { t, locale } = useTranslation();
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -59,9 +55,9 @@ export default function Profile() {
         setProfileImage(d.profileImage || null);
         setSignatureImage(d.signatureImage || null);
       })
-      .catch(() => toast.error('خطأ في تحميل الملف الشخصي'))
+      .catch(() => toast.error(t('profile.loadFailed')))
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -73,11 +69,11 @@ export default function Profile() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      toast.error('يجب اختيار ملف صورة');
+      toast.error(t('profile.mustBeImage'));
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      toast.error('حجم الصورة كبير جداً (الحد الأقصى 4 ميجابايت)');
+      toast.error(t('profile.imageTooLarge'));
       return;
     }
 
@@ -86,17 +82,17 @@ export default function Profile() {
       if (field === 'profileImage') setProfileImage(dataUrl);
       else setSignatureImage(dataUrl);
     } catch {
-      toast.error('فشل في قراءة الصورة');
+      toast.error(t('profile.imageReadFailed'));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.firstName.trim() || !form.lastName.trim()) {
-      return toast.error('الاسم الأول والأخير مطلوبان');
+      return toast.error(t('profile.nameRequired'));
     }
     if (!form.mobileNumber.trim()) {
-      return toast.error('رقم الجوال مطلوب');
+      return toast.error(t('profile.mobileRequired'));
     }
 
     setSaving(true);
@@ -117,9 +113,9 @@ export default function Profile() {
       const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
       storage.setItem('cachedUser', JSON.stringify(updatedUser));
 
-      toast.success('تم حفظ التعديلات بنجاح');
+      toast.success(t('profile.saveSuccess'));
     } catch (err) {
-      toast.error(err.response?.data?.message || 'فشل في حفظ التعديلات');
+      toast.error(err.response?.data?.message || t('profile.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -136,12 +132,12 @@ export default function Profile() {
       const payload = testEmail.trim() ? { to: testEmail.trim() } : {};
       const res = await api.post('/admin/email-test', payload);
       if (res.data?.sent) {
-        toast.success(`تم إرسال رسالة الاختبار إلى ${res.data.to}`);
+        toast.success(t('profile.testEmailSent', { to: res.data.to }));
       } else {
-        toast.error('تعذر إرسال رسالة الاختبار — تحقق من إعدادات البريد');
+        toast.error(t('profile.testEmailFailed'));
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'فشل في إرسال رسالة الاختبار');
+      toast.error(err.response?.data?.message || t('profile.testEmailError'));
     } finally {
       setTestSending(false);
     }
@@ -149,9 +145,9 @@ export default function Profile() {
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
-    if (!pwForm.currentPassword) return toast.error('كلمة المرور الحالية مطلوبة');
-    if (pwForm.newPassword !== pwForm.confirmPassword) return toast.error('كلمتا المرور الجديدتان غير متطابقتين');
-    if (pwForm.newPassword.length < 8) return toast.error('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل');
+    if (!pwForm.currentPassword) return toast.error(t('profile.currentPasswordRequired'));
+    if (pwForm.newPassword !== pwForm.confirmPassword) return toast.error(t('profile.newPasswordMismatch'));
+    if (pwForm.newPassword.length < 8) return toast.error(t('profile.newPasswordMinLength'));
 
     setPwSaving(true);
     try {
@@ -159,10 +155,10 @@ export default function Profile() {
         currentPassword: pwForm.currentPassword,
         newPassword: pwForm.newPassword,
       });
-      toast.success('تم تغيير كلمة المرور بنجاح');
+      toast.success(t('profile.passwordChanged'));
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err) {
-      toast.error(err.response?.data?.message || 'فشل في تغيير كلمة المرور');
+      toast.error(err.response?.data?.message || t('profile.passwordChangeFailed'));
     } finally {
       setPwSaving(false);
     }
@@ -175,32 +171,32 @@ export default function Profile() {
   return (
     <MainLayout>
       <Head>
-        <title>ملفي الشخصي | حوكمة العمليات التدريبية</title>
+        <title>{`${t('profile.title')} | ${t('common.appName')}`}</title>
       </Head>
 
       <div className="mx-auto w-full max-w-3xl space-y-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-text-main">ملفي الشخصي</h1>
-          <p className="mt-1 text-sm text-text-soft">عرض وتعديل بياناتك الشخصية، صورتك، توقيعك، وكلمة المرور</p>
+          <h1 className="text-2xl font-extrabold text-text-main">{t('profile.title')}</h1>
+          <p className="mt-1 text-sm text-text-soft">{t('profile.subtitle')}</p>
         </div>
 
         {loading ? (
-          <div className="rounded-3xl border border-border bg-white p-8 text-center text-text-soft">جاري التحميل...</div>
+          <div className="rounded-3xl border border-border bg-white p-8 text-center text-text-soft">{t('common.loading')}</div>
         ) : (
           <>
             {/* البيانات الأساسية */}
             <form onSubmit={handleSubmit} className="space-y-6 rounded-3xl border border-border bg-white p-5 sm:p-6">
-              <h2 className="text-lg font-extrabold text-text-main">البيانات الأساسية</h2>
+              <h2 className="text-lg font-extrabold text-text-main">{t('profile.basicInfo')}</h2>
 
               {/* الصورة الشخصية */}
               <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start">
                 <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border border-border bg-background">
                   {profileImage ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={profileImage} alt="الصورة الشخصية" className="h-full w-full object-cover" />
+                    <img src={profileImage} alt={t('common.profileImage')} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-2xl font-extrabold text-text-soft">
-                      {(form.firstName?.[0] || '') + (form.lastName?.[0] || '')}
+                      {(form.firstName?.[0] || '') + (form.lastName?.[0] || '') || <User size={28} aria-hidden="true" />}
                     </div>
                   )}
                 </div>
@@ -216,66 +212,66 @@ export default function Profile() {
                     <button
                       type="button"
                       onClick={() => profileInputRef.current?.click()}
-                      className="rounded-xl border border-border bg-white px-4 py-2 text-xs font-bold text-text-main transition hover:bg-background"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-4 py-2 text-xs font-bold text-text-main transition hover:bg-background"
                     >
-                      تغيير الصورة
+                      <Upload size={14} aria-hidden="true" /> {t('profile.changeImage')}
                     </button>
                     {profileImage && (
                       <button
                         type="button"
                         onClick={() => setProfileImage(null)}
-                        className="rounded-xl border border-danger/30 px-4 py-2 text-xs font-bold text-danger transition hover:bg-burgundy/5"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-danger/30 px-4 py-2 text-xs font-bold text-danger transition hover:bg-burgundy/5"
                       >
-                        إزالة
+                        <Trash2 size={14} aria-hidden="true" /> {t('profile.remove')}
                       </button>
                     )}
                   </div>
-                  <p className="text-[11px] text-text-soft">PNG أو JPG أو WEBP — حتى 4 ميجابايت</p>
+                  <p className="text-[11px] text-text-soft">{t('profile.imageHint')}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className={labelClass}>الاسم الأول</label>
+                  <label className={labelClass}>{t('profile.firstName')}</label>
                   <input name="firstName" value={form.firstName} onChange={handleChange} className={inputClass} required />
                 </div>
                 <div>
-                  <label className={labelClass}>الاسم الأخير</label>
+                  <label className={labelClass}>{t('profile.lastName')}</label>
                   <input name="lastName" value={form.lastName} onChange={handleChange} className={inputClass} required />
                 </div>
                 <div>
-                  <label className={labelClass}>رقم الجوال</label>
+                  <label className={labelClass}>{t('profile.mobileNumber')}</label>
                   <input name="mobileNumber" value={form.mobileNumber} onChange={handleChange} className={inputClass} required />
                 </div>
                 <div>
-                  <label className={labelClass}>التحويلة</label>
-                  <input name="extensionNumber" value={form.extensionNumber} onChange={handleChange} className={inputClass} placeholder="اختياري" />
+                  <label className={labelClass}>{t('profile.extension')}</label>
+                  <input name="extensionNumber" value={form.extensionNumber} onChange={handleChange} className={inputClass} placeholder={t('common.optional')} />
                 </div>
                 <div>
-                  <label className={labelClass}>البريد الإلكتروني</label>
-                  <input value={user?.email || ''} disabled className={`${inputClass} cursor-not-allowed bg-background text-text-soft`} />
+                  <label className={labelClass}>{t('common.email')}</label>
+                  <input value={user?.email || ''} disabled dir="ltr" className={`${inputClass} cursor-not-allowed bg-background text-text-soft text-start`} />
                 </div>
                 <div>
-                  <label className={labelClass}>الدور</label>
+                  <label className={labelClass}>{t('profile.role')}</label>
                   <input
-                    value={(user?.roles || []).map((r) => ROLE_LABELS[r] || r).join('، ')}
+                    value={(user?.roles || []).map((r) => t(`roles.${r}`)).join(locale === 'en' ? ', ' : '، ')}
                     disabled
                     className={`${inputClass} cursor-not-allowed bg-background text-text-soft`}
                   />
-                  <p className="mt-1 text-[11px] text-text-soft">تعديل الدور حصري لصلاحية المدير</p>
+                  <p className="mt-1 text-[11px] text-text-soft">{t('profile.roleHint')}</p>
                 </div>
               </div>
 
               {/* التوقيع الإلكتروني */}
               <div>
-                <label className={labelClass}>التوقيع الإلكتروني</label>
+                <label className={labelClass}>{t('profile.signature')}</label>
                 <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
                   <div className="flex h-20 w-48 items-center justify-center overflow-hidden rounded-2xl border border-border bg-background">
                     {signatureImage ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={signatureImage} alt="التوقيع الإلكتروني" className="h-full w-full object-contain" />
+                      <img src={signatureImage} alt={t('profile.signature')} className="h-full w-full object-contain" />
                     ) : (
-                      <span className="text-xs text-text-soft">لا يوجد توقيع</span>
+                      <span className="text-xs text-text-soft">{t('profile.noSignature')}</span>
                     )}
                   </div>
                   <div className="flex flex-col gap-2">
@@ -290,17 +286,17 @@ export default function Profile() {
                       <button
                         type="button"
                         onClick={() => signatureInputRef.current?.click()}
-                        className="rounded-xl border border-border bg-white px-4 py-2 text-xs font-bold text-text-main transition hover:bg-background"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-4 py-2 text-xs font-bold text-text-main transition hover:bg-background"
                       >
-                        رفع توقيع
+                        <Upload size={14} aria-hidden="true" /> {t('profile.uploadSignature')}
                       </button>
                       {signatureImage && (
                         <button
                           type="button"
                           onClick={() => setSignatureImage(null)}
-                          className="rounded-xl border border-danger/30 px-4 py-2 text-xs font-bold text-danger transition hover:bg-burgundy/5"
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-danger/30 px-4 py-2 text-xs font-bold text-danger transition hover:bg-burgundy/5"
                         >
-                          إزالة
+                          <Trash2 size={14} aria-hidden="true" /> {t('profile.remove')}
                         </button>
                       )}
                     </div>
@@ -312,20 +308,26 @@ export default function Profile() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
                 >
-                  {saving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+                  {saving ? (
+                    t('common.saving')
+                  ) : (
+                    <>
+                      <Save size={16} aria-hidden="true" /> {t('profile.saveChanges')}
+                    </>
+                  )}
                 </button>
               </div>
             </form>
 
             {/* تغيير كلمة المرور */}
             <form onSubmit={handlePasswordSubmit} className="space-y-4 rounded-3xl border border-border bg-white p-5 sm:p-6">
-              <h2 className="text-lg font-extrabold text-text-main">تغيير كلمة المرور</h2>
+              <h2 className="text-lg font-extrabold text-text-main">{t('profile.changePassword')}</h2>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
-                  <label className={labelClass}>كلمة المرور الحالية</label>
+                  <label className={labelClass}>{t('profile.currentPassword')}</label>
                   <input
                     type="password"
                     name="currentPassword"
@@ -336,7 +338,7 @@ export default function Profile() {
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>كلمة المرور الجديدة</label>
+                  <label className={labelClass}>{t('profile.newPassword')}</label>
                   <input
                     type="password"
                     name="newPassword"
@@ -347,7 +349,7 @@ export default function Profile() {
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>تأكيد كلمة المرور الجديدة</label>
+                  <label className={labelClass}>{t('profile.confirmNewPassword')}</label>
                   <input
                     type="password"
                     name="confirmPassword"
@@ -358,15 +360,21 @@ export default function Profile() {
                   />
                 </div>
               </div>
-              <p className="text-[11px] text-text-soft">يجب أن تكون كلمة المرور 8 أحرف على الأقل وتحتوي على حروف وأرقام</p>
+              <p className="text-[11px] text-text-soft">{t('profile.passwordPolicy')}</p>
 
               <div className="flex justify-end">
                 <button
                   type="submit"
                   disabled={pwSaving}
-                  className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
                 >
-                  {pwSaving ? 'جاري التغيير...' : 'تغيير كلمة المرور'}
+                  {pwSaving ? (
+                    t('profile.changing')
+                  ) : (
+                    <>
+                      <KeyRound size={16} aria-hidden="true" /> {t('profile.changePassword')}
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -374,28 +382,36 @@ export default function Profile() {
             {/* اختبار البريد الإلكتروني — للمدير فقط */}
             {isManager && (
               <div className="space-y-4 rounded-3xl border border-border bg-white p-5 sm:p-6">
-                <h2 className="text-lg font-extrabold text-text-main">اختبار البريد الإلكتروني</h2>
-                <p className="text-sm text-text-soft">
-                  أرسل رسالة اختبار للتأكد من وصول البريد وظهور شعار الجامعة بشكل صحيح. اتركه فارغاً للإرسال إلى بريدك الحالي.
-                </p>
+                <h2 className="text-lg font-extrabold text-text-main">{t('profile.emailTest')}</h2>
+                <p className="text-sm text-text-soft">{t('profile.emailTestDescription')}</p>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div className="flex-1">
-                    <label className={labelClass}>البريد الإلكتروني المستهدف</label>
-                    <input
-                      type="email"
-                      value={testEmail}
-                      onChange={(e) => setTestEmail(e.target.value)}
-                      placeholder={user?.email || 'example@nauss.edu.sa'}
-                      className={inputClass}
-                    />
+                    <label className={labelClass}>{t('profile.targetEmail')}</label>
+                    <div className="relative">
+                      <Mail size={18} aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-text-soft start-3.5" />
+                      <input
+                        type="email"
+                        value={testEmail}
+                        onChange={(e) => setTestEmail(e.target.value)}
+                        placeholder={user?.email || 'example@nauss.edu.sa'}
+                        dir="ltr"
+                        className="w-full rounded-2xl border border-border bg-white py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 ps-11 pe-4 text-start"
+                      />
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={handleSendTestEmail}
                     disabled={testSending}
-                    className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
                   >
-                    {testSending ? 'جاري الإرسال...' : 'إرسال رسالة اختبار'}
+                    {testSending ? (
+                      t('profile.sending')
+                    ) : (
+                      <>
+                        <MailCheck size={16} aria-hidden="true" /> {t('profile.sendTestEmail')}
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

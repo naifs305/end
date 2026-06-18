@@ -1,7 +1,9 @@
+import { memo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, LabelList
 } from 'recharts';
+import { useTranslation } from '../../lib/i18n';
 
 const scoreColor = (v) => {
   if (v >= 80) return '#5D8A70';
@@ -9,9 +11,11 @@ const scoreColor = (v) => {
   return '#633646';
 };
 
-export default function TeamBarChart({ data = [] }) {
+function TeamBarChart({ data = [] }) {
+  const { t } = useTranslation();
+
   if (!data.length) return (
-    <div className="flex h-full items-center justify-center text-sm text-text-soft">لا توجد بيانات — احتسب المؤشرات أولاً</div>
+    <div className="flex h-full items-center justify-center text-sm text-text-soft">{t('charts.noDataComputeFirst')}</div>
   );
 
   const sorted = [...data].sort((a, b) => b.score - a.score).slice(0, 8);
@@ -32,7 +36,7 @@ export default function TeamBarChart({ data = [] }) {
           tick={{ fontFamily: 'Cairo, sans-serif', fontSize: 11, fill: '#2F3437' }}
         />
         <Tooltip
-          formatter={(value) => [`${Number(value).toFixed(1)}%`, 'الدرجة']}
+          formatter={(value) => [`${Number(value).toFixed(1)}%`, t('charts.score')]}
           contentStyle={{ fontFamily: 'Cairo, sans-serif', fontSize: 12, borderRadius: 12, border: '1px solid #D8DDDA' }}
         />
         <Bar dataKey="score" radius={[0, 6, 6, 0]} maxBarSize={22}>
@@ -50,3 +54,5 @@ export default function TeamBarChart({ data = [] }) {
     </ResponsiveContainer>
   );
 }
+
+export default memo(TeamBarChart);

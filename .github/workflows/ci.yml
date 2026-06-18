@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # npm install (not ci) — package-lock may lag until refreshed locally
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Build
+        run: npx next build
+        env:
+          # قيم وهمية للبناء فقط (لا اتصال فعلي بقاعدة البيانات أثناء البناء)
+          JWT_SECRET: ci_dummy_secret_change_me_32_characters
+          DATABASE_URL: postgresql://user:pass@localhost:5432/db
+          DIRECT_URL: postgresql://user:pass@localhost:5432/db
+          NEXT_TELEMETRY_DISABLED: '1'

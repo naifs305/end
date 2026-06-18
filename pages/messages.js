@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
+import { MessageSquare, Search, RefreshCw, Send } from 'lucide-react';
+import { useTranslation } from '../lib/i18n';
 
 function getDisplayName(person) {
   if (!person) return '-';
@@ -9,25 +11,18 @@ function getDisplayName(person) {
   return fullName || person.email || '-';
 }
 
-function getRoleLabel(roles = []) {
-  if (roles.includes('MANAGER')) return 'مدير';
-  if (roles.includes('PROJECT_SUPERVISOR')) return 'مشرف مشروع';
-  if (roles.includes('QUALITY_VIEWER')) return 'جودة';
-  if (roles.includes('EMPLOYEE')) return 'موظف';
-  return 'مستخدم';
-}
-
-function formatDate(value) {
-  if (!value) return '-';
-  try {
-    return new Date(value).toLocaleString('ar-SA');
-  } catch {
-    return value;
-  }
+function getRoleKey(roles = []) {
+  if (roles.includes('MANAGER')) return 'MANAGER';
+  if (roles.includes('PROJECT_SUPERVISOR')) return 'PROJECT_SUPERVISOR';
+  if (roles.includes('QUALITY_VIEWER')) return 'QUALITY_VIEWER';
+  if (roles.includes('EMPLOYEE')) return 'EMPLOYEE';
+  return null;
 }
 
 export default function MessagesPage() {
   const { activeRole } = useAuth();
+  const { t, locale } = useTranslation();
+  const intl = locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory';
   const [users, setUsers] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -38,6 +33,20 @@ export default function MessagesPage() {
   const [error, setError] = useState('');
   const [messageText, setMessageText] = useState('');
   const [search, setSearch] = useState('');
+
+  const roleLabel = (roles = []) => {
+    const key = getRoleKey(roles);
+    return key ? t(`roles.${key}`) : t('messagesPage.userFallback');
+  };
+
+  const formatDate = (value) => {
+    if (!value) return '-';
+    try {
+      return new Date(value).toLocaleString(intl);
+    } catch {
+      return value;
+    }
+  };
 
   const loadPage = async () => {
     try {
@@ -52,7 +61,7 @@ export default function MessagesPage() {
       setConversations(list);
       setSelectedUserId((prev) => prev || list[0]?.user?.id || usersRes.data?.[0]?.id || null);
     } catch (err) {
-      setError(err?.response?.data?.message || 'فشل تحميل المحادثات');
+      setError(err?.response?.data?.message || t('messagesPage.loadConversationsFailed'));
     } finally {
       setLoading(false);
     }
@@ -68,7 +77,7 @@ export default function MessagesPage() {
       const res = await api.get(`/messages/thread/${userId}`);
       setThread(res.data || []);
     } catch (err) {
-      setError(err?.response?.data?.message || 'فشل تحميل المحادثة');
+      setError(err?.response?.data?.message || t('messagesPage.loadThreadFailed'));
     } finally {
       setThreadLoading(false);
     }
@@ -120,39 +129,44 @@ export default function MessagesPage() {
       await api.post('/messages', {
         recipientIds: [selectedUserId],
         message: messageText.trim(),
-        subject: 'محادثة داخلية',
+        subject: t('messagesPage.internalSubject'),
       });
       setMessageText('');
       await Promise.all([loadPage(), loadThread(selectedUserId)]);
     } catch (err) {
-      setError(err?.response?.data?.message || 'فشل إرسال الرسالة');
+      setError(err?.response?.data?.message || t('messagesPage.sendFailed'));
     } finally {
       setSending(false);
     }
   };
 
   return (
-    <MainLayout title="المراسلات الداخلية">
+    <MainLayout title={t('messagesPage.title')}>
       <div className="grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] gap-6 h-[calc(100vh-180px)]">
         <section className="bg-white border border-border rounded-2xl overflow-hidden flex flex-col shadow-card">
           <div className="p-4 border-b border-border space-y-3">
             <div>
-              <h1 className="text-lg font-extrabold text-primary">💬 المحادثات</h1>
-              <p className="text-xs text-text-soft mt-0.5">مراسلات داخلية مع الفريق</p>
+              <h1 className="inline-flex items-center gap-2 text-lg font-extrabold text-primary">
+                <MessageSquare size={18} aria-hidden="true" /> {t('messagesPage.conversations')}
+              </h1>
+              <p className="text-xs text-text-soft mt-0.5">{t('messagesPage.subtitle')}</p>
             </div>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
-              placeholder="🔍 ابحث عن مستخدم..."
-            />
+            <div className="relative">
+              <Search size={16} aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-text-soft start-3" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 ps-9 pe-3"
+                placeholder={t('messagesPage.searchPlaceholder')}
+              />
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             {loading ? (
-              <div className="p-4 text-sm text-text-soft">جاري التحميل...</div>
+              <div className="p-4 text-sm text-text-soft">{t('common.loading')}</div>
             ) : filteredConversations.length === 0 ? (
-              <div className="p-4 text-sm text-text-soft">لا توجد محادثات حالياً.</div>
+              <div className="p-4 text-sm text-text-soft">{t('messagesPage.noConversations')}</div>
             ) : (
               filteredConversations.map((item) => {
                 const selected = selectedUserId === item.user?.id;
@@ -161,20 +175,20 @@ export default function MessagesPage() {
                     key={item.user?.id}
                     type="button"
                     onClick={() => setSelectedUserId(item.user?.id)}
-                    className={`w-full text-right px-4 py-4 border-b border-border transition ${selected ? 'bg-primary-light' : 'bg-white hover:bg-background'}`}
+                    className={`w-full text-start px-4 py-4 border-b border-border transition ${selected ? 'bg-primary-light' : 'bg-white hover:bg-background'}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="font-semibold text-text-main truncate">{getDisplayName(item.user)}</div>
                         <div className="text-xs text-text-soft mt-1">
-                          {getRoleLabel(item.user?.roles || [])}
+                          {roleLabel(item.user?.roles || [])}
                           {item.user?.operationalProject?.name ? ` - ${item.user.operationalProject.name}` : ''}
                         </div>
                         <div className="text-sm text-text-soft mt-2 truncate">
-                          {item.lastMessage?.body || 'ابدأ محادثة جديدة'}
+                          {item.lastMessage?.body || t('messagesPage.startNewConversation')}
                         </div>
                       </div>
-                      <div className="shrink-0 text-left">
+                      <div className="shrink-0 text-end">
                         <div className="text-[11px] text-text-soft/60">{formatDate(item.updatedAt || item.lastMessage?.createdAt)}</div>
                         {item.unreadCount > 0 ? (
                           <div className="mt-2 inline-flex min-w-[24px] h-6 px-2 items-center justify-center rounded-full bg-danger text-white text-xs font-bold">
@@ -193,10 +207,10 @@ export default function MessagesPage() {
         <section className="bg-white border border-border rounded-2xl overflow-hidden flex flex-col min-h-0 shadow-card">
           <div className="p-4 border-b border-border flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-extrabold text-text-main">{selectedUser ? getDisplayName(selectedUser) : 'اختر محادثة'}</h2>
+              <h2 className="text-base font-extrabold text-text-main">{selectedUser ? getDisplayName(selectedUser) : t('messagesPage.selectConversation')}</h2>
               {selectedUser ? (
                 <p className="text-sm text-text-soft">
-                  {getRoleLabel(selectedUser.roles || [])}
+                  {roleLabel(selectedUser.roles || [])}
                   {selectedUser?.operationalProject?.name ? ` - ${selectedUser.operationalProject.name}` : ''}
                 </p>
               ) : null}
@@ -207,19 +221,19 @@ export default function MessagesPage() {
                 loadPage();
                 if (selectedUserId) loadThread(selectedUserId);
               }}
-              className="px-3 py-2 rounded-xl border border-border text-sm hover:bg-background"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-sm hover:bg-background"
             >
-              تحديث
+              <RefreshCw size={15} aria-hidden="true" /> {t('common.refresh')}
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 bg-background space-y-3 min-h-[320px]">
             {threadLoading ? (
-              <div className="text-sm text-text-soft">جاري تحميل المحادثة...</div>
+              <div className="text-sm text-text-soft">{t('messagesPage.loadingThread')}</div>
             ) : !selectedUserId ? (
-              <div className="text-sm text-text-soft">اختر مستخدمًا لبدء المحادثة.</div>
+              <div className="text-sm text-text-soft">{t('messagesPage.selectUserToStart')}</div>
             ) : thread.length === 0 ? (
-              <div className="text-sm text-text-soft">لا توجد رسائل بعد. ابدأ أول رسالة الآن.</div>
+              <div className="text-sm text-text-soft">{t('messagesPage.noMessagesYet')}</div>
             ) : (
               thread.map((item) => (
                 <div
@@ -244,7 +258,7 @@ export default function MessagesPage() {
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
                 rows={3}
-                placeholder={selectedUserId ? 'اكتب رسالتك هنا' : 'اختر محادثة أولاً'}
+                placeholder={selectedUserId ? t('messagesPage.typeMessage') : t('messagesPage.selectConversationFirst')}
                 disabled={!selectedUserId || sending}
                 className="flex-1 rounded-2xl border border-border px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:bg-background"
               />
@@ -254,8 +268,8 @@ export default function MessagesPage() {
                 className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-primary text-white text-sm font-bold hover:bg-primary-dark disabled:opacity-50 transition"
               >
                 {sending
-                ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> إرسال...</>
-                : '✉️ إرسال'}
+                ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> {t('messagesPage.sending')}</>
+                : <><Send size={16} aria-hidden="true" /> {t('common.submit')}</>}
               </button>
             </div>
           </form>

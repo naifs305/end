@@ -1,23 +1,19 @@
-const { withAuth, withMethods } = require('../../../lib/middleware/auth');
-const messagesService = require('../../../lib/services/messages');
-const { validateMessage } = require('../../../lib/middleware/validate');
+const { withAuth, withMethods, withValidation, ok, created, fail } = require('../../../lib/server/http');
+const messagingService = require('../../../lib/modules/messaging/messaging.service');
+const { sendMessageSchema } = require('../../../lib/modules/messaging/messaging.schema');
 
 async function handler(req, res) {
+  const actor = { userId: req.user.id, activeRole: req.activeRole };
   try {
     if (req.method === 'GET') {
-      const conversations = await messagesService.getConversationList(req.user.id);
-      return res.status(200).json(conversations);
+      return ok(res, await messagingService.getConversationList(actor));
     }
 
-    if (req.method === 'POST') {
-      const body = req.body || {};
-      const v = validateMessage({ recipientIds: body.recipientIds, message: body.message, subject: body.subject });
-      if (!v.valid) return res.status(400).json({ message: v.message });
-      const msg = await messagesService.sendMessage(req.user.id, body);
-      return res.status(201).json(msg);
-    }
+    return await withValidation(sendMessageSchema, (r, s) =>
+      messagingService.sendMessage(r.valid, actor).then((msg) => created(s, msg)).catch((e) => fail(s, e)),
+    )(req, res);
   } catch (err) {
-    return res.status(err.statusCode || 500).json({ message: err.message });
+    return fail(res, err);
   }
 }
 
