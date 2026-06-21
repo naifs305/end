@@ -28,10 +28,10 @@ const EL_STATUS_META = {
 };
 
 const ELEMENT_ORDER = {
-  trainee_registration: 1, registration_message: 2, advance_req: 3, pre_test: 4,
-  opening_report: 5, reaction_evaluation: 6, post_test: 7, certificates: 8,
-  closing_report: 9, report: 9, supervisor_compensation: 10, trainer_compensation: 11,
-  revenues: 12, materials: 13, settlement: 14,
+  trainee_registration: 1, registration_message: 2, medical_insurance: 3, advance_req: 4, pre_test: 5,
+  opening_report: 6, reaction_evaluation: 7, post_test: 8, certificates: 9,
+  closing_report: 10, report: 10, supervisor_compensation: 11, trainer_compensation: 12,
+  revenues: 13, materials: 14, settlement: 15,
 };
 
 // العناصر الحرجة التي تستوجب إنذاراً خاصاً
