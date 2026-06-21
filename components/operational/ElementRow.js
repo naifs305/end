@@ -275,7 +275,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               disabled={loading}
               className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-primary-dark disabled:opacity-50 transition"
             >
-              📋 {element.status === 'RETURNED' ? '↩ إعادة تقديم' : 'تقديم'}
+              📋 {element.status === 'RETURNED' ? '↩ إعادة تقديم' : element.formData ? '✏️ استكمال المسودة' : 'تقديم'}
             </button>
             ) : (
             <button
@@ -611,6 +611,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               course={element.course}
               reportType={element.element.key}
               delayReason={delayReason}
+              initialData={element.formData || null}
               onClose={() => setShowReportForm(false)}
               onSuccess={onUpdate}
             />

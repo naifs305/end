@@ -237,10 +237,11 @@ function formatLocationType(value) {
   return map[value] || value || '-';
 }
 
-export default function CourseReportForm({ trackingId, onClose, onSuccess, course, reportType = 'closing_report', delayReason = '' }) {
+export default function CourseReportForm({ trackingId, onClose, onSuccess, course, reportType = 'closing_report', delayReason = '', initialData = null }) {
   const normalizedType = reportType === 'opening_report' ? 'opening_report' : 'closing_report';
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState(getInitialForm(normalizedType));
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [form, setForm] = useState({ ...getInitialForm(normalizedType), ...(initialData || {}) });
 
   const courseInfo = useMemo(() => {
     if (!course) return null;
@@ -418,6 +419,25 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
     }
   };
 
+  const handleSaveDraft = async () => {
+    setSavingDraft(true);
+    try {
+      await api.post(`/closure/${trackingId}/draft`, {
+        ...form,
+        attendance_rate: attendanceRate,
+        passing_rate: passingRate,
+        generatedCourseInfo: courseInfo,
+      });
+      toast.success('تم حفظ التقرير كمسودة، يمكنك إكماله لاحقاً');
+      onSuccess();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'تعذر حفظ المسودة');
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const title = normalizedType === 'opening_report' ? 'تقرير افتتاح الدورة' : 'تقرير اختتام الدورة';
   const subtitle = normalizedType === 'opening_report'
     ? 'نموذج تفصيلي لمتابعة الجاهزية التشغيلية والحضور الأولي عند افتتاح البرنامج'
@@ -553,7 +573,8 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
 
       <div className="flex flex-col-reverse gap-3 pt-2 md:flex-row md:justify-end">
         <button type="button" onClick={onClose} className="rounded-2xl border border-border bg-white px-5 py-3 text-sm font-bold text-text-main transition hover:bg-background">إغلاق</button>
-        <button type="submit" disabled={loading} className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{loading ? 'جاري الحفظ...' : 'حفظ وتقديم التقرير'}</button>
+        <button type="button" onClick={handleSaveDraft} disabled={savingDraft || loading} className="rounded-2xl border border-primary/30 bg-primary-light px-5 py-3 text-sm font-bold text-primary transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{savingDraft ? 'جاري الحفظ...' : 'حفظ كمسودة'}</button>
+        <button type="submit" disabled={loading || savingDraft} className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{loading ? 'جاري الحفظ...' : 'حفظ وتقديم التقرير'}</button>
       </div>
     </form>
     </>
