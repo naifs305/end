@@ -9,6 +9,7 @@ const ratings = [
   { value: 'needs_improvement', label: 'يحتاج تحسين' },
   { value: 'weak', label: 'ضعيف' },
   { value: 'requires_development', label: 'يحتاج تطوير' },
+  { value: 'not_applicable', label: 'غير منطبق' },
 ];
 
 const ratingValuesRequiringComment = ['needs_improvement', 'weak', 'requires_development'];
@@ -153,6 +154,7 @@ function RatingBadgePreview({ value }) {
     needs_improvement:    'bg-sand/20 text-warning border-sand/40',
     weak:                 'bg-burgundy/10 text-danger border-burgundy/20',
     requires_development: 'bg-sand/10 text-warning border-sand/30',
+    not_applicable:       'bg-background text-text-soft border-border',
   };
   const label = ratings.find((r) => r.value === value)?.label || value;
   return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${map[value] || 'bg-background text-text-soft border-border'}`}>{label}</span>;
