@@ -160,6 +160,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       courseName: element.course?.name || '',
       employeeEmail: element.course?.primaryEmployee?.email || '',
       location: element.course?.city || '',
+      formType: element.element?.key === 'settlement' ? 'settlement' : 'request',
       startDate: element.course?.startDate ? String(element.course.startDate).slice(0, 10) : '',
       endDate: element.course?.endDate ? String(element.course.endDate).slice(0, 10) : '',
     });
