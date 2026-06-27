@@ -1,10 +1,12 @@
 // POST /api/courses/[id]/toggle-report
 // { type: 'opening' | 'closing', enabled: boolean }
-// مشرف المشروع أو المدير يفعّل/يعطّل تقرير على دورة قائمة
+// المدير/المشرف: يفعّل أو يعطّل التقرير ويجعله إجبارياً رسمياً على الدورة.
+// الموظف المسؤول عن الدورة (أو الداعم): يمكنه تفعيله تطوّعاً فقط (لا يملك تعطيله) عندما لا يكون إجبارياً —
+// يُمنح تقدير في المؤشرات عند اعتماده لاحقاً لأنه عمل تطوّعي وليس مطلوباً.
 const prisma = require('../../../../lib/db/prisma');
 const { withAuth, withMethods } = require('../../../../lib/middleware/auth');
 const { logAudit } = require('../../../../lib/services/audit');
-const { refreshConditionalElements } = require('../../../../lib/services/courses');
+const permissions = require('../../../../lib/services/permissions');
 
 async function handler(req, res) {
   const { id } = req.query;
@@ -17,17 +19,36 @@ async function handler(req, res) {
   if (typeof enabled !== 'boolean') {
     return res.status(400).json({ message: 'enabled يجب أن يكون boolean' });
   }
-  if (!['MANAGER', 'PROJECT_SUPERVISOR'].includes(activeRole)) {
-    return res.status(403).json({ message: 'غير مصرح' });
-  }
 
   const course = await prisma.course.findUnique({ where: { id } });
   if (!course) return res.status(404).json({ message: 'الدورة غير موجودة' });
 
   const field = type === 'opening' ? 'requiresOpeningReport' : 'requiresClosingReport';
+  const voluntaryField = type === 'opening' ? 'openingReportVoluntary' : 'closingReportVoluntary';
   const elKey = type === 'opening' ? 'opening_report' : 'closing_report';
 
-  await prisma.course.update({ where: { id }, data: { [field]: enabled } });
+  const isManagerOrSupervisor = ['MANAGER', 'PROJECT_SUPERVISOR'].includes(activeRole);
+  let updateData;
+
+  if (isManagerOrSupervisor) {
+    // المسار الرسمي: يجعل التقرير إجبارياً/غير إجباري على الدورة
+    updateData = { [field]: enabled, [voluntaryField]: false };
+  } else {
+    // مسار الموظف: تفعيل تطوّعي فقط، ولا يملك تعطيل تقرير مفعّل أصلاً
+    if (!enabled) {
+      return res.status(403).json({ message: 'غير مصرح' });
+    }
+    if (course[field]) {
+      return res.status(400).json({ message: 'التقرير مفعّل بالفعل على هذه الدورة' });
+    }
+    const allowed = await permissions.canSubmitElement(user, activeRole, course);
+    if (!allowed) {
+      return res.status(403).json({ message: 'غير مصرح' });
+    }
+    updateData = { [field]: true, [voluntaryField]: true };
+  }
+
+  await prisma.course.update({ where: { id }, data: updateData });
 
   // تحديث حالة العنصر في عناصر الإقفال
   const element = await prisma.closureElement.findFirst({ where: { key: elKey } });
@@ -42,10 +63,10 @@ async function handler(req, res) {
   }
 
   await logAudit(user.id, activeRole, 'COURSE_REPORT_TOGGLED', {
-    courseId: id, type, enabled,
+    courseId: id, type, enabled, voluntary: !isManagerOrSupervisor,
   }, id);
 
-  return res.status(200).json({ success: true, [field]: enabled });
+  return res.status(200).json({ success: true, [field]: enabled, [voluntaryField]: updateData[voluntaryField] });
 }
 
 module.exports = withMethods(['POST'], withAuth(handler));

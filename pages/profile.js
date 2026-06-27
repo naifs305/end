@@ -4,6 +4,7 @@ import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
+import { isAcceptableImageFile, normalizeImageFile } from '../lib/clientImage';
 
 const ROLE_LABELS = {
   EMPLOYEE: 'موظف',
@@ -72,7 +73,7 @@ export default function Profile() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    if (!isAcceptableImageFile(file)) {
       toast.error('يجب اختيار ملف صورة');
       return;
     }
@@ -82,11 +83,12 @@ export default function Profile() {
     }
 
     try {
-      const dataUrl = await readFileAsDataUrl(file);
+      const normalized = await normalizeImageFile(file);
+      const dataUrl = await readFileAsDataUrl(normalized);
       if (field === 'profileImage') setProfileImage(dataUrl);
       else setSignatureImage(dataUrl);
     } catch {
-      toast.error('فشل في قراءة الصورة');
+      toast.error('تعذرت قراءة الصورة — جرّب صورة بصيغة JPG أو PNG');
     }
   };
 

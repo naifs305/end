@@ -39,6 +39,24 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const canExecute = isEmployee || isCoordinator;
   const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
   const isManager  = activeRole === 'MANAGER';
+  const [volunteering, setVolunteering] = useState(false);
+  const canVolunteerReport = canExecute && isCourseReport && element.status === 'NOT_APPLICABLE';
+
+  const handleVolunteerReport = async () => {
+    setVolunteering(true);
+    try {
+      await api.post(`/courses/${element.courseId}/toggle-report`, {
+        type: isOpeningReport ? 'opening' : 'closing',
+        enabled: true,
+      });
+      toast.success('تم تفعيل التقرير — يمكنك تقديمه الآن، وسيُقدَّر هذا العمل التطوّعي في مؤشرات أدائك');
+      onUpdate();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'تعذر تفعيل التقرير');
+    } finally {
+      setVolunteering(false);
+    }
+  };
 
   // ---- إجراءات الموظف ----
 
@@ -264,6 +282,18 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           )}
 
         </div>
+      )}
+
+      {canVolunteerReport && (
+        <button
+          type="button"
+          onClick={handleVolunteerReport}
+          disabled={volunteering}
+          className="whitespace-nowrap rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent shadow-sm hover:bg-accent hover:text-white disabled:opacity-50"
+          title="هذا التقرير غير إجباري على هذه الدورة، لكن تقديمه تطوّعاً يُحتسب لك تقديراً في مؤشرات الأداء"
+        >
+          {volunteering ? '...' : '🙋 تطوّع بتقديم هذا التقرير'}
+        </button>
       )}
 
       {canExecute && element.status === 'PENDING_APPROVAL' && (

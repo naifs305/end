@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
+import { isAcceptableImageFile, normalizeImageFile } from '../../lib/clientImage';
 
 const CATEGORY_OPTIONS = [
   { value: '', label: 'بدون تصنيف' },
@@ -105,32 +106,35 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
     };
   }, [course]);
 
-  const compressImage = (file) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const maxWidth = 1600;
-        const scale = Math.min(1, maxWidth / img.width);
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const content = canvas.toDataURL('image/jpeg', 0.72);
-        resolve({
-          name: file.name.replace(/\.[^.]+$/, '.jpg'),
-          type: 'image/jpeg',
-          size: Math.round((content.length * 3) / 4),
-          content,
-        });
+  const compressImage = async (file) => {
+    const normalized = await normalizeImageFile(file);
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxWidth = 1600;
+          const scale = Math.min(1, maxWidth / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const content = canvas.toDataURL('image/jpeg', 0.72);
+          resolve({
+            name: normalized.name.replace(/\.[^.]+$/, '.jpg'),
+            type: 'image/jpeg',
+            size: Math.round((content.length * 3) / 4),
+            content,
+          });
+        };
+        img.onerror = reject;
+        img.src = reader.result;
       };
-      img.onerror = reject;
-      img.src = reader.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+      reader.onerror = reject;
+      reader.readAsDataURL(normalized);
+    });
+  };
 
   const handleAttachmentsChange = async (e) => {
     try {
@@ -141,7 +145,7 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
         e.target.value = '';
         return;
       }
-      const invalidFile = files.find((file) => !file.type.startsWith('image/'));
+      const invalidFile = files.find((file) => !isAcceptableImageFile(file));
       if (invalidFile) {
         toast.error('يسمح فقط برفع الصور');
         e.target.value = '';

@@ -182,6 +182,9 @@ model Course {
   // التقارير — مشروطة (خارجية = إجبارية، داخلية = اختيارية)
   requiresOpeningReport          Boolean      @default(false)
   requiresClosingReport          Boolean      @default(false)
+  // الموظف فعّل التقرير بنفسه تطوّعاً (وليس لكونه إجبارياً) — يُستخدم لمنح تقدير في المؤشرات
+  openingReportVoluntary         Boolean      @default(false)
+  closingReportVoluntary         Boolean      @default(false)
   status                         CourseStatus @default(PREPARATION)
 
   operationalProjectId           String
