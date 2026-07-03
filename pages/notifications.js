@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
@@ -26,7 +26,7 @@ function fmtRelative(v) {
   if (hrs < 24)  return `منذ ${hrs} ساعة`;
   const days = Math.floor(hrs / 24);
   if (days < 7)  return `منذ ${days} يوم`;
-  return new Date(v).toLocaleDateString('ar-SA', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(v).toLocaleDateString('ar-SA-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export default function Notifications() {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import api from '../lib/axios';
 
@@ -29,7 +29,7 @@ function fmtRelative(date) {
   if (hrs < 24)   return `منذ ${hrs} ساعة`;
   const days = Math.floor(hrs / 24);
   if (days < 7)   return `منذ ${days} يوم`;
-  return new Date(date).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' });
+  return new Date(date).toLocaleDateString('ar-SA-u-ca-gregory', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 const ROLE_LABEL = { MANAGER: 'مدير', PROJECT_SUPERVISOR: 'مشرف', EMPLOYEE: 'موظف', SYSTEM: 'نظام' };
@@ -136,7 +136,7 @@ export default function AuditLog() {
                           <p className="mt-0.5 text-xs text-text-soft">الدورة: <span className="font-medium text-text-main">{log.course.name}</span></p>
                         )}
                       </div>
-                      <span className="shrink-0 text-xs text-text-soft" title={new Date(log.createdAt).toLocaleString('ar-SA')}>
+                      <span className="shrink-0 text-xs text-text-soft" title={new Date(log.createdAt).toLocaleString('ar-SA-u-ca-gregory')}>
                         {fmtRelative(log.createdAt)}
                       </span>
                     </div>

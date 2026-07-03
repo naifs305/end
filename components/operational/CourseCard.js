@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 
 const STATUS_CFG = {
   DRAFT:            { label: 'مسودة',            cls: 'bg-background text-text-soft border-border' },
@@ -22,7 +22,7 @@ export default function CourseCard({ course }) {
         </p>
         <div className="flex items-center justify-between border-t border-border pt-3 text-xs">
           <span className="text-text-soft">
-            {new Date(course.startDate).toLocaleDateString('ar-SA', { day: 'numeric', month: 'short' })}
+            {new Date(course.startDate).toLocaleDateString('ar-SA-u-ca-gregory', { day: 'numeric', month: 'short' })}
           </span>
           <span className={`rounded-full border px-2 py-0.5 font-bold ${s.cls}`}>{s.label}</span>
         </div>

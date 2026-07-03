@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
@@ -100,8 +100,8 @@ export default function CourseNotesReportForm({ courseId, course, onClose }) {
       project: course.operationalProject?.name || '-',
       city: course.city || '-',
       locationType: course.locationType || '-',
-      startDate: course.startDate ? new Date(course.startDate).toLocaleDateString('ar-SA') : '-',
-      endDate: course.endDate ? new Date(course.endDate).toLocaleDateString('ar-SA') : '-',
+      startDate: course.startDate ? new Date(course.startDate).toLocaleDateString('ar-SA-u-ca-gregory') : '-',
+      endDate: course.endDate ? new Date(course.endDate).toLocaleDateString('ar-SA-u-ca-gregory') : '-',
       supervisor: `${course.primaryEmployee?.firstName || ''} ${course.primaryEmployee?.lastName || ''}`.trim() || '-',
     };
   }, [course]);

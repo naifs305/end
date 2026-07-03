@@ -1,4 +1,4 @@
-import dynamic from 'next/dynamic';
+﻿import dynamic from 'next/dynamic';
 import { canCreateCourse, isAdminRole } from '../lib/roles';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -22,7 +22,7 @@ function fmt(v, d = 1) {
 
 function fmtDate(v) {
   if (!v) return '-';
-  return new Date(v).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' });
+  return new Date(v).toLocaleDateString('ar-SA-u-ca-gregory', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 const STATUS_MAP = {
@@ -157,9 +157,9 @@ export default function Home() {
     if (teamPeriod === 'year') return `سنة ${now.getFullYear()}`;
     if (teamPeriod === 'previous') {
       const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      return `${d.toLocaleString('ar-SA', { month: 'long' })} ${d.getFullYear()}`;
+      return `${d.toLocaleString('ar-SA-u-ca-gregory', { month: 'long' })} ${d.getFullYear()}`;
     }
-    return `${now.toLocaleString('ar-SA', { month: 'long' })} ${now.getFullYear()}`;
+    return `${now.toLocaleString('ar-SA-u-ca-gregory', { month: 'long' })} ${now.getFullYear()}`;
   }, [teamPeriod]);
 
   useEffect(() => {
@@ -213,7 +213,7 @@ export default function Home() {
   );
 
   const now     = new Date();
-  const month   = now.toLocaleString('ar-SA', { month: 'long' });
+  const month   = now.toLocaleString('ar-SA-u-ca-gregory', { month: 'long' });
   const year    = now.getFullYear();
 
   // ---- stat cards ----

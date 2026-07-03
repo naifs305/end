@@ -1,4 +1,4 @@
-import dynamic from 'next/dynamic';
+﻿import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
@@ -33,7 +33,7 @@ function fmtRelative(v) {
   if (diffHours < 1)   return 'منذ أقل من ساعة';
   if (diffHours < 24)  return `منذ ${Math.round(diffHours)} ساعة`;
   if (diffHours < 168) return `منذ ${Math.floor(diffHours / 24)} يوم`;
-  return new Date(v).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' });
+  return new Date(v).toLocaleDateString('ar-SA-u-ca-gregory', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function initials(firstName, lastName) {
@@ -724,7 +724,7 @@ function EmployeePersonalView({ snap, month, year }) {
                 <div className="mb-1 flex items-center justify-between">
                   <span className="text-xs font-extrabold text-primary">{n.manager?.firstName} {n.manager?.lastName}</span>
                   <span className="text-[10px] text-text-soft">
-                    {new Date(n.createdAt).toLocaleDateString('ar-SA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {new Date(n.createdAt).toLocaleDateString('ar-SA-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                 </div>
                 <p className="text-xs leading-relaxed text-text-main">{n.note}</p>

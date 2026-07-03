@@ -1,4 +1,4 @@
-// صفحة التقارير الميدانية — إعادة بناء احترافية
+﻿// صفحة التقارير الميدانية — إعادة بناء احترافية
 import { canViewReports, isAdminRole } from '../lib/roles';
 import { useEffect, useMemo, useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
@@ -23,11 +23,11 @@ const STATUS_META = {
 
 function fmtDate(v) {
   if (!v) return '—';
-  return new Date(v).toLocaleDateString('ar-SA', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(v).toLocaleDateString('ar-SA-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 function fmtDateTime(v) {
   if (!v) return '—';
-  return new Date(v).toLocaleString('ar-SA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(v).toLocaleString('ar-SA-u-ca-gregory', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 // ── مكوّن بطاقة تقرير واحد ─────────────────────────────────────────────────

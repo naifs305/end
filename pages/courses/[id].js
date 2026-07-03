@@ -44,11 +44,11 @@ const CRITICAL_META = {
 
 function fmt(date) {
   if (!date) return '-';
-  return new Date(date).toLocaleDateString('ar-SA', { day:'numeric', month:'short', year:'numeric' });
+  return new Date(date).toLocaleDateString('ar-SA-u-ca-gregory', { day:'numeric', month:'short', year:'numeric' });
 }
 function fmtFull(date) {
   if (!date) return '-';
-  return new Date(date).toLocaleString('ar-SA', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  return new Date(date).toLocaleString('ar-SA-u-ca-gregory', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
 }
 
 // ── بطاقة معلومة مصغّرة ───────────────────────────────────────────────
@@ -363,6 +363,15 @@ export default function CourseDetail() {
               <span>✓</span>
               <span>تم الاعتماد: {fmtFull(el.decisionAt)}</span>
               {el.decider && <span className="text-text-soft font-normal">— {el.decider.firstName} {el.decider.lastName}</span>}
+            </div>
+          )}
+
+          {/* رقم المعاملة من منصة السلف */}
+          {['advance_req', 'settlement'].includes(el.element?.key) && el.formData?.referenceNumber && (
+            <div className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary-light/40 px-2.5 py-1.5 text-[11px] font-bold text-primary w-fit">
+              <span>🔗</span>
+              <span>رقم المعاملة في منصة السلف:</span>
+              <span className="font-extrabold">{el.formData.referenceNumber}</span>
             </div>
           )}
 

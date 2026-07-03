@@ -1,4 +1,4 @@
-// صفحة التقرير القيادي الشهري — مدير ومشرف مشروع
+﻿// صفحة التقرير القيادي الشهري — مدير ومشرف مشروع
 import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import MainLayout from '../components/layout/MainLayout';
@@ -350,7 +350,7 @@ export default function ExecutiveReportPage() {
           </div>
           {data && (
             <div className="mt-2 text-[11px] text-text-soft/70">
-              تقرير {MONTHS[month - 1]} {year} — تم الإنشاء: {new Date(data.generatedAt).toLocaleString('ar-SA')}
+              تقرير {MONTHS[month - 1]} {year} — تم الإنشاء: {new Date(data.generatedAt).toLocaleString('ar-SA-u-ca-gregory')}
             </div>
           )}
         </div>

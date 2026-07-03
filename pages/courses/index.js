@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import MainLayout from '../../components/layout/MainLayout';
 import api from '../../lib/axios';
@@ -28,7 +28,7 @@ const STATUSES = [
 
 function fmtDate(v) {
   if (!v) return '-';
-  return new Date(v).toLocaleDateString('ar-SA', { year:'numeric', month:'short', day:'numeric' });
+  return new Date(v).toLocaleDateString('ar-SA-u-ca-gregory', { year:'numeric', month:'short', day:'numeric' });
 }
 
 function empName(u) { return `${u?.firstName||''} ${u?.lastName||''}`.trim() || '-'; }

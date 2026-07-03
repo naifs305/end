@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
@@ -11,14 +11,14 @@ import useAuth from '../context/AuthContext';
 
 function fmtDT(v) {
   if (!v) return '-';
-  return new Date(v).toLocaleString('ar-SA', {
+  return new Date(v).toLocaleString('ar-SA-u-ca-gregory', {
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
 }
 function fmtDate(v) {
   if (!v) return '-';
-  return new Date(v).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' });
+  return new Date(v).toLocaleDateString('ar-SA-u-ca-gregory', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 function waitLabel(h) {
   if (h < 1)  return 'أقل من ساعة';

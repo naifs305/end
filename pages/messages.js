@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
@@ -20,7 +20,7 @@ function getRoleLabel(roles = []) {
 function formatDate(value) {
   if (!value) return '-';
   try {
-    return new Date(value).toLocaleString('ar-SA');
+    return new Date(value).toLocaleString('ar-SA-u-ca-gregory');
   } catch {
     return value;
   }

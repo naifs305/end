@@ -1,4 +1,4 @@
-// مركز التحفيز — 4 أدوات تحفيزية
+﻿// مركز التحفيز — 4 أدوات تحفيزية
 import { useState, useEffect, useCallback } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
@@ -164,7 +164,7 @@ function BadgesSection({ isManager, currentUser, users }) {
                     )}
                     {b.note && <p className="mt-1 text-[11px] opacity-60">"{b.note}"</p>}
                     <p className="mt-1 text-[10px] opacity-50">
-                      {b.periodLabel || ''} · {new Date(b.awardedAt).toLocaleDateString('ar-SA', { day:'numeric', month:'short', year:'numeric' })}
+                      {b.periodLabel || ''} · {new Date(b.awardedAt).toLocaleDateString('ar-SA-u-ca-gregory', { day:'numeric', month:'short', year:'numeric' })}
                     </p>
                   </div>
                 </div>
@@ -345,7 +345,7 @@ function IdeasSection({ isManager, currentUser }) {
 
                   <div className="mt-3 flex items-center justify-between text-[11px] text-text-soft">
                     <span className="font-bold">{idea.firstName} {idea.lastName}</span>
-                    <span>{new Date(idea.createdAt).toLocaleDateString('ar-SA', { day:'numeric', month:'short', year:'numeric' })}</span>
+                    <span>{new Date(idea.createdAt).toLocaleDateString('ar-SA-u-ca-gregory', { day:'numeric', month:'short', year:'numeric' })}</span>
                   </div>
 
                   {idea.reviewNotes && (
@@ -746,7 +746,7 @@ function PledgeSection({ isManager, currentUser, users }) {
             )}
             {pledge.evaluatedAt && (
               <p className="text-[11px] text-text-soft text-center">
-                تم التقييم: {new Date(pledge.evaluatedAt).toLocaleDateString('ar-SA', { day:'numeric', month:'short', year:'numeric' })}
+                تم التقييم: {new Date(pledge.evaluatedAt).toLocaleDateString('ar-SA-u-ca-gregory', { day:'numeric', month:'short', year:'numeric' })}
               </p>
             )}
           </div>

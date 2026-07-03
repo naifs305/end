@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import api from '../lib/axios';
 import Link from 'next/link';
@@ -129,7 +129,7 @@ export default function Archive() {
 
   const formatDate = (date) => {
     if (!date) return '-';
-    return new Date(date).toLocaleDateString('ar-SA');
+    return new Date(date).toLocaleDateString('ar-SA-u-ca-gregory');
   };
 
   const getStatusLabel = (status) => {
