@@ -6,6 +6,7 @@
 const prisma = require('../../../../lib/db/prisma');
 const { withAuth, withMethods } = require('../../../../lib/middleware/auth');
 const { logAudit } = require('../../../../lib/services/audit');
+const { createNotification } = require('../../../../lib/services/notifications');
 const permissions = require('../../../../lib/services/permissions');
 
 async function handler(req, res) {
@@ -65,6 +66,18 @@ async function handler(req, res) {
   await logAudit(user.id, activeRole, 'COURSE_REPORT_TOGGLED', {
     courseId: id, type, enabled, voluntary: !isManagerOrSupervisor,
   }, id);
+
+  // إشعار الموظف المسؤول عند تفعيل التقرير من قِبَل المدير/المشرف
+  if (enabled && isManagerOrSupervisor && course.primaryEmployeeId && course.primaryEmployeeId !== user.id) {
+    const reportName = type === 'opening' ? 'تقرير افتتاح الدورة' : 'تقرير اختتام الدورة';
+    await createNotification(
+      course.primaryEmployeeId,
+      'ELEMENT_ASSIGNED',
+      `تكليف جديد: ${reportName}`,
+      `تم تكليفك بتقديم "${reportName}" لدورة "${course.name}" — يُرجى الدخول على الدورة وتقديم التقرير في الموعد المحدد.`,
+      { courseId: id, elementKey: elKey },
+    );
+  }
 
   return res.status(200).json({ success: true, [field]: enabled, [voluntaryField]: updateData[voluntaryField] });
 }
