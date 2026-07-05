@@ -187,6 +187,19 @@ export default function CourseDetail() {
   const exemptedByManager = useMemo(() =>
     sortedElements.filter(el => el.status === 'NOT_APPLICABLE' && el.overriddenById), [sortedElements]);
 
+  const reportElements = useMemo(() =>
+    sortedElements.filter(el => ['opening_report','closing_report'].includes(el.element?.key)), [sortedElements]);
+
+  const toggleReport = async (type, enabled) => {
+    try {
+      await api.post(`/courses/${id}/toggle-report`, { type, enabled });
+      toast.success(enabled ? 'تم تفعيل التقرير' : 'تم إلغاء تفعيل التقرير');
+      fetchCourse();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'تعذر تغيير حالة التقرير');
+    }
+  };
+
   const toggleOptionalElement = async (trackingId, enabled) => {
     try {
       await api.post(`/courses/${id}/toggle-element`, { trackingId, enabled });
@@ -614,6 +627,40 @@ export default function CourseDetail() {
                         onChange={(e) => toggleOptionalElement(el.id, e.target.checked)}
                         className="h-4 w-4 accent-primary" />
                       <span className="text-sm font-bold text-text-main">{el.element.name}</span>
+                    </div>
+                    <Badge meta={EL_STATUS_META[el.status] || EL_STATUS_META.NOT_STARTED} small />
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── تفعيل تقارير الافتتاح والاختتام (داخلية فقط) ──────────────── */}
+        {course?.courseType === 'internal' && (isCoordinator || isApprover) && reportElements.length > 0 && (
+          <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
+            <div className="border-b border-border px-4 py-3">
+              <h2 className="font-extrabold text-text-main">📋 تقارير الافتتاح والاختتام</h2>
+              <p className="text-[11px] text-text-soft mt-0.5">فعّل التقارير التي تنطبق على هذه الدورة الداخلية</p>
+            </div>
+            <div className="p-3 space-y-2">
+              {reportElements.map((el) => {
+                const type = el.element.key === 'opening_report' ? 'opening' : 'closing';
+                const enabled = el.status !== 'NOT_APPLICABLE';
+                const locked = ['APPROVED', 'PENDING_APPROVAL'].includes(el.status);
+                return (
+                  <label key={el.id}
+                    className={`flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2.5 ${locked ? '' : 'cursor-pointer hover:bg-background'}`}>
+                    <div className="flex items-center gap-3">
+                      <input type="checkbox" checked={enabled} disabled={locked || (!isApprover && enabled)}
+                        onChange={(e) => toggleReport(type, e.target.checked)}
+                        className="h-4 w-4 accent-primary" />
+                      <div>
+                        <span className="text-sm font-bold text-text-main">{el.element.name}</span>
+                        {!isApprover && !enabled && (
+                          <p className="text-[10px] text-text-soft">تفعيله تطوّعي — يُحتسب إيجاباً في مؤشرات أدائك</p>
+                        )}
+                      </div>
                     </div>
                     <Badge meta={EL_STATUS_META[el.status] || EL_STATUS_META.NOT_STARTED} small />
                   </label>
