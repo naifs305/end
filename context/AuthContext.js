@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }) => {
       storage.setItem('activeRole', resolvedRole);
     } catch (error) {
       console.error('Session invalid - AuthContext.js', error);
-      logout(false);
+      logout(true);
     } finally {
       setLoading(false);
     }
