@@ -114,50 +114,77 @@ function CourseCard({ course }) {
 }
 
 // ======================================================================
-// شريط أخبار الموظف المتحرك
+// شريط أخبار الموظف — تصميم بطاقات أفقية
 // ======================================================================
 
-const TONE_STYLE = {
-  green:   'text-accent',
-  amber:   'text-warning',
-  red:     'text-danger',
-  primary: 'text-primary',
+const TONE_CARD = {
+  green:   { bg: 'bg-forest-50 border-accent/20',     icon_bg: 'bg-accent/10',     text: 'text-accent'   },
+  amber:   { bg: 'bg-sand/10 border-sand/30',          icon_bg: 'bg-sand/20',       text: 'text-warning'  },
+  red:     { bg: 'bg-burgundy/5 border-burgundy/20',   icon_bg: 'bg-burgundy/10',   text: 'text-danger'   },
+  primary: { bg: 'bg-primary/5 border-primary/15',     icon_bg: 'bg-primary/10',    text: 'text-primary'  },
 };
 
 function NewsTicker({ items }) {
-  const ref = useRef(null);
+  const [current, setCurrent] = useState(0);
+  const trackRef = useRef(null);
+  const timerRef = useRef(null);
 
+  // عدد البطاقات المرئية حسب حجم الشاشة
+  const VISIBLE = 3;
+
+  const goNext = () => setCurrent(c => (c + 1) % Math.max(1, items.length));
+  const goPrev = () => setCurrent(c => (c - 1 + items.length) % Math.max(1, items.length));
+
+  // تمرير تلقائي كل 4 ثوانٍ
   useEffect(() => {
-    if (!ref.current || !items.length) return;
-    const el = ref.current;
-    let pos = 0;
-    const speed = 0.6; // px per frame
-    const step = () => {
-      pos += speed;
-      if (pos >= el.scrollWidth / 2) pos = 0;
-      el.style.transform = `translateX(${pos}px)`;
-      raf = requestAnimationFrame(step);
-    };
-    let raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [items]);
+    if (items.length <= 1) return;
+    timerRef.current = setInterval(goNext, 4000);
+    return () => clearInterval(timerRef.current);
+  }, [items.length]);
 
-  if (!items.length) return null;
-
-  // نضاعف القائمة لتبدو لا نهائية
-  const doubled = [...items, ...items];
+  // العناصر المرئية (نعيد تدوير القائمة)
+  const visible = items.length
+    ? Array.from({ length: Math.min(VISIBLE, items.length) }, (_, i) => items[(current + i) % items.length])
+    : [{ id: 'empty', icon: '📋', text: 'لا توجد أحداث جديدة', tone: 'primary' }];
 
   return (
-    <div className="overflow-hidden rounded-xl border border-primary/15 bg-primary/5 py-2 select-none">
-      <div className="flex items-center gap-0" ref={ref} style={{ willChange: 'transform', display: 'flex', width: 'max-content' }}>
-        {doubled.map((item, i) => (
-          <span key={i} className={`flex shrink-0 items-center gap-1.5 px-5 text-xs font-bold ${TONE_STYLE[item.tone] || 'text-text-main'}`}>
-            <span>{item.icon}</span>
-            <span>{item.text}</span>
-            <span className="mx-3 text-border/60">◆</span>
-          </span>
-        ))}
+    <div className="flex items-stretch rounded-xl border border-border bg-white shadow-sm overflow-hidden select-none">
+      {/* علامة الشريط */}
+      <div className="shrink-0 flex items-center justify-center bg-primary px-3 w-20 text-center">
+        <span className="text-white text-[10px] font-extrabold leading-tight">📰 أخبارك</span>
       </div>
+
+      {/* البطاقات */}
+      <div className="flex flex-1 divide-x divide-x-reverse divide-border/60 overflow-hidden">
+        {visible.map((item, i) => {
+          const t = TONE_CARD[item.tone] || TONE_CARD.primary;
+          return (
+            <div
+              key={item.id + '-' + i}
+              className={`flex flex-1 items-center gap-2.5 px-3 py-2.5 border ${t.bg} transition-all duration-500 min-w-0`}
+            >
+              <div className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-sm ${t.icon_bg}`}>
+                {item.icon}
+              </div>
+              <p className={`text-xs font-bold leading-snug line-clamp-2 ${t.text}`}>{item.text}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* أزرار التنقل */}
+      {items.length > VISIBLE && (
+        <div className="shrink-0 flex flex-col border-r border-border divide-y divide-border">
+          <button
+            onClick={goPrev}
+            className="flex-1 px-2.5 text-text-soft hover:bg-background hover:text-primary transition text-xs font-extrabold"
+          >▶</button>
+          <button
+            onClick={goNext}
+            className="flex-1 px-2.5 text-text-soft hover:bg-background hover:text-primary transition text-xs font-extrabold"
+          >◀</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -446,7 +473,7 @@ export default function Home() {
         </div>
 
         {/* ── شريط الأخبار — موظف فقط ── */}
-        {isEmployee && ticker.tickerItems.length > 0 && (
+        {isEmployee && (
           <NewsTicker items={ticker.tickerItems} />
         )}
 
