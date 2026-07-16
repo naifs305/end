@@ -629,3 +629,4 @@ model MonthlyPledge {
   @@index([userId])
   @@index([periodLabel])
 }
+

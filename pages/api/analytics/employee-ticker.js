@@ -67,8 +67,16 @@ async function handler(req, res) {
       take: 15,
     });
 
-    // الخطوة ٤: رسائل المدير + لقطة الأداء
-    const [notifications, kpiSnapshot] = await Promise.all([
+    // الخطوة ٤: عدد المكتملة في الدورات النشطة
+    const completedCount = activeCourseIds.length > 0
+      ? await prisma.courseClosureTracking.count({
+          where: { courseId: { in: activeCourseIds }, status: 'APPROVED' },
+        })
+      : 0;
+
+    // الخطوة ٥: رسائل المدير + تعاميم + لقطة الأداء
+    const now2 = new Date();
+    const [notifications, announcements, kpiSnapshot] = await Promise.all([
       prisma.notification.findMany({
         where: {
           userId,
@@ -78,6 +86,12 @@ async function handler(req, res) {
         select: { id: true, type: true, title: true, message: true, createdAt: true },
         orderBy: { createdAt: 'desc' },
         take: 5,
+      }),
+      prisma.notification.findMany({
+        where: { type: 'TICKER_ANNOUNCEMENT' },
+        select: { id: true, message: true, metadata: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
       }),
       prisma.employeeKpiSnapshot.findUnique({
         where: { userId_periodType_periodLabel: { userId, periodType: 'MONTHLY', periodLabel } },
@@ -103,6 +117,19 @@ async function handler(req, res) {
 
     // ── بناء بنود الشريط ──
     const tickerItems = [];
+
+    // ٠. التعاميم — تُعرض أولاً لجميع المستخدمين
+    for (const a of announcements) {
+      const exp = a.metadata?.expiresAt;
+      if (exp && new Date(exp) < now2) continue; // منتهية
+      tickerItems.push({
+        id: `ann-${a.id}`,
+        icon: a.metadata?.icon || '📢',
+        text: a.message,
+        tone: a.metadata?.tone || 'primary',
+        isAnnouncement: true,
+      });
+    }
 
     // ١. رسائل المدير — الأعلى أولوية
     for (const n of notifications) {
@@ -154,7 +181,17 @@ async function handler(req, res) {
       }
     }
 
-    // ٥. درجة الأداء أو ترحيب
+    // ٥. بطاقة الإحصائيات الشاملة (مكتملة + غير مكتملة)
+    const totalElements = completedCount + totalPending;
+    const completionPct = totalElements > 0 ? Math.round((completedCount / totalElements) * 100) : 100;
+    tickerItems.push({
+      id: 'elements-summary',
+      icon: completionPct === 100 ? '🎯' : completionPct >= 70 ? '📈' : '📋',
+      text: `عناصرك: ${completedCount} مكتملة ✅ · ${totalPending} غير مكتملة ⏳ · ${completionPct}% إنجاز`,
+      tone: completionPct === 100 ? 'green' : completionPct >= 70 ? 'primary' : 'amber',
+    });
+
+    // ٦. درجة الأداء
     if (kpiSnapshot?.finalScore != null) {
       const score = Number(kpiSnapshot.finalScore).toFixed(1);
       const perfIcon = score >= 90 ? '🏆' : score >= 80 ? '🌟' : score >= 60 ? '📊' : '📉';
@@ -165,7 +202,7 @@ async function handler(req, res) {
         tone: score >= 80 ? 'green' : score >= 60 ? 'amber' : 'red',
       });
     } else {
-      tickerItems.push({ id: 'welcome', icon: '👋', text: 'مرحباً — تابع دوراتك ومهامك من هنا', tone: 'primary' });
+      tickerItems.push({ id: 'welcome', icon: '👋', text: 'مرحباً — تابع إنجازاتك ودوراتك', tone: 'primary' });
     }
 
     // ── بناء لوحة العناصر بالأولوية ──

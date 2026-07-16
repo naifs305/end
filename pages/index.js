@@ -114,77 +114,70 @@ function CourseCard({ course }) {
 }
 
 // ======================================================================
-// شريط أخبار الموظف — تصميم بطاقات أفقية
+// شريط أخبار متحرك — marquee حقيقي
 // ======================================================================
 
-const TONE_CARD = {
-  green:   { bg: 'bg-forest-50 border-accent/20',     icon_bg: 'bg-accent/10',     text: 'text-accent'   },
-  amber:   { bg: 'bg-sand/10 border-sand/30',          icon_bg: 'bg-sand/20',       text: 'text-warning'  },
-  red:     { bg: 'bg-burgundy/5 border-burgundy/20',   icon_bg: 'bg-burgundy/10',   text: 'text-danger'   },
-  primary: { bg: 'bg-primary/5 border-primary/15',     icon_bg: 'bg-primary/10',    text: 'text-primary'  },
+const TONE_TEXT = {
+  green:   'text-accent',
+  amber:   'text-warning',
+  red:     'text-danger',
+  primary: 'text-primary',
+};
+const TONE_SEP = {
+  green:   'text-accent/40',
+  amber:   'text-warning/40',
+  red:     'text-danger/40',
+  primary: 'text-primary/40',
 };
 
 function NewsTicker({ items }) {
-  const [current, setCurrent] = useState(0);
-  const trackRef = useRef(null);
-  const timerRef = useRef(null);
-
-  // عدد البطاقات المرئية حسب حجم الشاشة
-  const VISIBLE = 3;
-
-  const goNext = () => setCurrent(c => (c + 1) % Math.max(1, items.length));
-  const goPrev = () => setCurrent(c => (c - 1 + items.length) % Math.max(1, items.length));
-
-  // تمرير تلقائي كل 4 ثوانٍ
-  useEffect(() => {
-    if (items.length <= 1) return;
-    timerRef.current = setInterval(goNext, 4000);
-    return () => clearInterval(timerRef.current);
-  }, [items.length]);
-
-  // العناصر المرئية (نعيد تدوير القائمة)
-  const visible = items.length
-    ? Array.from({ length: Math.min(VISIBLE, items.length) }, (_, i) => items[(current + i) % items.length])
+  const list = items.length
+    ? items
     : [{ id: 'empty', icon: '📋', text: 'لا توجد أحداث جديدة', tone: 'primary' }];
 
+  // نكرر القائمة 3 مرات لضمان تمرير سلس لا نهائي
+  const track = [...list, ...list, ...list];
+  // سرعة التمرير: كل بند يأخذ ~5 ثانية
+  const duration = list.length * 5;
+
   return (
-    <div className="flex items-stretch rounded-xl border border-border bg-white shadow-sm overflow-hidden select-none">
+    <div className="flex items-stretch rounded-xl border border-border bg-white shadow-sm overflow-hidden select-none" style={{ height: 44 }}>
       {/* علامة الشريط */}
-      <div className="shrink-0 flex items-center justify-center bg-primary px-3 w-20 text-center">
-        <span className="text-white text-[10px] font-extrabold leading-tight">📰 أخبارك</span>
+      <div className="shrink-0 flex items-center justify-center bg-primary px-4 gap-1.5" style={{ minWidth: 88 }}>
+        <span className="text-white text-base">📰</span>
+        <span className="text-white text-[10px] font-extrabold leading-tight">أخبارك</span>
       </div>
 
-      {/* البطاقات */}
-      <div className="flex flex-1 divide-x divide-x-reverse divide-border/60 overflow-hidden">
-        {visible.map((item, i) => {
-          const t = TONE_CARD[item.tone] || TONE_CARD.primary;
-          return (
-            <div
-              key={item.id + '-' + i}
-              className={`flex flex-1 items-center gap-2.5 px-3 py-2.5 border ${t.bg} transition-all duration-500 min-w-0`}
-            >
-              <div className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-sm ${t.icon_bg}`}>
-                {item.icon}
-              </div>
-              <p className={`text-xs font-bold leading-snug line-clamp-2 ${t.text}`}>{item.text}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* أزرار التنقل */}
-      {items.length > VISIBLE && (
-        <div className="shrink-0 flex flex-col border-r border-border divide-y divide-border">
-          <button
-            onClick={goPrev}
-            className="flex-1 px-2.5 text-text-soft hover:bg-background hover:text-primary transition text-xs font-extrabold"
-          >▶</button>
-          <button
-            onClick={goNext}
-            className="flex-1 px-2.5 text-text-soft hover:bg-background hover:text-primary transition text-xs font-extrabold"
-          >◀</button>
+      {/* منطقة التمرير */}
+      <div className="flex-1 overflow-hidden relative">
+        <style>{`
+          @keyframes ticker-rtl {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(50%); }
+          }
+          .ticker-track {
+            display: flex;
+            align-items: center;
+            width: max-content;
+            animation: ticker-rtl ${duration}s linear infinite;
+            direction: rtl;
+          }
+          .ticker-track:hover { animation-play-state: paused; }
+        `}</style>
+        <div className="ticker-track h-full">
+          {track.map((item, i) => {
+            const tc = TONE_TEXT[item.tone] || TONE_TEXT.primary;
+            const sc = TONE_SEP[item.tone] || TONE_SEP.primary;
+            return (
+              <span key={`${item.id}-${i}`} className="flex items-center gap-2 px-4 whitespace-nowrap">
+                <span className="text-sm">{item.icon}</span>
+                <span className={`text-xs font-bold ${tc}`}>{item.text}</span>
+                <span className={`mx-2 text-sm font-light ${sc}`}>◆</span>
+              </span>
+            );
+          })}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -329,6 +322,14 @@ export default function Home() {
   const [pageLoad, setPageLoad]       = useState(true);
   const [teamPeriod, setTeamPeriod]   = useState('current');
   const [ticker, setTicker]           = useState({ tickerItems: [], pendingElements: [] });
+  // تعاميم الشريط — للمدير
+  const [announcements, setAnnouncements] = useState([]);
+  const [annText, setAnnText]             = useState('');
+  const [annIcon, setAnnIcon]             = useState('📢');
+  const [annTone, setAnnTone]             = useState('primary');
+  const [annExpiry, setAnnExpiry]         = useState('');
+  const [annSaving, setAnnSaving]         = useState(false);
+  const [annLoaded, setAnnLoaded]         = useState(false);
 
   useEffect(() => { if (!loading && !user) router.replace('/login'); }, [loading, user, router]);
 
@@ -345,6 +346,12 @@ export default function Home() {
       api.get('/analytics/employee-ticker')
         .then(r => setTicker(r.data || { tickerItems: [], pendingElements: [] }))
         .catch(() => {});
+    }
+    // تعاميم الشريط — للمدير والمشرف
+    if (isAdmin || isSupervisor) {
+      api.get('/announcements')
+        .then(r => { setAnnouncements(r.data || []); setAnnLoaded(true); })
+        .catch(() => setAnnLoaded(true));
     }
   }, [user, activeRole, isAdmin, isSupervisor]);
 
@@ -421,6 +428,27 @@ export default function Home() {
     </MainLayout>
   );
 
+  // ── إضافة تعميم ──
+  async function addAnnouncement(e) {
+    e.preventDefault();
+    if (!annText.trim()) return;
+    setAnnSaving(true);
+    try {
+      const res = await api.post('/announcements', {
+        content: annText.trim(), icon: annIcon, tone: annTone,
+        expiresAt: annExpiry || null,
+      });
+      setAnnouncements(prev => [res.data, ...prev]);
+      setAnnText(''); setAnnExpiry('');
+    } catch {}
+    setAnnSaving(false);
+  }
+
+  async function deleteAnnouncement(id) {
+    await api.delete(`/announcements?id=${id}`).catch(() => {});
+    setAnnouncements(prev => prev.filter(a => a.id !== id));
+  }
+
   const now     = new Date();
   const month   = now.toLocaleString('ar-SA-u-ca-gregory', { month: 'long' });
   const year    = now.getFullYear();
@@ -472,9 +500,15 @@ export default function Home() {
           <div className="pointer-events-none absolute -top-6 left-1/3 h-24 w-24 rounded-full bg-white/5" />
         </div>
 
-        {/* ── شريط الأخبار — موظف فقط ── */}
-        {isEmployee && (
-          <NewsTicker items={ticker.tickerItems} />
+        {/* ── شريط الأخبار ── */}
+        {isEmployee && <NewsTicker items={ticker.tickerItems} />}
+        {(isAdmin || isSupervisor) && announcements.length > 0 && (
+          <NewsTicker items={announcements.map(a => ({
+            id: a.id,
+            icon: a.metadata?.icon || '📢',
+            text: a.message,
+            tone: a.metadata?.tone || 'primary',
+          }))} />
         )}
 
         {/* ── Stat Cards ── */}
@@ -686,6 +720,84 @@ export default function Home() {
             </div>
             {/* لوحة العناصر المعلّقة — على اليسار (ثاني عمود في RTL) */}
             <PendingElementsPanel elements={ticker.pendingElements} />
+          </div>
+        )}
+
+        {/* ── المدير: إدارة تعاميم الشريط ── */}
+        {isAdmin && (
+          <div className="overflow-hidden rounded-2xl border border-primary/20 bg-white shadow-card">
+            <div className="flex items-center gap-3 border-b border-border px-5 py-3.5">
+              <span className="text-xl">📣</span>
+              <div>
+                <h3 className="font-extrabold text-text-main">تعاميم شريط الأخبار</h3>
+                <p className="text-[11px] text-text-soft mt-0.5">تظهر للجميع في شريط الأخبار أعلى الصفحة</p>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* نموذج إضافة تعميم */}
+              <form onSubmit={addAnnouncement} className="flex flex-wrap gap-2 items-end">
+                {/* الأيقونة */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-text-soft">أيقونة</label>
+                  <select value={annIcon} onChange={e => setAnnIcon(e.target.value)}
+                    className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                    {['📢','🔔','⚠️','🚨','✅','📌','🎯','💡','🏆','📅','🚀','❗'].map(ic => (
+                      <option key={ic} value={ic}>{ic}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* اللون */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-text-soft">النوع</label>
+                  <select value={annTone} onChange={e => setAnnTone(e.target.value)}
+                    className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                    <option value="primary">عام 🔵</option>
+                    <option value="green">إيجابي 🟢</option>
+                    <option value="amber">تنبيه 🟡</option>
+                    <option value="red">تحذير 🔴</option>
+                  </select>
+                </div>
+                {/* النص */}
+                <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+                  <label className="text-[10px] font-bold text-text-soft">نص التعميم</label>
+                  <input value={annText} onChange={e => setAnnText(e.target.value)}
+                    placeholder="اكتب نص التعميم هنا..."
+                    className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary w-full" />
+                </div>
+                {/* تاريخ الانتهاء */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-text-soft">ينتهي في (اختياري)</label>
+                  <input type="date" value={annExpiry} onChange={e => setAnnExpiry(e.target.value)}
+                    className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                </div>
+                <button type="submit" disabled={annSaving || !annText.trim()}
+                  className="rounded-xl bg-primary px-4 py-1.5 text-sm font-bold text-white hover:bg-primary-dark transition disabled:opacity-50 shrink-0">
+                  {annSaving ? '...' : '+ نشر'}
+                </button>
+              </form>
+
+              {/* قائمة التعاميم الحالية */}
+              {annLoaded && announcements.length > 0 && (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {announcements.map(a => (
+                    <div key={a.id} className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
+                      <span className="text-base shrink-0">{a.metadata?.icon || '📢'}</span>
+                      <p className="flex-1 text-xs text-text-main truncate">{a.message}</p>
+                      {a.metadata?.expiresAt && (
+                        <span className="text-[10px] text-text-soft shrink-0">
+                          ينتهي {new Date(a.metadata.expiresAt).toLocaleDateString('ar-SA-u-ca-gregory')}
+                        </span>
+                      )}
+                      <button onClick={() => deleteAnnouncement(a.id)}
+                        className="shrink-0 text-danger hover:text-danger/80 text-xs font-bold px-1">✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {annLoaded && announcements.length === 0 && (
+                <p className="text-xs text-text-soft text-center py-2">لا توجد تعاميم نشطة — أضف أول تعميم</p>
+              )}
+            </div>
           </div>
         )}
 
