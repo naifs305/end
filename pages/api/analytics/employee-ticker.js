@@ -85,23 +85,15 @@ async function handler(req, res) {
       }),
     ]);
 
-    // ── بناء بنود الشريط ──
-    const tickerItems = [];
+    // ── تحليل العناصر ──
+    const totalPending   = pendingElements.length;
+    const returned       = pendingElements.filter(e => e.status === 'RETURNED').length;
+    const rejected       = pendingElements.filter(e => e.status === 'REJECTED').length;
+    const pendingApproval= pendingElements.filter(e => e.status === 'PENDING_APPROVAL').length;
+    const notStarted     = pendingElements.filter(e => e.status === 'NOT_STARTED').length;
+    const criticalCount  = pendingElements.filter(e => e.element?.isCritical).length;
 
-    // رسائل المدير
-    for (const n of notifications) {
-      const icons = { MANAGER_WARNING: '🚨', MANAGER_REMINDER: '🔔', MANAGER_INQUIRY: '💬' };
-      tickerItems.push({
-        id: n.id, icon: icons[n.type] || '📩',
-        text: `${n.title}: ${n.message}`,
-        tone: n.type === 'MANAGER_WARNING' ? 'red' : n.type === 'MANAGER_REMINDER' ? 'amber' : 'primary',
-      });
-    }
-
-    // تنبيهات العناصر المتأخرة والمُعادة والمرفوضة
-    const returned = pendingElements.filter(e => e.status === 'RETURNED').length;
-    const rejected = pendingElements.filter(e => e.status === 'REJECTED').length;
-    const overdue  = pendingElements.filter(e => {
+    const overdue = pendingElements.filter(e => {
       if (!e.element?.deadlineMaxHours) return false;
       const course = courseMap[e.courseId];
       if (!course) return false;
@@ -109,32 +101,71 @@ async function handler(req, res) {
       return (now - new Date(ref.getTime() + e.element.deadlineMaxHours * 3600000)) > 0;
     }).length;
 
-    if (overdue > 0)  tickerItems.unshift({ id: 'overdue',  icon: '🔴', text: `لديك ${overdue} عنصر تجاوز الموعد الأقصى`, tone: 'red' });
-    if (returned > 0) tickerItems.unshift({ id: 'returned', icon: '↩',  text: `لديك ${returned} عنصر مُعاد يحتاج إعادة تقديم`, tone: 'amber' });
-    if (rejected > 0) tickerItems.unshift({ id: 'rejected', icon: '❌', text: `لديك ${rejected} عنصر مرفوض — راجع سبب الرفض`, tone: 'red' });
+    // ── بناء بنود الشريط ──
+    const tickerItems = [];
 
-    // آخر الأحداث
+    // ١. رسائل المدير — الأعلى أولوية
+    for (const n of notifications) {
+      const META = {
+        MANAGER_WARNING: { icon: '🚨', tone: 'red' },
+        MANAGER_REMINDER:{ icon: '🔔', tone: 'amber' },
+        MANAGER_INQUIRY: { icon: '💬', tone: 'primary' },
+      };
+      const m = META[n.type] || { icon: '📩', tone: 'primary' };
+      tickerItems.push({ id: n.id, icon: m.icon, text: `${n.title}: ${n.message}`, tone: m.tone });
+    }
+
+    // ٢. إجمالي العناصر غير المكتملة — بند رئيسي دائم
+    if (totalPending > 0) {
+      const breakdown = [
+        notStarted      > 0 ? `${notStarted} لم تبدأ` : '',
+        returned        > 0 ? `${returned} مُعادة` : '',
+        rejected        > 0 ? `${rejected} مرفوضة` : '',
+        pendingApproval > 0 ? `${pendingApproval} تنتظر اعتماد` : '',
+      ].filter(Boolean).join(' · ');
+
+      const urgentIcon = overdue > 0 ? '🔥' : criticalCount > 0 ? '⚡' : '📋';
+      const tone = overdue > 0 ? 'red' : returned > 0 || rejected > 0 ? 'amber' : 'primary';
+      tickerItems.push({
+        id: 'total-pending',
+        icon: urgentIcon,
+        text: `لديك ${totalPending} عنصر غير مكتمل${breakdown ? ' — ' + breakdown : ''}`,
+        tone,
+      });
+    } else {
+      tickerItems.push({ id: 'all-done', icon: '🎉', text: 'رائع! جميع عناصرك مكتملة في دوراتك النشطة', tone: 'green' });
+    }
+
+    // ٣. تنبيهات حرجة مفصّلة
+    if (overdue > 0)  tickerItems.unshift({ id: 'overdue',  icon: '⏰', text: `تنبيه: ${overdue} عنصر تجاوز الموعد الأقصى — تصرّف الآن`, tone: 'red' });
+    if (returned > 0) tickerItems.push({ id: 'returned', icon: '↩️',  text: `${returned} عنصر مُعاد يحتاج مراجعة وإعادة تقديم`, tone: 'amber' });
+    if (rejected > 0) tickerItems.push({ id: 'rejected', icon: '🚫', text: `${rejected} عنصر مرفوض — راجع سبب الرفض وتواصل مع المشرف`, tone: 'red' });
+    if (criticalCount > 0 && overdue === 0) tickerItems.push({ id: 'critical', icon: '⚡', text: `${criticalCount} عنصر حرج ينتظر تقديمك — أولوية قصوى`, tone: 'red' });
+    if (pendingApproval > 0) tickerItems.push({ id: 'pending-appr', icon: '🕐', text: `${pendingApproval} عنصر بانتظار اعتماد المشرف`, tone: 'primary' });
+
+    // ٤. آخر الأحداث
     for (const t of recentTracking) {
       if (t.status === 'APPROVED') {
-        tickerItems.push({ id: `tr-${t.id}`, icon: '✅', text: `تم اعتماد "${t.element?.name}" — ${t.course?.name}`, tone: 'green' });
+        tickerItems.push({ id: `tr-${t.id}`, icon: '✅', text: `اعتُمد "${t.element?.name}" — ${t.course?.name}`, tone: 'green' });
       } else if (t.status === 'RETURNED') {
-        tickerItems.push({ id: `tr-${t.id}`, icon: '↩', text: `أُعيد "${t.element?.name}" للمراجعة — ${t.course?.name}`, tone: 'amber' });
+        tickerItems.push({ id: `tr-${t.id}`, icon: '↩️', text: `أُعيد "${t.element?.name}" للمراجعة — ${t.course?.name}`, tone: 'amber' });
       } else if (t.status === 'REJECTED') {
-        tickerItems.push({ id: `tr-${t.id}`, icon: '❌', text: `رُفض "${t.element?.name}" — ${t.course?.name}`, tone: 'red' });
+        tickerItems.push({ id: `tr-${t.id}`, icon: '🚫', text: `رُفض "${t.element?.name}" — ${t.course?.name}`, tone: 'red' });
       }
     }
 
-    // بند ثابت: درجة الأداء أو ترحيب
+    // ٥. درجة الأداء أو ترحيب
     if (kpiSnapshot?.finalScore != null) {
       const score = Number(kpiSnapshot.finalScore).toFixed(1);
+      const perfIcon = score >= 90 ? '🏆' : score >= 80 ? '🌟' : score >= 60 ? '📊' : '📉';
       tickerItems.push({
         id: 'kpi-score',
-        icon: score >= 80 ? '🌟' : score >= 60 ? '📊' : '📉',
-        text: `درجتك هذا الشهر: ${score}% — جودة: ${Number(kpiSnapshot.qualityScore || 0).toFixed(1)}% — إنتاجية: ${Number(kpiSnapshot.productivityScore || 0).toFixed(1)}%`,
+        icon: perfIcon,
+        text: `درجتك هذا الشهر: ${score}% — جودة: ${Number(kpiSnapshot.qualityScore || 0).toFixed(1)}% · إنتاجية: ${Number(kpiSnapshot.productivityScore || 0).toFixed(1)}%`,
         tone: score >= 80 ? 'green' : score >= 60 ? 'amber' : 'red',
       });
     } else {
-      tickerItems.push({ id: 'welcome', icon: '👋', text: 'مرحباً — هنا تظهر آخر أحداثك وإشعارات مؤشرات الأداء', tone: 'primary' });
+      tickerItems.push({ id: 'welcome', icon: '👋', text: 'مرحباً — تابع دوراتك ومهامك من هنا', tone: 'primary' });
     }
 
     // ── بناء لوحة العناصر بالأولوية ──
