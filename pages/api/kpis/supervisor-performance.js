@@ -68,23 +68,77 @@ async function handler(req, res) {
     }
   }
 
-  const result = Array.from(map.values()).map(s => ({
-    userId:       s.userId,
-    name:         s.name,
-    roles:        s.roles,
-    totalDecisions: s.total,
-    approved:     s.approved,
-    returned:     s.returned,
-    rejected:     s.rejected,
-    approvalRate: s.total ? Math.round((s.approved / s.total) * 100) : 0,
-    avgResponseHours: s.decidedCount ? Math.round(s.totalWaitHours / s.decidedCount * 10) / 10 : null,
-    responsiveness: s.decidedCount
-      ? s.totalWaitHours / s.decidedCount < 8  ? 'سريع جداً'
-      : s.totalWaitHours / s.decidedCount < 24 ? 'مقبول'
-      : s.totalWaitHours / s.decidedCount < 48 ? 'بطيء'
-      : 'متأخر'
-      : '-',
-  })).sort((a, b) => (a.avgResponseHours ?? 999) - (b.avgResponseHours ?? 999));
+  // ── العناصر المعلّقة (PENDING_APPROVAL) لكل مشرف ──
+  const allSupervisors = await prisma.projectSupervisor.findMany({
+    select: { userId: true, operationalProjectId: true },
+  });
+  const supervisorProjects = new Map();
+  for (const s of allSupervisors) {
+    const arr = supervisorProjects.get(s.userId) || [];
+    arr.push(s.operationalProjectId);
+    supervisorProjects.set(s.userId, arr);
+  }
+
+  // جمع كل الموظفين حسب المشروع
+  const allEmployees = await prisma.user.findMany({
+    where: { isActive: true, roles: { has: 'EMPLOYEE' } },
+    select: { id: true, operationalProjectId: true },
+  });
+  const employeesByProject = new Map();
+  for (const e of allEmployees) {
+    const arr = employeesByProject.get(e.operationalProjectId) || [];
+    arr.push(e.id);
+    employeesByProject.set(e.operationalProjectId, arr);
+  }
+
+  // العناصر المعلّقة الآن
+  const now = new Date();
+  const pendingAll = await prisma.courseClosureTracking.findMany({
+    where: { status: 'PENDING_APPROVAL' },
+    select: { executedById: true, executionAt: true },
+  });
+
+  // بناء خريطة الموظف → المشاريع
+  const employeeProjectMap = new Map(allEmployees.map(e => [e.id, e.operationalProjectId]));
+
+  // حساب العناصر المعلّقة لكل مشرف
+  const pendingBySupId = new Map();
+  for (const p of pendingAll) {
+    const projId = employeeProjectMap.get(p.executedById);
+    if (!projId) continue;
+    for (const [supId, projIds] of supervisorProjects) {
+      if (projIds.includes(projId)) {
+        const entry = pendingBySupId.get(supId) || { total: 0, urgent: 0 };
+        entry.total++;
+        const ageHours = p.executionAt ? (now - new Date(p.executionAt)) / 3600000 : 0;
+        if (ageHours >= 72) entry.urgent++;
+        pendingBySupId.set(supId, entry);
+      }
+    }
+  }
+
+  const result = Array.from(map.values()).map(s => {
+    const avg = s.decidedCount ? s.totalWaitHours / s.decidedCount : null;
+    const pending = pendingBySupId.get(s.userId) || { total: 0, urgent: 0 };
+    return {
+      userId:       s.userId,
+      name:         s.name,
+      roles:        s.roles,
+      totalDecisions: s.total,
+      approved:     s.approved,
+      returned:     s.returned,
+      rejected:     s.rejected,
+      approvalRate: s.total ? Math.round((s.approved / s.total) * 100) : 0,
+      avgResponseHours: avg != null ? Math.round(avg * 10) / 10 : null,
+      responsiveness: avg == null ? '-'
+        : avg < 8  ? 'سريع جداً'
+        : avg < 24 ? 'مقبول'
+        : avg < 48 ? 'بطيء'
+        : 'متأخر',
+      pendingTotal:  pending.total,
+      pendingUrgent: pending.urgent,
+    };
+  }).sort((a, b) => (a.avgResponseHours ?? 999) - (b.avgResponseHours ?? 999));
 
   return res.status(200).json(result);
 }

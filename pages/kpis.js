@@ -1214,6 +1214,9 @@ export default function KpisPage() {
           </div>
         )}
 
+        {/* ══════ لوحة أداء المشرف الذاتية ══════ */}
+        {isSupervisor && !isManager && <MySupervisorStats />}
+
         {/* ══════ تقرير المشرفين + سجل الإسناد — مدير فقط ══════ */}
         {isManager && <SupervisorReport periodLabel={periodLabel} />}
         {isManager && <AssignmentSection periodLabel={periodLabel} year={year} month={month} />}
@@ -1276,7 +1279,7 @@ function SupervisorReport({ periodLabel }) {
               <table className="min-w-full text-xs">
                 <thead className="bg-background text-text-soft">
                   <tr>
-                    {['المشرف', 'إجمالي البت', 'معتمد', 'مُعاد', 'مرفوض', 'معدل الاعتماد', 'متوسط وقت البت', 'التقييم'].map(h => (
+                    {['المشرف', 'إجمالي البت', 'معتمد', 'مُعاد', 'مرفوض', 'معدل الاعتماد', 'متوسط وقت البت', 'التقييم', 'معلّق عاجل 🔴'].map(h => (
                       <th key={h} className="px-3 py-2.5 text-right font-bold">{h}</th>
                     ))}
                   </tr>
@@ -1303,6 +1306,19 @@ function SupervisorReport({ periodLabel }) {
                           {s.responsiveness || '—'}
                         </span>
                       </td>
+                      <td className="px-3 py-2.5 text-center">
+                        {s.pendingUrgent > 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-burgundy/10 border border-burgundy/30 px-2 py-0.5 text-[10px] font-extrabold text-danger">
+                            🔴 {s.pendingUrgent}
+                          </span>
+                        ) : s.pendingTotal > 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-sand/10 border border-sand/40 px-2 py-0.5 text-[10px] font-bold text-warning">
+                            ⏳ {s.pendingTotal}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-accent font-bold">✅</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1311,6 +1327,133 @@ function SupervisorReport({ periodLabel }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── لوحة أداء المشرف الذاتية ────────────────────────────────────────────────
+
+function MySupervisorStats() {
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/kpis/my-supervisor-stats')
+      .then(r => setData(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return (
+    <div className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-8 shadow-card text-sm text-text-soft">
+      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      جاري تحميل إحصائياتك...
+    </div>
+  );
+
+  if (!data) return null;
+
+  const RESP_STYLE = {
+    'سريع جداً': { bg: 'bg-forest-50 border-forest-200', text: 'text-accent',   icon: '⚡' },
+    'مقبول':     { bg: 'bg-primary-light border-primary/20', text: 'text-primary', icon: '✅' },
+    'بطيء':      { bg: 'bg-sand/20 border-sand/50',         text: 'text-warning', icon: '⏳' },
+    'متأخر':     { bg: 'bg-burgundy/10 border-burgundy/30', text: 'text-danger',  icon: '🔴' },
+  };
+  const resp = RESP_STYLE[data.responsiveness] || { bg: 'bg-background border-border', text: 'text-text-soft', icon: '—' };
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-primary/20 bg-white shadow-card">
+      {/* الرأس */}
+      <div className="flex items-center justify-between border-b border-border bg-gradient-to-l from-primary/5 to-white px-5 py-3.5">
+        <div>
+          <h3 className="font-extrabold text-text-main">📋 لوحة أدائك كمشرف</h3>
+          <p className="text-[10px] text-text-soft mt-0.5">مدى سرعتك في البت بعناصر فريقك</p>
+        </div>
+        {data.responsiveness && (
+          <span className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-extrabold ${resp.bg} ${resp.text}`}>
+            {resp.icon} {data.responsiveness}
+          </span>
+        )}
+      </div>
+
+      <div className="p-5 space-y-4">
+
+        {/* تنبيه العناصر العاجلة */}
+        {data.urgentCount > 0 && (
+          <div className="flex items-start gap-3 rounded-2xl border border-burgundy/30 bg-burgundy/8 px-4 py-3.5">
+            <span className="text-2xl shrink-0 mt-0.5">🔴</span>
+            <div>
+              <p className="font-extrabold text-danger text-sm">
+                {data.urgentCount} عنصر ينتظر بتّك منذ أكثر من 3 أيام!
+              </p>
+              <p className="text-xs text-danger/70 mt-0.5">
+                هذا التأخر يؤثر سلباً على سير العمل — يُنصح بمراجعتها الآن
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* إشعار معتدل */}
+        {data.urgentCount === 0 && data.moderateCount > 0 && (
+          <div className="flex items-start gap-3 rounded-2xl border border-sand/50 bg-sand/10 px-4 py-3.5">
+            <span className="text-2xl shrink-0 mt-0.5">⏳</span>
+            <div>
+              <p className="font-extrabold text-warning text-sm">
+                {data.moderateCount} عنصر بانتظار بتّك (بين يوم و3 أيام)
+              </p>
+              <p className="text-xs text-warning/70 mt-0.5">راجعها قريباً قبل أن تصبح عاجلة</p>
+            </div>
+          </div>
+        )}
+
+        {/* حالة جيدة */}
+        {data.pendingTotal === 0 && (
+          <div className="flex items-center gap-3 rounded-2xl border border-forest-200 bg-forest-50 px-4 py-3.5">
+            <span className="text-2xl">✅</span>
+            <p className="font-extrabold text-accent text-sm">أحسنت! لا توجد عناصر معلّقة بانتظار بتّك</p>
+          </div>
+        )}
+
+        {/* الإحصائيات الأربع */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: 'إجمالي بتّاتك',    val: data.totalDecisions,  color: 'text-primary' },
+            { label: 'معتمدة',            val: data.approved,        color: 'text-accent' },
+            { label: 'معلّقة الآن',       val: data.pendingTotal,    color: data.pendingTotal > 0 ? 'text-warning' : 'text-text-soft' },
+            { label: 'متوسط وقت البت',   val: data.avgResponseHours != null ? fmtDur(data.avgResponseHours) : '—', color: 'text-text-main' },
+          ].map(c => (
+            <div key={c.label} className="rounded-xl border border-border bg-background p-3 text-center">
+              <p className="text-[10px] text-text-soft mb-0.5">{c.label}</p>
+              <p className={`text-xl font-extrabold ${c.color}`}>{c.val}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* العناصر العاجلة */}
+        {data.urgentItems?.length > 0 && (
+          <div>
+            <h4 className="mb-2 text-xs font-extrabold text-danger uppercase tracking-wide">
+              🔴 عناصر عاجلة — تحتاج بتّك فوراً
+            </h4>
+            <div className="space-y-1.5">
+              {data.urgentItems.map(item => (
+                <div key={item.id} className="flex items-center justify-between rounded-xl border border-burgundy/20 bg-burgundy/5 px-3.5 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-text-main truncate">
+                      {item.executedBy?.firstName} {item.executedBy?.lastName}
+                      <span className="text-text-soft font-normal"> · {item.element?.name}</span>
+                    </p>
+                    <p className="text-[10px] text-text-soft truncate">{item.course?.name}</p>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-extrabold text-danger bg-burgundy/10 rounded-full px-2 py-0.5">
+                    منذ {fmtDur(item.ageHours)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
