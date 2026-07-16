@@ -13,7 +13,10 @@ async function handler(req, res) {
     ],
   };
 
-  const [recentTracking, pendingElements, notifications] = await Promise.all([
+  const now2 = new Date();
+  const periodLabel = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}`;
+
+  const [recentTracking, pendingElements, notifications, kpiSnapshot] = await Promise.all([
     // آخر 15 حدث في عناصر الإقفال (معتمد أو مُعاد)
     prisma.courseClosureTracking.findMany({
       where: {
@@ -65,6 +68,11 @@ async function handler(req, res) {
       select: { id: true, type: true, title: true, message: true, metadata: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
       take: 5,
+    }),
+    // لقطة الأداء الشهري
+    prisma.employeeKpiSnapshot.findUnique({
+      where: { userId_periodType_periodLabel: { userId, periodType: 'MONTHLY', periodLabel } },
+      select: { finalScore: true, qualityScore: true, productivityScore: true },
     }),
   ]);
 
@@ -134,6 +142,28 @@ async function handler(req, res) {
         at: new Date(),
       });
     }
+  }
+
+  // بند ثابت: درجة الأداء الشهري (يضمن ظهور الشريط دائماً)
+  if (kpiSnapshot?.finalScore != null) {
+    const score = Number(kpiSnapshot.finalScore).toFixed(1);
+    const icon = score >= 80 ? '🌟' : score >= 60 ? '📊' : '📉';
+    tickerItems.push({
+      id: 'kpi-score',
+      icon,
+      text: `درجتك هذا الشهر: ${score}% — جودة: ${Number(kpiSnapshot.qualityScore || 0).toFixed(1)}% — إنتاجية: ${Number(kpiSnapshot.productivityScore || 0).toFixed(1)}%`,
+      tone: score >= 80 ? 'green' : score >= 60 ? 'amber' : 'red',
+      at: new Date(),
+    });
+  } else {
+    // لا توجد درجة بعد — بند ثابت للترحيب
+    tickerItems.push({
+      id: 'welcome',
+      icon: '👋',
+      text: 'مرحباً — هنا تظهر آخر أحداثك وإشعارات مؤشرات الأداء',
+      tone: 'primary',
+      at: new Date(),
+    });
   }
 
   // حساب العناصر بأولويتها للوحة التفصيلية
