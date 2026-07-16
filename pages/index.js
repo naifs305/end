@@ -185,20 +185,19 @@ function PendingElementsPanel({ elements }) {
     );
   }
 
-  // تجميع العناصر حسب الدورة
-  const byCourse = [];
-  const seen = new Map();
-  for (const el of elements) {
-    if (!seen.has(el.courseId)) {
-      seen.set(el.courseId, { courseId: el.courseId, courseName: el.courseName, items: [] });
-      byCourse.push(seen.get(el.courseId));
-    }
-    seen.get(el.courseId).items.push(el);
-  }
-
-  const totalCount = elements.length;
-  const urgentCount = elements.filter(e => e.urgency === 2).length;
+  const urgentCount  = elements.filter(e => e.urgency === 2).length;
   const returnedCount = elements.filter(e => e.status === 'RETURNED').length;
+
+  // ترتيب أولوية: متأخر > حرج+مُعاد > يقترب > عادي
+  const PRIORITY = (e) => {
+    let p = 0;
+    if (e.urgency === 2) p += 100;
+    if (e.status === 'RETURNED') p += 50;
+    if (e.isCritical) p += 30;
+    if (e.urgency === 1) p += 20;
+    return p;
+  };
+  const sorted = [...elements].sort((a, b) => PRIORITY(b) - PRIORITY(a));
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card flex flex-col">
@@ -207,67 +206,61 @@ function PendingElementsPanel({ elements }) {
         <div>
           <h3 className="font-extrabold text-text-main">📌 عناصر تحتاج تقديمك</h3>
           <p className="text-[10px] text-text-soft mt-0.5">
-            {byCourse.length} دورة · {totalCount} عنصر
+            {elements.length} عنصر مرتّبة بالأولوية
             {urgentCount > 0 && <span className="text-danger font-bold"> · {urgentCount} متأخر</span>}
             {returnedCount > 0 && <span className="text-warning font-bold"> · {returnedCount} مُعاد</span>}
           </p>
         </div>
         <span className={`rounded-full border px-2.5 py-0.5 text-xs font-extrabold ${urgentCount > 0 ? 'bg-danger/10 border-danger/20 text-danger' : 'bg-primary/10 border-primary/20 text-primary'}`}>
-          {totalCount}
+          {elements.length}
         </span>
       </div>
 
-      {/* القائمة مجمّعة حسب الدورة */}
-      <div className="overflow-y-auto max-h-[440px] flex-1">
-        {byCourse.map((group) => (
-          <div key={group.courseId}>
-            {/* عنوان الدورة */}
-            <Link href={`/courses/${group.courseId}`}>
-              <div className="flex items-center justify-between bg-background px-4 py-2 hover:bg-primary/5 transition cursor-pointer border-b border-border/50">
-                <span className="text-[11px] font-extrabold text-primary truncate">{group.courseName}</span>
-                <span className="shrink-0 text-[10px] text-text-soft ml-2">
-                  {group.items.length} عنصر ←
+      {/* القائمة المسطّحة بالأولوية */}
+      <div className="overflow-y-auto max-h-[440px] flex-1 divide-y divide-border/60">
+        {sorted.map((el, idx) => {
+          const u = URGENCY_STYLE[el.urgency] || URGENCY_STYLE[0];
+          const borderColor = el.urgency === 2 ? 'border-r-danger' : el.status === 'RETURNED' ? 'border-r-warning' : el.isCritical ? 'border-r-danger/50' : 'border-r-primary/20';
+          const icon = el.status === 'RETURNED' ? '↩' : el.urgency === 2 ? '🔴' : el.urgency === 1 ? '⏳' : el.isCritical ? '⚡' : '📋';
+          return (
+            <Link key={el.id} href={`/courses/${el.courseId}`}>
+              <div className={`flex items-center gap-3 px-4 py-3 hover:bg-background transition border-r-4 ${borderColor}`}>
+                {/* رقم الأولوية */}
+                <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-border/40 text-[10px] font-extrabold text-text-soft">
+                  {idx + 1}
                 </span>
+                {/* أيقونة الحالة */}
+                <span className="shrink-0 text-base">{icon}</span>
+                {/* التفاصيل */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <p className="text-xs font-extrabold text-text-main truncate">{el.elementName}</p>
+                    {el.isCritical && (
+                      <span className="shrink-0 rounded-full bg-danger/10 border border-danger/15 px-1.5 py-px text-[9px] font-extrabold text-danger">حرج</span>
+                    )}
+                    {el.status === 'RETURNED' && (
+                      <span className="shrink-0 rounded-full bg-sand/20 border border-sand/40 px-1.5 py-px text-[9px] font-bold text-warning">مُعاد</span>
+                    )}
+                  </div>
+                  {/* اسم الدورة كمعلومة ثانوية */}
+                  <p className="text-[10px] text-text-soft truncate mt-0.5">{el.courseName}</p>
+                </div>
+                {/* الوقت المتبقي */}
+                {el.hoursLeft != null ? (
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-extrabold ${u.badge}`}>
+                    {el.hoursLeft < 0
+                      ? `تأخر ${Math.abs(el.hoursLeft)}س`
+                      : el.hoursLeft < 24
+                      ? `${el.hoursLeft}س`
+                      : `${Math.floor(el.hoursLeft / 24)}ي`}
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-text-soft/30 text-xs">←</span>
+                )}
               </div>
             </Link>
-            {/* عناصر الدورة */}
-            <div className="divide-y divide-border/50">
-              {group.items.map((el) => {
-                const u = URGENCY_STYLE[el.urgency] || URGENCY_STYLE[0];
-                const borderColor = el.urgency === 2 ? 'border-r-danger' : el.urgency === 1 ? 'border-r-warning' : 'border-r-primary/20';
-                return (
-                  <Link key={el.id} href={`/courses/${el.courseId}`}>
-                    <div className={`flex items-center gap-2.5 px-4 py-2.5 hover:bg-background/80 transition border-r-4 ${borderColor}`}>
-                      <span className="shrink-0 text-base">
-                        {el.status === 'RETURNED' ? '↩' : el.urgency === 2 ? '🔴' : el.urgency === 1 ? '⏳' : '📋'}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <p className="text-xs font-bold text-text-main truncate">{el.elementName}</p>
-                          {el.isCritical && (
-                            <span className="shrink-0 rounded-full bg-danger/10 border border-danger/15 px-1.5 py-px text-[9px] font-extrabold text-danger">حرج</span>
-                          )}
-                          {el.status === 'RETURNED' && (
-                            <span className="shrink-0 rounded-full bg-sand/20 border border-sand/40 px-1.5 py-px text-[9px] font-bold text-warning">مُعاد</span>
-                          )}
-                        </div>
-                      </div>
-                      {el.hoursLeft != null && (
-                        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-extrabold ${u.badge}`}>
-                          {el.hoursLeft < 0
-                            ? `تأخر ${Math.abs(el.hoursLeft)}س`
-                            : el.hoursLeft < 24
-                            ? `${el.hoursLeft}س`
-                            : `${Math.floor(el.hoursLeft / 24)}ي`}
-                        </span>
-                      )}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
