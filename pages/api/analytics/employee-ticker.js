@@ -41,7 +41,7 @@ async function handler(req, res) {
                 name: true,
                 deadlineRefPoint: true,
                 deadlineMaxHours: true,
-                isCritical: true,
+                elementType: true,
               },
             },
           },
@@ -91,7 +91,7 @@ async function handler(req, res) {
     const rejected       = pendingElements.filter(e => e.status === 'REJECTED').length;
     const pendingApproval= pendingElements.filter(e => e.status === 'PENDING_APPROVAL').length;
     const notStarted     = pendingElements.filter(e => e.status === 'NOT_STARTED').length;
-    const criticalCount  = pendingElements.filter(e => e.element?.isCritical).length;
+    const criticalCount  = pendingElements.filter(e => e.element?.elementType === 'MANDATORY').length;
 
     const overdue = pendingElements.filter(e => {
       if (!e.element?.deadlineMaxHours) return false;
@@ -185,7 +185,7 @@ async function handler(req, res) {
         id:          el.id,
         status:      el.status,
         elementName: el.element?.name,
-        isCritical:  el.element?.isCritical || false,
+        isCritical:  el.element?.elementType === 'MANDATORY',
         courseName:  course.name,
         courseId:    el.courseId,
         urgency,
