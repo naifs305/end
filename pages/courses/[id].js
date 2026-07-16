@@ -213,7 +213,10 @@ export default function CourseDetail() {
   const overrideElement = async (trackingId, action, needsReason) => {
     let reason;
     if (needsReason) {
-      reason = window.prompt(action === 'revert' ? 'سبب استرجاع العنصر (إلزامي):' : 'سبب الاستثناء (إلزامي):');
+      const promptText = action === 'revert' ? 'سبب استرجاع العنصر (إلزامي):'
+        : action === 'force-reset' ? 'سبب إعادة فتح العنصر (إلزامي):'
+        : 'سبب الاستثناء (إلزامي):';
+      reason = window.prompt(promptText);
       if (!reason || !reason.trim()) {
         if (reason !== null) toast.error('السبب مطلوب');
         return;
@@ -225,6 +228,31 @@ export default function CourseDetail() {
       fetchCourse();
     } catch (e) {
       toast.error(e.response?.data?.message || 'تعذر التنفيذ');
+    }
+  };
+
+  // أدوات المدير: إرسال رسالة موجّهة
+  const [msgModal, setMsgModal] = useState(null); // { trackingId, elementName, employeeName }
+  const [msgType, setMsgType]   = useState('REMINDER');
+  const [msgText, setMsgText]   = useState('');
+  const [msgSending, setMsgSending] = useState(false);
+
+  const sendManagerMessage = async () => {
+    if (!msgText.trim()) return toast.error('الرسالة مطلوبة');
+    setMsgSending(true);
+    try {
+      await api.post(`/courses/${id}/manager-message`, {
+        trackingId: msgModal.trackingId,
+        messageType: msgType,
+        message: msgText.trim(),
+      });
+      toast.success('تم إرسال الرسالة للموظف');
+      setMsgModal(null);
+      setMsgText('');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذر الإرسال');
+    } finally {
+      setMsgSending(false);
     }
   };
 
@@ -699,6 +727,52 @@ export default function CourseDetail() {
                 )}
               </div>
 
+              {/* ── إرسال رسالة موجّهة ── */}
+              <div>
+                <h4 className="mb-2 text-xs font-extrabold text-text-soft">📩 إرسال رسالة لموظف عن عنصر</h4>
+                <div className="space-y-1.5">
+                  {sortedElements.filter(el => el.status !== 'NOT_APPLICABLE' && el.executedById).map((el) => (
+                    <div key={el.id} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2">
+                      <div className="min-w-0">
+                        <span className="text-sm font-bold text-text-main block truncate">{el.element.name}</span>
+                        <span className="text-[10px] text-text-soft">{el.executedBy?.firstName} {el.executedBy?.lastName}</span>
+                      </div>
+                      <button
+                        onClick={() => setMsgModal({ trackingId: el.id, elementName: el.element.name, employeeName: `${el.executedBy?.firstName} ${el.executedBy?.lastName}` })}
+                        className="shrink-0 rounded-lg border border-primary/20 bg-primary/5 px-2 py-1 text-[11px] font-bold text-primary hover:bg-primary/10">
+                        📩 راسله
+                      </button>
+                    </div>
+                  ))}
+                  {sortedElements.filter(el => el.status !== 'NOT_APPLICABLE' && el.executedById).length === 0 && (
+                    <p className="text-xs text-text-soft">لا توجد عناصر مرتبطة بموظف بعد</p>
+                  )}
+                </div>
+              </div>
+
+              {/* ── إعادة فتح أي عنصر (قوة استثنائية) ── */}
+              <div>
+                <h4 className="mb-1 text-xs font-extrabold text-danger">🔓 إعادة فتح عنصر (إلزامي سبب)</h4>
+                <p className="mb-2 text-[10px] text-text-soft">يُعيد أي عنصر إلى "لم يبدأ" بغض النظر عن حالته الحالية</p>
+                <div className="space-y-1.5">
+                  {sortedElements.filter(el => !['NOT_APPLICABLE','NOT_STARTED'].includes(el.status)).map((el) => (
+                    <div key={el.id} className="flex items-center justify-between gap-2 rounded-xl border border-burgundy/20 bg-burgundy/5 px-3 py-2">
+                      <div className="min-w-0">
+                        <span className="text-sm font-bold text-text-main block truncate">{el.element.name}</span>
+                        <span className="text-[10px] text-warning">{el.status === 'APPROVED' ? '✅ معتمد' : el.status === 'PENDING_APPROVAL' ? '⏳ معلّق' : el.status === 'RETURNED' ? '↩ مُعاد' : el.status}</span>
+                      </div>
+                      <button onClick={() => overrideElement(el.id, 'force-reset', true)}
+                        className="shrink-0 rounded-lg border border-danger/20 px-2 py-1 text-[11px] font-bold text-danger hover:bg-burgundy/10">
+                        🔓 فتح
+                      </button>
+                    </div>
+                  ))}
+                  {sortedElements.filter(el => !['NOT_APPLICABLE','NOT_STARTED'].includes(el.status)).length === 0 && (
+                    <p className="text-xs text-text-soft">لا توجد عناصر يمكن إعادة فتحها</p>
+                  )}
+                </div>
+              </div>
+
               {/* استثناء عنصر */}
               <div>
                 <h4 className="mb-2 text-xs font-extrabold text-text-soft">استثناء عنصر من هذه الدورة</h4>
@@ -762,6 +836,67 @@ export default function CourseDetail() {
           course={course}
           onClose={() => setShowNotesReport(false)}
         />
+      )}
+
+      {/* ── Modal رسالة المدير ── */}
+      {msgModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-white shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border bg-gradient-to-l from-primary/5 to-white px-5 py-3.5">
+              <div>
+                <h3 className="font-extrabold text-text-main">📩 رسالة إلى الموظف</h3>
+                <p className="text-[10px] text-text-soft mt-0.5">
+                  العنصر: {msgModal.elementName} · الموظف: {msgModal.employeeName}
+                </p>
+              </div>
+              <button onClick={() => { setMsgModal(null); setMsgText(''); }}
+                className="rounded-full p-1.5 hover:bg-background text-text-soft">✕</button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* نوع الرسالة */}
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { val: 'INQUIRY',  icon: '💬', label: 'استفسار', cls: 'border-primary/30 bg-primary/5 text-primary' },
+                  { val: 'REMINDER', icon: '🔔', label: 'تذكير',   cls: 'border-sand/50 bg-sand/10 text-warning' },
+                  { val: 'WARNING',  icon: '🚨', label: 'إنذار',   cls: 'border-danger/30 bg-danger/5 text-danger' },
+                ].map(t => (
+                  <button key={t.val}
+                    onClick={() => setMsgType(t.val)}
+                    className={`flex flex-col items-center gap-1 rounded-xl border py-2.5 text-xs font-extrabold transition ${msgType === t.val ? t.cls + ' ring-2 ring-offset-1 ring-primary/30' : 'border-border text-text-soft hover:bg-background'}`}>
+                    <span className="text-lg">{t.icon}</span>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              {/* نص الرسالة */}
+              <textarea
+                rows={4}
+                value={msgText}
+                onChange={e => setMsgText(e.target.value)}
+                placeholder="اكتب رسالتك هنا..."
+                className="w-full rounded-xl border border-border bg-background p-3 text-sm text-text-main placeholder:text-text-soft/50 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                dir="rtl"
+              />
+              {/* إرسال */}
+              <div className="flex gap-2">
+                <button
+                  onClick={sendManagerMessage}
+                  disabled={msgSending || !msgText.trim()}
+                  className={`flex-1 rounded-xl py-2.5 text-sm font-extrabold text-white transition ${
+                    msgType === 'WARNING' ? 'bg-danger hover:bg-danger/90'
+                    : msgType === 'REMINDER' ? 'bg-warning hover:bg-warning/90'
+                    : 'bg-primary hover:bg-primary-dark'
+                  } disabled:opacity-40`}>
+                  {msgSending ? 'جاري الإرسال...' : '📨 إرسال'}
+                </button>
+                <button onClick={() => { setMsgModal(null); setMsgText(''); }}
+                  className="rounded-xl border border-border px-4 py-2.5 text-sm font-bold text-text-soft hover:bg-background">
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </MainLayout>
   );

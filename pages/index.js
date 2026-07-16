@@ -1,6 +1,6 @@
 ﻿import dynamic from 'next/dynamic';
 import { canCreateCourse, isAdminRole } from '../lib/roles';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
@@ -114,6 +114,130 @@ function CourseCard({ course }) {
 }
 
 // ======================================================================
+// شريط أخبار الموظف المتحرك
+// ======================================================================
+
+const TONE_STYLE = {
+  green:   'text-accent',
+  amber:   'text-warning',
+  red:     'text-danger',
+  primary: 'text-primary',
+};
+
+function NewsTicker({ items }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!ref.current || !items.length) return;
+    const el = ref.current;
+    let pos = 0;
+    const speed = 0.6; // px per frame
+    const step = () => {
+      pos += speed;
+      if (pos >= el.scrollWidth / 2) pos = 0;
+      el.style.transform = `translateX(${pos}px)`;
+      raf = requestAnimationFrame(step);
+    };
+    let raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [items]);
+
+  if (!items.length) return null;
+
+  // نضاعف القائمة لتبدو لا نهائية
+  const doubled = [...items, ...items];
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-primary/15 bg-primary/5 py-2 select-none">
+      <div className="flex items-center gap-0" ref={ref} style={{ willChange: 'transform', display: 'flex', width: 'max-content' }}>
+        {doubled.map((item, i) => (
+          <span key={i} className={`flex shrink-0 items-center gap-1.5 px-5 text-xs font-bold ${TONE_STYLE[item.tone] || 'text-text-main'}`}>
+            <span>{item.icon}</span>
+            <span>{item.text}</span>
+            <span className="mx-3 text-border/60">◆</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ======================================================================
+// لوحة العناصر المعلّقة للموظف
+// ======================================================================
+
+const URGENCY_STYLE = {
+  2: { bg: 'border-burgundy/25 bg-burgundy/5',  badge: 'bg-danger/10 text-danger border-danger/20',   icon: '🔴', label: 'متأخر' },
+  1: { bg: 'border-sand/40 bg-sand/5',          badge: 'bg-warning/10 text-warning border-sand/40',   icon: '⏳', label: 'يقترب' },
+  0: { bg: 'border-border bg-background',        badge: 'bg-primary/10 text-primary border-primary/20', icon: '📋', label: '' },
+};
+
+function PendingElementsPanel({ elements }) {
+  if (!elements?.length) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-accent/20 bg-forest-50 p-8 text-center">
+        <span className="text-3xl">🎉</span>
+        <p className="font-extrabold text-accent text-sm">أحسنت! لا توجد عناصر معلّقة</p>
+        <p className="text-xs text-text-soft">جميع عناصرك في دوراتك النشطة مكتملة</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
+      <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+        <div>
+          <h3 className="font-extrabold text-text-main">📌 عناصر تحتاج تقديمك</h3>
+          <p className="text-[10px] text-text-soft mt-0.5">مرتبة بالأولوية — انقر للانتقال مباشرة</p>
+        </div>
+        <span className="rounded-full bg-danger/10 border border-danger/20 px-2.5 py-0.5 text-xs font-extrabold text-danger">
+          {elements.length}
+        </span>
+      </div>
+      <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
+        {elements.map((el) => {
+          const u = URGENCY_STYLE[el.urgency] || URGENCY_STYLE[0];
+          return (
+            <Link key={el.id} href={`/courses/${el.courseId}`}>
+              <div className={`flex items-center gap-3 px-4 py-3 transition hover:brightness-95 border-r-4 ${el.urgency === 2 ? 'border-r-danger' : el.urgency === 1 ? 'border-r-warning' : 'border-r-primary/20'}`}>
+                {/* أيقونة الحالة */}
+                <span className="shrink-0 text-lg">
+                  {el.status === 'RETURNED' ? '↩' : u.icon}
+                </span>
+                {/* التفاصيل */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-xs font-extrabold text-text-main truncate">{el.elementName}</p>
+                    {el.isCritical && (
+                      <span className="shrink-0 rounded-full bg-danger/10 border border-danger/15 px-1.5 py-0.5 text-[9px] font-extrabold text-danger">حرج</span>
+                    )}
+                    {el.status === 'RETURNED' && (
+                      <span className="shrink-0 rounded-full bg-warning/10 border border-sand/40 px-1.5 py-0.5 text-[9px] font-bold text-warning">مُعاد</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-text-soft truncate mt-0.5">{el.courseName}</p>
+                </div>
+                {/* الوقت المتبقي */}
+                {el.hoursLeft != null && (
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-extrabold ${u.badge}`}>
+                    {el.hoursLeft < 0
+                      ? `متأخر ${Math.abs(el.hoursLeft)}س`
+                      : el.hoursLeft < 24
+                      ? `${el.hoursLeft}س`
+                      : `${Math.floor(el.hoursLeft / 24)}ي`}
+                  </span>
+                )}
+                <span className="shrink-0 text-text-soft/40 text-xs">←</span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ======================================================================
 // الصفحة الرئيسية
 // ======================================================================
 
@@ -123,10 +247,11 @@ export default function Home() {
   const isAdmin      = isAdminRole(activeRole);
   const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
   const isEmployee   = activeRole === 'EMPLOYEE';
-  const [dash, setDash]           = useState(null);
-  const [kpiSnaps, setKpiSnaps]   = useState([]);
-  const [pageLoad, setPageLoad]   = useState(true);
-  const [teamPeriod, setTeamPeriod] = useState('current'); // 'previous' | 'current' | 'year'
+  const [dash, setDash]               = useState(null);
+  const [kpiSnaps, setKpiSnaps]       = useState([]);
+  const [pageLoad, setPageLoad]       = useState(true);
+  const [teamPeriod, setTeamPeriod]   = useState('current');
+  const [ticker, setTicker]           = useState({ tickerItems: [], pendingElements: [] });
 
   useEffect(() => { if (!loading && !user) router.replace('/login'); }, [loading, user, router]);
 
@@ -137,6 +262,13 @@ export default function Home() {
     api.get(ep).catch(() => null)
       .then((dashRes) => setDash(dashRes?.data || null))
       .finally(() => setPageLoad(false));
+
+    // شريط الأخبار — للموظف فقط
+    if (!isAdmin && !isSupervisor) {
+      api.get('/analytics/employee-ticker')
+        .then(r => setTicker(r.data || { tickerItems: [], pendingElements: [] }))
+        .catch(() => {});
+    }
   }, [user, activeRole, isAdmin, isSupervisor]);
 
   // ── معايير فترة مقارنة أداء الفريق ──
@@ -262,6 +394,11 @@ export default function Home() {
           <div className="pointer-events-none absolute -bottom-8 -left-8 h-36 w-36 rounded-full bg-white/5" />
           <div className="pointer-events-none absolute -top-6 left-1/3 h-24 w-24 rounded-full bg-white/5" />
         </div>
+
+        {/* ── شريط الأخبار — موظف فقط ── */}
+        {isEmployee && ticker.tickerItems.length > 0 && (
+          <NewsTicker items={ticker.tickerItems} />
+        )}
 
         {/* ── Stat Cards ── */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -436,8 +573,46 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── آخر الدورات المضافة — مع الموظف المسؤول ── */}
-        <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
+        {/* ── الموظف: لوحة العناصر + آخر الدورات ── */}
+        {isEmployee && (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <PendingElementsPanel elements={ticker.pendingElements} />
+            {/* آخر الدورات — نصف العرض على الشاشات الكبيرة */}
+            <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <div>
+                  <h3 className="font-extrabold text-text-main">آخر الدورات المضافة</h3>
+                  <p className="mt-0.5 text-xs text-text-soft">أحدث دوراتك مع حالة الإقفال</p>
+                </div>
+                <Link href="/courses" className="text-xs font-bold text-primary hover:text-primary-dark">عرض الكل ←</Link>
+              </div>
+              {!dash.latestCourses?.length ? (
+                <div className="px-5 py-10 text-center text-sm text-text-soft">لا توجد دورات مسجلة بعد</div>
+              ) : (
+                <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
+                  {dash.latestCourses.map((c) => {
+                    const s = STATUS_MAP[c.status] || { label: c.status, cls: 'bg-background text-text-soft' };
+                    return (
+                      <Link key={c.id} href={`/courses/${c.id}`}>
+                        <div className="flex items-center gap-3 px-5 py-3 hover:bg-background transition">
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${s.cls}`}>{s.label}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="truncate font-bold text-sm text-text-main">{c.name}</p>
+                            <p className="text-[10px] text-text-soft mt-0.5">📅 {fmtDate(c.startDate)} — {fmtDate(c.endDate)}</p>
+                          </div>
+                          <span className="text-text-soft/40 text-xs shrink-0">←</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── المدير/المشرف: آخر الدورات المضافة ── */}
+        {!isEmployee && (<div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <div>
               <h3 className="font-extrabold text-text-main">آخر الدورات المضافة</h3>
@@ -490,7 +665,7 @@ export default function Home() {
               })}
             </div>
           )}
-        </div>
+        </div>)}
 
       </div>
     </MainLayout>

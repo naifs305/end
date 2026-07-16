@@ -8,7 +8,7 @@ const prisma = require('../../../../lib/db/prisma');
 const { withMethods, withManager } = require('../../../../lib/middleware/auth');
 const { logAudit } = require('../../../../lib/services/audit');
 
-const ACTIONS = ['revert', 'exempt', 'restore'];
+const ACTIONS = ['revert', 'exempt', 'restore', 'force-reset'];
 
 async function handler(req, res) {
   const { id } = req.query;
@@ -19,7 +19,7 @@ async function handler(req, res) {
     return res.status(400).json({ message: 'trackingId و action صالح مطلوبان' });
   }
 
-  if (['revert', 'exempt'].includes(action) && !reason?.trim()) {
+  if (['revert', 'exempt', 'force-reset'].includes(action) && !reason?.trim()) {
     return res.status(400).json({ message: 'السبب مطلوب لهذا الإجراء' });
   }
 
@@ -57,6 +57,23 @@ async function handler(req, res) {
       overriddenById: user.id,
     };
     auditAction = 'CLOSURE_ELEMENT_EXEMPTED';
+  } else if (action === 'force-reset') {
+    // إعادة فتح أي عنصر بغض النظر عن حالته (للمدير فقط)
+    if (tracking.status === 'NOT_APPLICABLE') {
+      return res.status(400).json({ message: 'استخدم restore لإلغاء الاستثناء' });
+    }
+    data = {
+      status: 'NOT_STARTED',
+      overrideReason: reason.trim(),
+      overriddenAt: new Date(),
+      overriddenById: user.id,
+      executionAt: null,
+      executedById: null,
+      decisionAt: null,
+      decidedById: null,
+      rejectionReason: null,
+    };
+    auditAction = 'CLOSURE_ELEMENT_FORCE_RESET';
   } else {
     if (tracking.status !== 'NOT_APPLICABLE' || !tracking.overriddenById) {
       return res.status(400).json({ message: 'لا يمكن استرجاع هذا العنصر' });
