@@ -31,10 +31,9 @@ async function handler(req, res) {
       orderBy: { decisionAt: 'desc' },
       take: 15,
     }),
-    // العناصر المعلّقة — لم تبدأ أو مُعادة
+    // العناصر المعلّقة — لم تبدأ أو مُعادة (البحث عبر الدورة لا executedById لأن NOT_STARTED بلا executedById)
     prisma.courseClosureTracking.findMany({
       where: {
-        executedById: userId,
         status: { in: ['NOT_STARTED', 'RETURNED'] },
         course: { ...courseWhere, status: { notIn: ['CLOSED', 'ARCHIVED'] } },
       },

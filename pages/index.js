@@ -175,63 +175,99 @@ const URGENCY_STYLE = {
 function PendingElementsPanel({ elements }) {
   if (!elements?.length) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-accent/20 bg-forest-50 p-8 text-center">
-        <span className="text-3xl">🎉</span>
-        <p className="font-extrabold text-accent text-sm">أحسنت! لا توجد عناصر معلّقة</p>
-        <p className="text-xs text-text-soft">جميع عناصرك في دوراتك النشطة مكتملة</p>
+      <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-accent/20 bg-forest-50 p-10 text-center h-full min-h-[200px]">
+        <span className="text-4xl">🎉</span>
+        <div>
+          <p className="font-extrabold text-accent">أحسنت! لا توجد عناصر معلّقة</p>
+          <p className="text-xs text-text-soft mt-1">جميع عناصرك في دوراتك النشطة مكتملة</p>
+        </div>
       </div>
     );
   }
 
+  // تجميع العناصر حسب الدورة
+  const byCourse = [];
+  const seen = new Map();
+  for (const el of elements) {
+    if (!seen.has(el.courseId)) {
+      seen.set(el.courseId, { courseId: el.courseId, courseName: el.courseName, items: [] });
+      byCourse.push(seen.get(el.courseId));
+    }
+    seen.get(el.courseId).items.push(el);
+  }
+
+  const totalCount = elements.length;
+  const urgentCount = elements.filter(e => e.urgency === 2).length;
+  const returnedCount = elements.filter(e => e.status === 'RETURNED').length;
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
+    <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card flex flex-col">
+      {/* الرأس */}
       <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
         <div>
           <h3 className="font-extrabold text-text-main">📌 عناصر تحتاج تقديمك</h3>
-          <p className="text-[10px] text-text-soft mt-0.5">مرتبة بالأولوية — انقر للانتقال مباشرة</p>
+          <p className="text-[10px] text-text-soft mt-0.5">
+            {byCourse.length} دورة · {totalCount} عنصر
+            {urgentCount > 0 && <span className="text-danger font-bold"> · {urgentCount} متأخر</span>}
+            {returnedCount > 0 && <span className="text-warning font-bold"> · {returnedCount} مُعاد</span>}
+          </p>
         </div>
-        <span className="rounded-full bg-danger/10 border border-danger/20 px-2.5 py-0.5 text-xs font-extrabold text-danger">
-          {elements.length}
+        <span className={`rounded-full border px-2.5 py-0.5 text-xs font-extrabold ${urgentCount > 0 ? 'bg-danger/10 border-danger/20 text-danger' : 'bg-primary/10 border-primary/20 text-primary'}`}>
+          {totalCount}
         </span>
       </div>
-      <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
-        {elements.map((el) => {
-          const u = URGENCY_STYLE[el.urgency] || URGENCY_STYLE[0];
-          return (
-            <Link key={el.id} href={`/courses/${el.courseId}`}>
-              <div className={`flex items-center gap-3 px-4 py-3 transition hover:brightness-95 border-r-4 ${el.urgency === 2 ? 'border-r-danger' : el.urgency === 1 ? 'border-r-warning' : 'border-r-primary/20'}`}>
-                {/* أيقونة الحالة */}
-                <span className="shrink-0 text-lg">
-                  {el.status === 'RETURNED' ? '↩' : u.icon}
+
+      {/* القائمة مجمّعة حسب الدورة */}
+      <div className="overflow-y-auto max-h-[440px] flex-1">
+        {byCourse.map((group) => (
+          <div key={group.courseId}>
+            {/* عنوان الدورة */}
+            <Link href={`/courses/${group.courseId}`}>
+              <div className="flex items-center justify-between bg-background px-4 py-2 hover:bg-primary/5 transition cursor-pointer border-b border-border/50">
+                <span className="text-[11px] font-extrabold text-primary truncate">{group.courseName}</span>
+                <span className="shrink-0 text-[10px] text-text-soft ml-2">
+                  {group.items.length} عنصر ←
                 </span>
-                {/* التفاصيل */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className="text-xs font-extrabold text-text-main truncate">{el.elementName}</p>
-                    {el.isCritical && (
-                      <span className="shrink-0 rounded-full bg-danger/10 border border-danger/15 px-1.5 py-0.5 text-[9px] font-extrabold text-danger">حرج</span>
-                    )}
-                    {el.status === 'RETURNED' && (
-                      <span className="shrink-0 rounded-full bg-warning/10 border border-sand/40 px-1.5 py-0.5 text-[9px] font-bold text-warning">مُعاد</span>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-text-soft truncate mt-0.5">{el.courseName}</p>
-                </div>
-                {/* الوقت المتبقي */}
-                {el.hoursLeft != null && (
-                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-extrabold ${u.badge}`}>
-                    {el.hoursLeft < 0
-                      ? `متأخر ${Math.abs(el.hoursLeft)}س`
-                      : el.hoursLeft < 24
-                      ? `${el.hoursLeft}س`
-                      : `${Math.floor(el.hoursLeft / 24)}ي`}
-                  </span>
-                )}
-                <span className="shrink-0 text-text-soft/40 text-xs">←</span>
               </div>
             </Link>
-          );
-        })}
+            {/* عناصر الدورة */}
+            <div className="divide-y divide-border/50">
+              {group.items.map((el) => {
+                const u = URGENCY_STYLE[el.urgency] || URGENCY_STYLE[0];
+                const borderColor = el.urgency === 2 ? 'border-r-danger' : el.urgency === 1 ? 'border-r-warning' : 'border-r-primary/20';
+                return (
+                  <Link key={el.id} href={`/courses/${el.courseId}`}>
+                    <div className={`flex items-center gap-2.5 px-4 py-2.5 hover:bg-background/80 transition border-r-4 ${borderColor}`}>
+                      <span className="shrink-0 text-base">
+                        {el.status === 'RETURNED' ? '↩' : el.urgency === 2 ? '🔴' : el.urgency === 1 ? '⏳' : '📋'}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <p className="text-xs font-bold text-text-main truncate">{el.elementName}</p>
+                          {el.isCritical && (
+                            <span className="shrink-0 rounded-full bg-danger/10 border border-danger/15 px-1.5 py-px text-[9px] font-extrabold text-danger">حرج</span>
+                          )}
+                          {el.status === 'RETURNED' && (
+                            <span className="shrink-0 rounded-full bg-sand/20 border border-sand/40 px-1.5 py-px text-[9px] font-bold text-warning">مُعاد</span>
+                          )}
+                        </div>
+                      </div>
+                      {el.hoursLeft != null && (
+                        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-extrabold ${u.badge}`}>
+                          {el.hoursLeft < 0
+                            ? `تأخر ${Math.abs(el.hoursLeft)}س`
+                            : el.hoursLeft < 24
+                            ? `${el.hoursLeft}س`
+                            : `${Math.floor(el.hoursLeft / 24)}ي`}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -573,11 +609,10 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── الموظف: لوحة العناصر + آخر الدورات ── */}
+        {/* ── الموظف: آخر الدورات + لوحة العناصر ── */}
         {isEmployee && (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <PendingElementsPanel elements={ticker.pendingElements} />
-            {/* آخر الدورات — نصف العرض على الشاشات الكبيرة */}
+            {/* آخر الدورات — على اليمين (أول عمود في RTL) */}
             <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
               <div className="flex items-center justify-between border-b border-border px-5 py-4">
                 <div>
@@ -608,6 +643,8 @@ export default function Home() {
                 </div>
               )}
             </div>
+            {/* لوحة العناصر المعلّقة — على اليسار (ثاني عمود في RTL) */}
+            <PendingElementsPanel elements={ticker.pendingElements} />
           </div>
         )}
 
