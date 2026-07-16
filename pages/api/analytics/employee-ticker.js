@@ -34,10 +34,10 @@ async function handler(req, res) {
       orderBy: { decisionAt: 'desc' },
       take: 15,
     }),
-    // العناصر المعلّقة — لم تبدأ أو مُعادة (البحث عبر الدورة لا executedById لأن NOT_STARTED بلا executedById)
+    // جميع العناصر غير المعتمدة في الدورات النشطة (للوحة التفصيلية)
     prisma.courseClosureTracking.findMany({
       where: {
-        status: { in: ['NOT_STARTED', 'RETURNED'] },
+        status: { notIn: ['APPROVED', 'NOT_APPLICABLE'] },
         course: { ...courseWhere, status: { notIn: ['CLOSED', 'ARCHIVED'] } },
       },
       select: {
@@ -120,28 +120,20 @@ async function handler(req, res) {
     }
   }
 
-  // إحصائية العناصر المعلّقة
+  // تنبيهات الشريط — المُعادة والمرفوضة والمتأخرة فقط
   if (pendingElements.length > 0) {
-    const returned = pendingElements.filter(e => e.status === 'RETURNED').length;
-    const notStarted = pendingElements.filter(e => e.status === 'NOT_STARTED').length;
-    if (returned > 0) {
-      tickerItems.unshift({
-        id: 'pending-returned',
-        icon: '⚠️',
-        text: `لديك ${returned} عنصر مُعاد يحتاج إعادة تقديم`,
-        tone: 'red',
-        at: new Date(),
-      });
-    }
-    if (notStarted > 0) {
-      tickerItems.unshift({
-        id: 'pending-notstarted',
-        icon: '📋',
-        text: `لديك ${notStarted} عنصر لم تبدأ تقديمه بعد`,
-        tone: 'amber',
-        at: new Date(),
-      });
-    }
+    const returned  = pendingElements.filter(e => e.status === 'RETURNED').length;
+    const rejected  = pendingElements.filter(e => e.status === 'REJECTED').length;
+    const overdue   = pendingElements.filter(e => {
+      if (!e.element?.deadlineMaxHours) return false;
+      const MS = 3600000;
+      const ref = e.element.deadlineRefPoint === 'START' ? new Date(e.course.startDate) : new Date(e.course.endDate);
+      return (new Date() - new Date(ref.getTime() + e.element.deadlineMaxHours * MS)) > 0;
+    }).length;
+
+    if (overdue > 0) tickerItems.unshift({ id: 'overdue', icon: '🔴', text: `لديك ${overdue} عنصر تجاوز الموعد الأقصى`, tone: 'red', at: new Date() });
+    if (returned > 0) tickerItems.unshift({ id: 'returned', icon: '↩', text: `لديك ${returned} عنصر مُعاد يحتاج إعادة تقديم`, tone: 'amber', at: new Date() });
+    if (rejected > 0) tickerItems.unshift({ id: 'rejected', icon: '❌', text: `لديك ${rejected} عنصر مرفوض — راجع سبب الرفض`, tone: 'red', at: new Date() });
   }
 
   // بند ثابت: درجة الأداء الشهري (يضمن ظهور الشريط دائماً)

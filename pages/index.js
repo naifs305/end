@@ -185,8 +185,10 @@ function PendingElementsPanel({ elements }) {
     );
   }
 
-  const urgentCount  = elements.filter(e => e.urgency === 2).length;
+  const urgentCount   = elements.filter(e => e.urgency === 2).length;
   const returnedCount = elements.filter(e => e.status === 'RETURNED').length;
+  const rejectedCount = elements.filter(e => e.status === 'REJECTED').length;
+  const pendingCount  = elements.filter(e => e.status === 'PENDING_APPROVAL').length;
 
   // ترتيب أولوية: متأخر > حرج+مُعاد > يقترب > عادي
   const PRIORITY = (e) => {
@@ -207,8 +209,10 @@ function PendingElementsPanel({ elements }) {
           <h3 className="font-extrabold text-text-main">📌 عناصر تحتاج تقديمك</h3>
           <p className="text-[10px] text-text-soft mt-0.5">
             {elements.length} عنصر مرتّبة بالأولوية
-            {urgentCount > 0 && <span className="text-danger font-bold"> · {urgentCount} متأخر</span>}
+            {urgentCount > 0   && <span className="text-danger font-bold"> · {urgentCount} متأخر</span>}
             {returnedCount > 0 && <span className="text-warning font-bold"> · {returnedCount} مُعاد</span>}
+            {rejectedCount > 0 && <span className="text-danger font-bold"> · {rejectedCount} مرفوض</span>}
+            {pendingCount > 0  && <span className="text-primary font-bold"> · {pendingCount} منتظر اعتماد</span>}
           </p>
         </div>
         <span className={`rounded-full border px-2.5 py-0.5 text-xs font-extrabold ${urgentCount > 0 ? 'bg-danger/10 border-danger/20 text-danger' : 'bg-primary/10 border-primary/20 text-primary'}`}>
@@ -220,8 +224,19 @@ function PendingElementsPanel({ elements }) {
       <div className="overflow-y-auto max-h-[440px] flex-1 divide-y divide-border/60">
         {sorted.map((el, idx) => {
           const u = URGENCY_STYLE[el.urgency] || URGENCY_STYLE[0];
-          const borderColor = el.urgency === 2 ? 'border-r-danger' : el.status === 'RETURNED' ? 'border-r-warning' : el.isCritical ? 'border-r-danger/50' : 'border-r-primary/20';
-          const icon = el.status === 'RETURNED' ? '↩' : el.urgency === 2 ? '🔴' : el.urgency === 1 ? '⏳' : el.isCritical ? '⚡' : '📋';
+          const borderColor = el.urgency === 2 ? 'border-r-danger'
+            : el.status === 'RETURNED'          ? 'border-r-warning'
+            : el.status === 'REJECTED'          ? 'border-r-danger'
+            : el.status === 'PENDING_APPROVAL'  ? 'border-r-primary/40'
+            : el.isCritical                     ? 'border-r-danger/50'
+            : 'border-r-border';
+          const icon = el.status === 'RETURNED'         ? '↩'
+            : el.status === 'REJECTED'                  ? '❌'
+            : el.status === 'PENDING_APPROVAL'          ? '🕐'
+            : el.urgency === 2                          ? '🔴'
+            : el.urgency === 1                          ? '⚠️'
+            : el.isCritical                             ? '⚡'
+            : '📋';
           return (
             <Link key={el.id} href={`/courses/${el.courseId}`}>
               <div className={`flex items-center gap-3 px-4 py-3 hover:bg-background transition border-r-4 ${borderColor}`}>
@@ -240,6 +255,12 @@ function PendingElementsPanel({ elements }) {
                     )}
                     {el.status === 'RETURNED' && (
                       <span className="shrink-0 rounded-full bg-sand/20 border border-sand/40 px-1.5 py-px text-[9px] font-bold text-warning">مُعاد</span>
+                    )}
+                    {el.status === 'REJECTED' && (
+                      <span className="shrink-0 rounded-full bg-burgundy/10 border border-burgundy/20 px-1.5 py-px text-[9px] font-bold text-danger">مرفوض</span>
+                    )}
+                    {el.status === 'PENDING_APPROVAL' && (
+                      <span className="shrink-0 rounded-full bg-primary/10 border border-primary/20 px-1.5 py-px text-[9px] font-bold text-primary">بانتظار اعتماد</span>
                     )}
                   </div>
                   {/* اسم الدورة كمعلومة ثانوية */}
