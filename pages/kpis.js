@@ -1043,6 +1043,37 @@ export default function KpisPage() {
                 </button>
               )}
 
+              <div className="h-5 w-px bg-border" />
+
+              {/* بحث بالاسم */}
+              <input
+                value={nameFilter}
+                onChange={e => setNameFilter(e.target.value)}
+                placeholder="🔍 بحث باسم الموظف..."
+                className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary w-40"
+              />
+
+              {/* فلتر المشروع */}
+              {projectList.length > 1 && (
+                <select
+                  value={projectFilter}
+                  onChange={e => setProjectFilter(e.target.value)}
+                  className="rounded-xl border border-border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">كل المشاريع</option>
+                  {projectList.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              )}
+
+              {(nameFilter || projectFilter) && (
+                <button
+                  onClick={() => { setNameFilter(''); setProjectFilter(''); }}
+                  className="rounded-xl border border-border px-2.5 py-1.5 text-[10px] text-text-soft hover:text-danger transition"
+                >
+                  ✕ مسح البحث
+                </button>
+              )}
+
               {stats.noData > 0 && (
                 <div className="rounded-xl border border-border bg-background px-2.5 py-1.5 text-xs text-text-soft">
                   {stats.noData} بدون بيانات
