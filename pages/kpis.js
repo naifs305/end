@@ -752,6 +752,308 @@ function StatsPill({ label, value, active, onClick }) {
   );
 }
 
+// ─── MultiPeriodPicker ────────────────────────────────────────────────────────
+
+function MultiPeriodPicker({ selectedMonths, onChange }) {
+  const now  = new Date();
+  // عرض آخر 18 شهر
+  const available = [];
+  for (let i = 0; i < 18; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    available.push({ label, name: `${AR_MONTHS[d.getMonth()]} ${d.getFullYear()}` });
+  }
+
+  const toggle = (label) => {
+    if (selectedMonths.includes(label)) {
+      onChange(selectedMonths.filter(m => m !== label));
+    } else {
+      onChange([...selectedMonths, label].sort());
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-extrabold text-text-main">📅 اختر الشهور للمقارنة</h3>
+        <div className="flex gap-2">
+          <button
+            onClick={() => onChange(available.map(a => a.label))}
+            className="rounded-lg border border-border px-2.5 py-1 text-[10px] font-bold text-text-soft hover:border-primary/40 hover:text-primary transition"
+          >
+            تحديد الكل
+          </button>
+          <button
+            onClick={() => onChange([])}
+            className="rounded-lg border border-border px-2.5 py-1 text-[10px] font-bold text-text-soft hover:border-danger/40 hover:text-danger transition"
+          >
+            إلغاء الكل
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+        {available.map(({ label, name }) => {
+          const active = selectedMonths.includes(label);
+          return (
+            <button
+              key={label}
+              onClick={() => toggle(label)}
+              className={`rounded-xl border px-2 py-2.5 text-center text-xs font-bold transition
+                ${active
+                  ? 'border-primary bg-primary text-white shadow-sm'
+                  : 'border-border bg-background text-text-soft hover:border-primary/40 hover:text-primary'
+                }`}
+            >
+              {name.split(' ')[0]}
+              <span className={`block text-[9px] font-normal ${active ? 'text-white/70' : 'text-text-soft/60'}`}>
+                {label.slice(0, 4)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {selectedMonths.length > 0 && (
+        <p className="mt-2 text-[10px] text-text-soft">
+          {selectedMonths.length} شهر محدد: {selectedMonths.map(m => {
+            const d = new Date(m + '-01');
+            return `${AR_MONTHS[d.getMonth()]}`;
+          }).join(' · ')}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── MultiPeriodResults — عرض نتائج الفترة المخصصة ──────────────────────────
+
+function MultiPeriodResults({ months, isManager }) {
+  const [data,    setData]    = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [nameFilter,    setNameFilter]    = useState('');
+  const [projectFilter, setProjectFilter] = useState('');
+  const [levelFilter,   setLevelFilter]   = useState(null);
+  const [selectedId,    setSelectedId]    = useState(null);
+
+  useEffect(() => {
+    if (!months.length) { setData([]); return; }
+    setLoading(true);
+    api.get('/analytics/kpi-multi-period', { params: { months: months.join(',') } })
+      .then(r => setData(r.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [months.join(',')]);
+
+  const activeSnaps   = useMemo(() => data.filter(x => x.isSubjectToEvaluation),  [data]);
+  const inactiveSnaps = useMemo(() => data.filter(x => !x.isSubjectToEvaluation), [data]);
+  const avg = activeSnaps.length
+    ? activeSnaps.reduce((a, x) => a + Number(x.finalScore ?? 0), 0) / activeSnaps.length
+    : 0;
+
+  const projectList = useMemo(() =>
+    [...new Set(data.map(s => s.user?.operationalProject?.name).filter(Boolean))],
+    [data]
+  );
+
+  const counts = useMemo(() => {
+    const c = {};
+    for (const key of Object.keys(LEVEL_CFG)) c[key] = activeSnaps.filter(x => x.performanceLevel === key).length;
+    return c;
+  }, [activeSnaps]);
+
+  const filtered = useMemo(() => {
+    let snaps = levelFilter ? activeSnaps.filter(x => x.performanceLevel === levelFilter) : [...activeSnaps, ...inactiveSnaps];
+    if (nameFilter)    snaps = snaps.filter(s => `${s.user?.firstName} ${s.user?.lastName}`.includes(nameFilter));
+    if (projectFilter) snaps = snaps.filter(s => s.user?.operationalProject?.name === projectFilter);
+    return snaps;
+  }, [activeSnaps, inactiveSnaps, levelFilter, nameFilter, projectFilter]);
+
+  if (!months.length) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white px-6 py-12 text-center shadow-card">
+        <div className="mb-3 text-4xl">📅</div>
+        <p className="text-sm font-bold text-text-main">حدد الشهور أعلاه لعرض النتائج المجمّعة</p>
+        <p className="mt-1 text-xs text-text-soft">يمكنك اختيار أي مجموعة من الشهور ثم مقارنة أداء الفريق</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center rounded-2xl border border-border bg-white py-16 shadow-card">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <span className="text-sm text-text-soft">جاري تجميع النتائج...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* ملخص الفترة */}
+      {activeSnaps.length > 0 && (
+        <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
+          <div className="flex flex-wrap items-center gap-2 px-5 py-3 border-b border-border bg-background/40">
+            <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-light px-4 py-1.5">
+              <span className="text-base font-extrabold text-primary">{avg.toFixed(1)}%</span>
+              <span className="text-xs text-text-soft">متوسط الفريق</span>
+              <span className="text-[10px] text-text-soft">({activeSnaps.length} موظف)</span>
+            </div>
+
+            <div className="h-5 w-px bg-border" />
+
+            {LEVEL_ORDER.map(key => counts[key] > 0 && (
+              <StatsPill
+                key={key}
+                label={LEVEL_CFG[key].label}
+                value={counts[key]}
+                active={levelFilter === key}
+                onClick={() => setLevelFilter(v => v === key ? null : key)}
+              />
+            ))}
+
+            {levelFilter && (
+              <button onClick={() => setLevelFilter(null)}
+                className="rounded-xl border border-border px-2.5 py-1.5 text-[10px] text-text-soft hover:text-danger transition">
+                ✕ إلغاء
+              </button>
+            )}
+
+            <div className="h-5 w-px bg-border" />
+
+            <input
+              value={nameFilter}
+              onChange={e => setNameFilter(e.target.value)}
+              placeholder="🔍 بحث باسم..."
+              className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary w-36"
+            />
+
+            {projectList.length > 1 && (
+              <select
+                value={projectFilter}
+                onChange={e => setProjectFilter(e.target.value)}
+                className="rounded-xl border border-border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">كل المشاريع</option>
+                {projectList.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            )}
+          </div>
+
+          {/* جدول النتائج */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border bg-background/60">
+                  <th className="px-4 py-2.5 text-right font-extrabold text-text-soft">#</th>
+                  <th className="px-4 py-2.5 text-right font-extrabold text-text-soft">الموظف</th>
+                  <th className="px-4 py-2.5 text-center font-extrabold text-text-soft">المستوى</th>
+                  <th className="px-4 py-2.5 text-center font-extrabold text-text-soft">الدرجة الكلية</th>
+                  <th className="px-4 py-2.5 text-center font-extrabold text-text-soft" title="نسبة إتمام عناصر الإقفال">📦 الإنتاجية</th>
+                  <th className="px-4 py-2.5 text-center font-extrabold text-text-soft" title="الالتزام بمواعيد التقديم">🕐 التوقيت</th>
+                  <th className="px-4 py-2.5 text-center font-extrabold text-text-soft" title="نسبة القبول من أول مرة">⭐ الجودة</th>
+                  <th className="px-4 py-2.5 text-center font-extrabold text-text-soft">الشهور</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {filtered.map((snap, idx) => {
+                  const name  = `${snap.user?.firstName || ''} ${snap.user?.lastName || ''}`.trim();
+                  const proj  = snap.user?.operationalProject?.name || '—';
+                  const ini   = initials(snap.user?.firstName, snap.user?.lastName);
+                  const score = Number(snap.finalScore ?? 0);
+                  const noData = !snap.isSubjectToEvaluation;
+                  const clr   = scoreColor(score);
+                  const level = snap.performanceLevel;
+                  const lcfg  = LEVEL_CFG[level] || LEVEL_CFG.GOOD;
+                  const isSelected = selectedId === snap.userId;
+
+                  return (
+                    <>
+                      <tr
+                        key={snap.userId}
+                        onClick={() => setSelectedId(isSelected ? null : snap.userId)}
+                        className={`cursor-pointer transition hover:bg-background/60 ${isSelected ? 'bg-primary-light/40' : ''}`}
+                      >
+                        <td className="px-4 py-2.5 text-text-soft">{idx + 1}</td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold text-white"
+                              style={{ backgroundColor: noData ? '#9DA3A1' : lcfg.color }}>
+                              {ini}
+                            </div>
+                            <div>
+                              <p className="font-bold text-text-main">{name}</p>
+                              <p className="text-[10px] text-text-soft">{proj}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <LevelBadge level={level} noData={noData} />
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          {noData ? <span className="text-text-soft/40">—</span> : (
+                            <span className={`font-extrabold ${clr.text}`}>{score.toFixed(1)}%</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          {noData ? '—' : <span className={scoreColor(snap.productivityScore).text}>{fmt(snap.productivityScore)}%</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          {noData ? '—' : <span className={scoreColor(snap.timelinessScore).text}>{fmt(snap.timelinessScore)}%</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          {noData ? '—' : <span className={scoreColor(snap.qualityScore).text}>{fmt(snap.qualityScore)}%</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className="text-text-soft">{snap.monthsIncluded}/{snap.monthsTotal}</span>
+                        </td>
+                      </tr>
+                      {/* تفاصيل الشهور عند فتح الصف */}
+                      {isSelected && (
+                        <tr key={`${snap.userId}-detail`} className="bg-primary-light/20">
+                          <td colSpan={8} className="px-6 py-3">
+                            <div className="flex flex-wrap gap-2 text-[10px]">
+                              <span className="font-bold text-text-soft">تفصيل الشهور:</span>
+                              {snap.monthDetail?.map(md => {
+                                const d = new Date(md.periodLabel + '-01');
+                                const mName = `${AR_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+                                return (
+                                  <span
+                                    key={md.periodLabel}
+                                    className={`rounded-lg border px-2 py-1 font-bold ${
+                                      !md.isSubjectToEvaluation
+                                        ? 'border-border bg-background text-text-soft/60'
+                                        : md.finalScore >= 80 ? 'border-accent/30 bg-forest-50 text-accent'
+                                        : md.finalScore >= 60 ? 'border-sand/40 bg-sand/10 text-warning'
+                                        : 'border-burgundy/30 bg-burgundy/5 text-danger'
+                                    }`}
+                                  >
+                                    {mName}: {md.isSubjectToEvaluation ? `${md.finalScore?.toFixed(1)}%` : 'لا بيانات'}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {data.length === 0 && !loading && (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white px-6 py-12 text-center shadow-card">
+          <p className="text-sm text-text-soft">لا توجد بيانات لهذه الشهور — تأكد من أن المؤشرات محتسبة لكل شهر</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── الصفحة الرئيسية ──────────────────────────────────────────────────────────
 
 export default function KpisPage() {
@@ -763,9 +1065,10 @@ export default function KpisPage() {
   const OFFICIAL_START = '2026-06'; // البداية الرسمية للاحتساب
 
   const now = new Date();
-  const [periodMode, setPeriodMode] = useState('monthly'); // 'monthly' | 'yearly'
+  const [periodMode, setPeriodMode] = useState('monthly'); // 'monthly' | 'yearly' | 'custom'
   const [year,  setYear]  = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [customMonths, setCustomMonths] = useState([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
   const [loadingLB, setLoadingLB] = useState(false);
@@ -939,18 +1242,23 @@ export default function KpisPage() {
               </p>
             </div>
 
-            {/* تبويب شهري / سنوي */}
+            {/* تبويب شهري / سنوي / مخصص */}
             <div className="flex overflow-hidden rounded-xl border border-border text-xs font-bold">
-              {['monthly','yearly'].map(m => (
-                <button key={m} onClick={() => { setPeriodMode(m); setSelectedId(null); setSelectedSnap(null); }}
-                  className={`px-4 py-2 transition ${periodMode===m ? 'bg-primary text-white' : 'bg-white text-text-soft hover:bg-background'}`}>
-                  {m === 'monthly' ? 'شهري' : 'سنوي'}
+              {[
+                { key: 'monthly', label: 'شهري' },
+                { key: 'yearly',  label: 'سنوي'  },
+                ...((isManager || isSupervisor) ? [{ key: 'custom', label: '📅 فترة مخصصة' }] : []),
+              ].map(({ key, label }) => (
+                <button key={key}
+                  onClick={() => { setPeriodMode(key); setSelectedId(null); setSelectedSnap(null); }}
+                  className={`px-4 py-2 transition ${periodMode===key ? 'bg-primary text-white' : 'bg-white text-text-soft hover:bg-background'}`}>
+                  {label}
                 </button>
               ))}
             </div>
 
-            {/* تنقل الأشهر */}
-            <div className="flex items-center gap-2">
+            {/* تنقل الأشهر — لا يظهر في وضع مخصص */}
+            <div className={`flex items-center gap-2 ${periodMode === 'custom' ? 'hidden' : ''}`}>
               <button
                 onClick={prevMonth}
                 className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-text-soft hover:bg-background hover:text-primary transition text-lg"
@@ -992,7 +1300,7 @@ export default function KpisPage() {
                   ✓ مؤشراتك محدَّثة {fmtRelative(lastCalc)}
                 </span>
               )}
-              {isManager && (
+              {isManager && periodMode !== 'custom' && (
                 <button
                   onClick={calculate}
                   disabled={calculating}
@@ -1012,7 +1320,7 @@ export default function KpisPage() {
           </div>
 
           {/* شريط الإحصائيات والفلتر — مدير/مشرف */}
-          {!loading && snapshots.length > 0 && !isEmployee && (
+          {periodMode !== 'custom' && !loading && snapshots.length > 0 && !isEmployee && (
             <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
               {/* متوسط الفريق */}
               <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-light px-4 py-1.5">
@@ -1083,8 +1391,16 @@ export default function KpisPage() {
           )}
         </div>
 
+        {/* ══════ وضع الفترة المخصصة ══════ */}
+        {periodMode === 'custom' && (
+          <div className="space-y-4">
+            <MultiPeriodPicker selectedMonths={customMonths} onChange={setCustomMonths} />
+            <MultiPeriodResults months={customMonths} isManager={isManager} />
+          </div>
+        )}
+
         {/* ══════ حالة التحميل ══════ */}
-        {loading && (
+        {periodMode !== 'custom' && loading && (
           <div className="flex items-center justify-center rounded-2xl border border-border bg-white py-20 shadow-card">
             <div className="flex flex-col items-center gap-3">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -1094,7 +1410,7 @@ export default function KpisPage() {
         )}
 
         {/* ══════ حالة فارغة ══════ */}
-        {!loading && snapshots.length === 0 && (
+        {periodMode !== 'custom' && !loading && snapshots.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white px-6 py-16 text-center shadow-card">
             <div className="mb-4 text-5xl">📊</div>
             <h3 className="mb-1 text-lg font-extrabold text-text-main">
@@ -1120,12 +1436,12 @@ export default function KpisPage() {
         )}
 
         {/* ══════ لوحة الموظف الشخصية ══════ */}
-        {!loading && isEmployee && snapshots.length > 0 && (
+        {periodMode !== 'custom' && !loading && isEmployee && snapshots.length > 0 && (
           <EmployeePersonalView snap={snapshots[0]} month={month} year={year} />
         )}
 
         {/* ══════ لوحة ترتيب المشاريع — مدير/مشرف ══════ */}
-        {!loading && (isManager || isSupervisor) && periodMode === 'monthly' && (
+        {periodMode !== 'custom' && !loading && (isManager || isSupervisor) && periodMode === 'monthly' && (
           <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
             <button onClick={() => setShowLeaderboard(v=>!v)}
               className="flex w-full items-center justify-between px-5 py-3.5 hover:bg-background transition">
@@ -1175,7 +1491,7 @@ export default function KpisPage() {
         )}
 
         {/* ══════ مقارنة الفريق — مدير/مشرف ══════ */}
-        {!loading && teamBarData.length > 1 && !isEmployee && (
+        {periodMode !== 'custom' && !loading && teamBarData.length > 1 && !isEmployee && (
           <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
             <div className="border-b border-border px-5 py-3">
               <h3 className="font-extrabold text-text-main">📈 مقارنة أداء الفريق</h3>
@@ -1188,7 +1504,7 @@ export default function KpisPage() {
         )}
 
         {/* ══════ شبكة بطاقات الموظفين النشطين ══════ */}
-        {!loading && filteredSnaps.length > 0 && !isEmployee && (
+        {periodMode !== 'custom' && !loading && filteredSnaps.length > 0 && !isEmployee && (
           <>
             {levelFilter && (
               <p className="text-xs text-text-soft px-1">
@@ -1227,7 +1543,7 @@ export default function KpisPage() {
         )}
 
         {/* ══════ لوح التفاصيل — شاشات كبيرة ══════ */}
-        {!loading && !isEmployee && (loadingDet || selectedSnap) && (
+        {periodMode !== 'custom' && !loading && !isEmployee && (loadingDet || selectedSnap) && (
           <div className="hidden sm:block">
             {loadingDet ? (
               <div className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-12 shadow-card text-text-soft">
@@ -1246,11 +1562,11 @@ export default function KpisPage() {
         )}
 
         {/* ══════ لوحة أداء المشرف الذاتية ══════ */}
-        {isSupervisor && !isManager && <MySupervisorStats />}
+        {periodMode !== 'custom' && isSupervisor && !isManager && <MySupervisorStats />}
 
         {/* ══════ تقرير المشرفين + سجل الإسناد — مدير فقط ══════ */}
-        {isManager && <SupervisorReport periodLabel={periodLabel} />}
-        {isManager && <AssignmentSection periodLabel={periodLabel} year={year} month={month} />}
+        {periodMode !== 'custom' && isManager && <SupervisorReport periodLabel={periodLabel} />}
+        {periodMode !== 'custom' && isManager && <AssignmentSection periodLabel={periodLabel} year={year} month={month} />}
 
       </div>
     </MainLayout>
