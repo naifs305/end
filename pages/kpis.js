@@ -222,98 +222,218 @@ function TrendSparkline({ trend }) {
   );
 }
 
+// ─── ThCol — عنوان عمود مع tooltip ──────────────────────────────────────────
+
+function ThCol({ children, tip, center = true }) {
+  const [show, setShow] = useState(false);
+  return (
+    <th className={`px-3 py-2.5 font-bold text-text-soft ${center ? 'text-center' : 'text-right'}`}>
+      <span className="relative inline-flex items-center gap-1">
+        {children}
+        {tip && (
+          <span className="relative inline-flex"
+            onMouseEnter={() => setShow(true)}
+            onMouseLeave={() => setShow(false)}>
+            <span className="inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full bg-border text-[9px] font-bold text-text-soft hover:bg-primary/20 hover:text-primary transition">?</span>
+            {show && (
+              <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-1.5 w-56 rounded-xl border border-border bg-white p-2.5 text-[11px] font-normal leading-relaxed text-text-main shadow-lg text-right">
+                {tip}
+              </span>
+            )}
+          </span>
+        )}
+      </span>
+    </th>
+  );
+}
+
+// ─── TimingBadge — شارة توقيت مع tooltip ─────────────────────────────────────
+
+function TimingBadge({ icon, count, color, tip }) {
+  const [show, setShow] = useState(false);
+  if (!count) return null;
+  return (
+    <span className="relative inline-flex"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}>
+      <span className={`cursor-help rounded px-1.5 py-0.5 text-[10px] font-bold ${color}`}>
+        {icon} {count}
+      </span>
+      {show && (
+        <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-1.5 w-52 rounded-xl border border-border bg-white p-2.5 text-[11px] leading-relaxed text-text-main shadow-lg text-right">
+          {tip}
+          <br />
+          <span className="font-extrabold text-primary">{count} عنصر</span> في هذه الفئة
+        </span>
+      )}
+    </span>
+  );
+}
+
 // ─── ElementBreakdownTable ────────────────────────────────────────────────────
 
 function ElementBreakdownTable({ breakdown }) {
   if (!breakdown?.length) return null;
   const [open, setOpen] = useState(false);
 
-  // هل لدينا بيانات توقيت؟
   const hasTimingData = breakdown.some(el =>
     (el.beforeIdeal || 0) + (el.beforeMax || 0) + (el.afterMax || 0) > 0
   );
+
+  const totals = breakdown.reduce((acc, el) => ({
+    total:    (acc.total    || 0) + (el.total    || 0),
+    approved: (acc.approved || 0) + (el.approved || 0),
+    returned: (acc.returned || 0) + (el.returned || 0),
+    beforeIdeal: (acc.beforeIdeal || 0) + (el.beforeIdeal || 0),
+    beforeMax:   (acc.beforeMax   || 0) + (el.beforeMax   || 0),
+    afterMax:    (acc.afterMax    || 0) + (el.afterMax    || 0),
+  }), {});
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
       <button
         onClick={() => setOpen(v => !v)}
-        className="flex w-full items-center justify-between px-5 py-3.5 text-sm font-extrabold text-text-main hover:bg-background transition"
+        className="flex w-full items-center justify-between px-5 py-3.5 hover:bg-background transition"
       >
-        <span>📋 تفصيل الأداء حسب نوع العنصر <span className="text-xs font-bold text-text-soft">({breakdown.length} نوع)</span></span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-extrabold text-text-main">
+            📋 تفصيل الأداء حسب نوع العنصر
+            <span className="mr-1.5 text-xs font-bold text-text-soft">({breakdown.length} نوع)</span>
+          </span>
+          {/* ملخص سريع */}
+          <div className="hidden sm:flex items-center gap-2 text-[10px]">
+            <span className="rounded-lg bg-forest-50 px-2 py-0.5 font-bold text-accent">✓ {totals.approved} مقبول</span>
+            {totals.returned > 0 && <span className="rounded-lg bg-sand/20 px-2 py-0.5 font-bold text-warning">↩ {totals.returned} أُعيد</span>}
+            {totals.afterMax > 0 && <span className="rounded-lg bg-burgundy/10 px-2 py-0.5 font-bold text-danger">⚠ {totals.afterMax} متأخر</span>}
+          </div>
+        </div>
         <span className="text-xs text-text-soft">{open ? '▲ إخفاء' : '▼ إظهار'}</span>
       </button>
+
       {open && (
         <div className="border-t border-border">
-          {/* أسطورة التوقيت */}
+          {/* شرح التوقيت */}
           {hasTimingData && (
-            <div className="flex flex-wrap gap-3 px-5 py-2.5 text-[10px] bg-background border-b border-border">
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-accent inline-block" /> قبل الموعد المثالي</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary inline-block" /> في الوقت (قبل الأقصى)</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-danger inline-block" /> بعد الموعد الأقصى</span>
+            <div className="flex flex-wrap items-center gap-4 bg-background/60 px-5 py-2.5 border-b border-border">
+              <span className="text-[10px] font-extrabold text-text-soft">دليل التوقيت:</span>
+              <span className="flex items-center gap-1.5 text-[10px]">
+                <span className="rounded bg-forest-50 px-1.5 py-0.5 font-bold text-accent">✓</span>
+                <span className="text-text-soft">قبل الموعد المثالي — ممتاز</span>
+              </span>
+              <span className="flex items-center gap-1.5 text-[10px]">
+                <span className="rounded bg-primary-light px-1.5 py-0.5 font-bold text-primary">⏱</span>
+                <span className="text-text-soft">بعد المثالي وقبل الأقصى — مقبول</span>
+              </span>
+              <span className="flex items-center gap-1.5 text-[10px]">
+                <span className="rounded bg-burgundy/10 px-1.5 py-0.5 font-bold text-danger">⚠</span>
+                <span className="text-text-soft">بعد الموعد الأقصى — متأخر</span>
+              </span>
             </div>
           )}
+
           <div className="overflow-x-auto">
             <table className="min-w-full text-xs">
-              <thead className="bg-background text-text-soft">
+              <thead className="bg-background/40">
                 <tr>
-                  <th className="px-3 py-2.5 text-right font-bold">العنصر</th>
-                  <th className="px-3 py-2.5 text-center font-bold">المطلوب</th>
-                  <th className="px-3 py-2.5 text-center font-bold">قُبل</th>
-                  <th className="px-3 py-2.5 text-center font-bold">أُعيد</th>
-                  <th className="px-3 py-2.5 text-center font-bold">معدل القبول</th>
-                  {hasTimingData && <th className="px-3 py-2.5 text-center font-bold">توزيع التوقيت</th>}
-                  <th className="px-3 py-2.5 text-center font-bold">متوسط التقديم</th>
+                  <ThCol center={false}>نوع العنصر</ThCol>
+                  <ThCol tip="العدد الإجمالي للعناصر المطلوب تقديمها من هذا النوع خلال الفترة">المطلوب</ThCol>
+                  <ThCol tip="عدد العناصر التي اعتمدها المشرف بشكل نهائي">✅ قُبل</ThCol>
+                  <ThCol tip="عدد العناصر التي أعادها المشرف للمراجعة والتعديل — كلما قلّت كان أفضل">↩ أُعيد</ThCol>
+                  <ThCol tip="نسبة العناصر المقبولة من أول تقديم دون إعادة — تؤثر مباشرة على مؤشر الجودة">معدل القبول</ThCol>
+                  {hasTimingData && (
+                    <ThCol tip="توزيع مواعيد التقديم: ✓ قبل المثالي (أفضل) · ⏱ بعد المثالي وقبل الأقصى (مقبول) · ⚠ بعد الأقصى (يؤثر سلباً على مؤشر التوقيت)">
+                      توزيع التوقيت ℹ️
+                    </ThCol>
+                  )}
+                  <ThCol tip="متوسط الوقت من تاريخ المرجع (بداية/نهاية الدورة) حتى تاريخ التقديم الفعلي">متوسط التقديم</ThCol>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-border/60">
                 {breakdown.map(el => {
                   const rate = Number(el.approvalRate) || 0;
                   const rateColor = rate >= 80 ? 'bg-forest-50 text-accent' : rate >= 60 ? 'bg-sand/20 text-warning' : 'bg-burgundy/10 text-danger';
                   const timedTotal = (el.beforeIdeal||0) + (el.beforeMax||0) + (el.afterMax||0);
                   return (
-                    <tr key={el.key} className="hover:bg-background transition">
-                      <td className="px-3 py-2 font-bold text-text-main">{el.name}</td>
-                      <td className="px-3 py-2 text-center">{el.total ?? '—'}</td>
-                      <td className="px-3 py-2 text-center font-bold text-accent">{el.approved ?? '—'}</td>
-                      <td className="px-3 py-2 text-center text-warning">{el.returned ?? '—'}</td>
-                      <td className="px-3 py-2">
+                    <tr key={el.key} className="hover:bg-background/60 transition">
+                      <td className="px-3 py-2.5 font-bold text-text-main">{el.name}</td>
+                      <td className="px-3 py-2.5 text-center font-bold text-text-main">{el.total ?? '—'}</td>
+                      <td className="px-3 py-2.5 text-center">
+                        <span className="font-extrabold text-accent">{el.approved ?? '—'}</span>
+                        {el.total > 0 && el.approved != null && (
+                          <span className="text-text-soft/60 text-[9px] mr-1">/{el.total}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        {(el.returned || 0) > 0
+                          ? <span className="font-bold text-warning">{el.returned}</span>
+                          : <span className="text-text-soft/40">—</span>}
+                      </td>
+                      <td className="px-3 py-2.5">
                         <div className="flex items-center gap-1.5">
-                          <div className="h-1.5 w-14 overflow-hidden rounded-full bg-forest-50">
-                            <div className={`h-full rounded-full ${rate>=80?'bg-accent':rate>=60?'bg-sand':'bg-burgundy'}`} style={{width:`${rate}%`}} />
+                          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-forest-50">
+                            <div className={`h-full rounded-full transition-all ${rate>=80?'bg-accent':rate>=60?'bg-sand':'bg-burgundy'}`} style={{width:`${rate}%`}} />
                           </div>
                           <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ${rateColor}`}>{fmt(rate)}%</span>
                         </div>
                       </td>
                       {hasTimingData && (
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-2.5">
                           {timedTotal > 0 ? (
-                            <div className="flex items-center gap-1 text-[10px]">
-                              {el.beforeIdeal > 0 && (
-                                <span className="rounded bg-forest-50 text-accent px-1.5 py-0.5 font-bold">
-                                  ✓ {el.beforeIdeal}
-                                </span>
-                              )}
-                              {el.beforeMax > 0 && (
-                                <span className="rounded bg-primary-light text-primary px-1.5 py-0.5 font-bold">
-                                  ⏱ {el.beforeMax}
-                                </span>
-                              )}
-                              {el.afterMax > 0 && (
-                                <span className="rounded bg-burgundy/10 text-danger px-1.5 py-0.5 font-bold">
-                                  ⚠ {el.afterMax}
-                                </span>
-                              )}
+                            <div className="flex items-center gap-1">
+                              <TimingBadge
+                                icon="✓" count={el.beforeIdeal}
+                                color="bg-forest-50 text-accent"
+                                tip="قُدِّم قبل الموعد المثالي — يُحسب كـ 100% في مؤشر التوقيت"
+                              />
+                              <TimingBadge
+                                icon="⏱" count={el.beforeMax}
+                                color="bg-primary-light text-primary"
+                                tip="قُدِّم بعد الموعد المثالي وقبل الأقصى — يُحسب كـ 70% في مؤشر التوقيت"
+                              />
+                              <TimingBadge
+                                icon="⚠" count={el.afterMax}
+                                color="bg-burgundy/10 text-danger"
+                                tip="قُدِّم بعد الموعد الأقصى — يُحسب كـ 20% أو أقل في مؤشر التوقيت"
+                              />
                             </div>
                           ) : <span className="text-text-soft/40">—</span>}
                         </td>
                       )}
-                      <td className="px-3 py-2 text-center text-text-soft">
-                        {fmtDur(el.avgSubmissionHours)}
-                      </td>
+                      <td className="px-3 py-2.5 text-center text-text-soft">{fmtDur(el.avgSubmissionHours)}</td>
                     </tr>
                   );
                 })}
               </tbody>
+              {/* صف الإجمالي */}
+              {breakdown.length > 1 && (
+                <tfoot className="border-t-2 border-border bg-background/60">
+                  <tr>
+                    <td className="px-3 py-2.5 font-extrabold text-text-main">الإجمالي</td>
+                    <td className="px-3 py-2.5 text-center font-extrabold text-text-main">{totals.total}</td>
+                    <td className="px-3 py-2.5 text-center font-extrabold text-accent">{totals.approved}</td>
+                    <td className="px-3 py-2.5 text-center font-extrabold text-warning">{totals.returned || '—'}</td>
+                    <td className="px-3 py-2.5">
+                      {totals.total > 0 && (
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                          totals.approved/totals.total >= 0.8 ? 'bg-forest-50 text-accent' : 'bg-sand/20 text-warning'
+                        }`}>
+                          {Math.round((totals.approved / totals.total) * 100)}%
+                        </span>
+                      )}
+                    </td>
+                    {hasTimingData && (
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-1 text-[10px]">
+                          {totals.beforeIdeal > 0 && <span className="rounded bg-forest-50 text-accent px-1.5 py-0.5 font-bold">✓ {totals.beforeIdeal}</span>}
+                          {totals.beforeMax   > 0 && <span className="rounded bg-primary-light text-primary px-1.5 py-0.5 font-bold">⏱ {totals.beforeMax}</span>}
+                          {totals.afterMax    > 0 && <span className="rounded bg-burgundy/10 text-danger px-1.5 py-0.5 font-bold">⚠ {totals.afterMax}</span>}
+                        </div>
+                      </td>
+                    )}
+                    <td className="px-3 py-2.5" />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
@@ -400,6 +520,130 @@ function EmployeeCard({ snap, selected, onSelect }) {
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── DetailsPanel ─────────────────────────────────────────────────────────────
+
+// ─── HowScoreWorks — شرح طريقة الاحتساب ─────────────────────────────────────
+
+function HowScoreWorks({ snap }) {
+  const [open, setOpen] = useState(false);
+
+  const CALC_DETAIL = [
+    {
+      key: 'productivityScore', icon: '📦', label: 'الإنتاجية', weight: 25,
+      formula: 'عدد العناصر المُقدَّمة ÷ عدد العناصر المطلوبة × 100',
+      detail:  'يقيس مدى إتمام الموظف لجميع عناصر الإقفال المطلوبة منه. كل عنصر لم يُقدَّم يخفّض الدرجة.',
+      good: '≥ 90% تعني إتمام معظم العناصر في الوقت المطلوب.',
+    },
+    {
+      key: 'timelinessScore', icon: '🕐', label: 'التوقيت', weight: 20,
+      formula: 'مرجّح: ✓ قبل المثالي = 100% · ⏱ بعد المثالي = 70% · ⚠ بعد الأقصى = 20% أو أقل',
+      detail:  'يقيس الالتزام بمواعيد تقديم العناصر. لكل عنصر موعد مثالي وموعد أقصى — التقديم مبكراً يمنح الدرجة الكاملة.',
+      good: 'تقديم العناصر قبل الموعد المثالي يعطي 100% في هذا المؤشر.',
+    },
+    {
+      key: 'qualityScore', icon: '⭐', label: 'الجودة', weight: 20,
+      formula: 'عدد العناصر المقبولة من أول مرة ÷ إجمالي العناصر المُقدَّمة × 100',
+      detail:  'يقيس جودة التقديم — العناصر التي تُعاد تعكس حاجة للتعديل وتخفّض الدرجة. الإعادة مرتان = تأثير أكبر.',
+      good: 'تجنّب الإعادة تماماً يعني 100% في الجودة.',
+    },
+    {
+      key: 'criticalScore', icon: '🎯', label: 'العناصر الحرجة', weight: 20,
+      formula: 'أداء التقارير (الافتتاح، الاختتام، التقييم) والمستحقات والتسويات المالية',
+      detail:  'يركّز على العناصر الأكثر أهمية: تقارير الدورة، الإيرادات، المستحقات، والتسوية. تأخيرها أو إعادتها يخفّض الدرجة بشكل أكبر.',
+      good: 'إتمام التقارير في موعدها يضمن درجة عالية في هذا المؤشر.',
+    },
+    {
+      key: 'speedScore', icon: '⚡', label: 'الاستجابة', weight: 10,
+      formula: 'متوسط الوقت بين إعادة العنصر وإعادة تقديمه — كلما قلّ كان أفضل',
+      detail:  'يقيس سرعة الاستجابة بعد أن يُعيد المشرف عنصراً. الرد خلال 24 ساعة = ممتاز، أكثر من 72 ساعة = يؤثر سلباً.',
+      good: 'إعادة التقديم خلال يوم عمل واحد يعطي الدرجة القصوى.',
+    },
+    {
+      key: 'disciplineScore', icon: '🛡️', label: 'الانضباط', weight: 5,
+      formula: 'غياب العناصر الراكدة (لم تُحرَّك لأكثر من 7 أيام) وغياب التأخر المتكرر',
+      detail:  'يقيس انتظام العمل ومتابعة المهام. وجود عناصر معلّقة لفترة طويلة دون تحريك يخفّض هذا المؤشر.',
+      good: 'متابعة جميع العناصر بانتظام يحافظ على انضباط عالٍ.',
+    },
+  ];
+
+  return (
+    <div className="border-t border-border/60">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex w-full items-center justify-between px-5 py-3 hover:bg-background/60 transition"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-extrabold text-text-soft">🧮 كيف تُحسب الدرجة الكلية؟</span>
+          <span className="rounded-lg bg-background border border-border px-2 py-0.5 text-[10px] text-text-soft">اضغط للشرح التفصيلي</span>
+        </div>
+        <span className="text-[10px] text-text-soft">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="px-5 pb-5 space-y-3">
+          {/* الصيغة الكلية */}
+          <div className="rounded-xl bg-primary/5 border border-primary/15 px-4 py-3">
+            <p className="text-xs font-extrabold text-primary mb-1">صيغة الدرجة الكلية:</p>
+            <p className="text-[11px] text-text-main font-mono leading-relaxed">
+              الدرجة = (الإنتاجية×25%) + (التوقيت×20%) + (الجودة×20%) + (الحرجة×20%) + (الاستجابة×10%) + (الانضباط×5%)
+            </p>
+          </div>
+
+          {/* تفصيل كل مؤشر */}
+          <div className="space-y-2">
+            {CALC_DETAIL.map(ind => {
+              const val = Number(snap?.[ind.key] || 0);
+              const contribution = (val * ind.weight) / 100;
+              const clr = scoreColor(val);
+              return (
+                <div key={ind.key} className="rounded-xl border border-border bg-background/40 px-4 py-3">
+                  <div className="flex items-start justify-between gap-3 mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{ind.icon}</span>
+                      <div>
+                        <span className="text-xs font-extrabold text-text-main">{ind.label}</span>
+                        <span className="mr-2 text-[10px] text-text-soft">وزن {ind.weight}%</span>
+                      </div>
+                    </div>
+                    <div className="text-left shrink-0">
+                      <span className={`text-sm font-extrabold ${clr.text}`}>{Math.round(val)}%</span>
+                      <span className="text-[10px] text-text-soft mr-1">← يضيف {contribution.toFixed(1)} نقطة</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-text-soft leading-relaxed mb-1">{ind.detail}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded bg-background border border-border/60 px-2 py-0.5 text-[9px] font-mono text-text-soft">{ind.formula}</span>
+                    <span className="text-[9px] text-accent">💡 {ind.good}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* مستويات الأداء */}
+          <div className="rounded-xl border border-border bg-background/40 px-4 py-3">
+            <p className="text-xs font-extrabold text-text-soft mb-2">مستويات الأداء:</p>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+              {[
+                { range: '90-100%', label: 'متميز',       color: 'bg-forest-50 text-primary border-primary/20' },
+                { range: '80-89%',  label: 'جيد جداً',    color: 'bg-primary-light text-primary border-primary/10' },
+                { range: '70-79%',  label: 'جيد',         color: 'bg-background text-text-main border-border' },
+                { range: '50-69%',  label: 'يحتاج تحسين', color: 'bg-sand/20 text-warning border-sand/40' },
+                { range: '0-49%',   label: 'ضعيف',        color: 'bg-burgundy/10 text-danger border-burgundy/20' },
+              ].map(lv => (
+                <div key={lv.range} className={`rounded-lg border px-2 py-1.5 text-center ${lv.color}`}>
+                  <p className="text-[9px] font-bold">{lv.label}</p>
+                  <p className="text-[9px] opacity-70">{lv.range}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -663,9 +907,14 @@ function EmployeePersonalView({ snap, month, year }) {
         {/* المؤشرات الست */}
         {!noData && (
           <div className="border-t border-border px-5 py-5">
-            <h3 className="mb-4 text-xs font-extrabold uppercase tracking-wide text-text-soft">
-              تفصيل المؤشرات الست — نتيجتك هذا الشهر
-            </h3>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-xs font-extrabold uppercase tracking-wide text-text-soft">
+                تفصيل المؤشرات الست — نتيجتك هذا الشهر
+              </h3>
+              <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary">
+                الدرجة الكلية = مجموع (درجة × وزن) لكل مؤشر
+              </span>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {IND_CFG.map(ind => (
                 <IndicatorBar key={ind.key} ind={ind} val={s[ind.key]} showWeight noData={noData} />
@@ -673,6 +922,9 @@ function EmployeePersonalView({ snap, month, year }) {
             </div>
           </div>
         )}
+
+        {/* شرح طريقة الاحتساب */}
+        {!noData && <HowScoreWorks snap={s} />}
       </div>
 
       {/* الرادار + الرؤى */}
