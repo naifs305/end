@@ -1088,6 +1088,8 @@ export default function KpisPage() {
   const [loadingDet,   setLoadingDet]   = useState(false);
   const [lastCalc,     setLastCalc]     = useState(null);
   const [levelFilter,  setLevelFilter]  = useState(null);
+  const [nameFilter,   setNameFilter]   = useState('');
+  const [projectFilter,setProjectFilter]= useState('');
 
   // ── جلب اللقطات ──
   const load = useCallback(async () => {
@@ -1208,10 +1210,17 @@ export default function KpisPage() {
     return { counts, avg, total: activeSnaps.length, noData: inactiveSnaps.length };
   }, [activeSnaps, inactiveSnaps]);
 
+  const projectList = useMemo(() =>
+    [...new Set(snapshots.map(s => s.user?.operationalProject?.name).filter(Boolean))],
+    [snapshots],
+  );
+
   const filteredSnaps = useMemo(() => {
-    if (levelFilter) return activeSnaps.filter(x => x.performanceLevel === levelFilter);
-    return [...activeSnaps, ...inactiveSnaps];
-  }, [activeSnaps, inactiveSnaps, levelFilter]);
+    let snaps = levelFilter ? activeSnaps.filter(x => x.performanceLevel === levelFilter) : [...activeSnaps, ...inactiveSnaps];
+    if (nameFilter)    snaps = snaps.filter(s => `${s.user?.firstName || ''} ${s.user?.lastName || ''}`.includes(nameFilter));
+    if (projectFilter) snaps = snaps.filter(s => s.user?.operationalProject?.name === projectFilter);
+    return snaps;
+  }, [activeSnaps, inactiveSnaps, levelFilter, nameFilter, projectFilter]);
 
   const teamBarData = useMemo(
     () => activeSnaps
