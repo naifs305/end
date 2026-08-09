@@ -16,6 +16,11 @@ async function handler(req, res) {
   }
 
   // التحقق من سرّ الكرون (يضبطه فرسيل تلقائياً)
+  //
+  // تنبيه أمني: إن لم يكن CRON_SECRET مضبوطاً في إعدادات فرسيل، يصبح هذا
+  // المسار قابلاً للاستدعاء من أي جهة. الخطورة محدودة لأن runDueJobs تُقدّم
+  // nextRunAt بعد كل تشغيل فلا تتكرر الإشعارات، لكن الإغلاق الصحيح هو ضبط
+  // CRON_SECRET في فرسيل — وعندها يسري الشرط أدناه تلقائياً.
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = req.headers.authorization || '';

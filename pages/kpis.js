@@ -1,5 +1,5 @@
 ﻿import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
@@ -1220,9 +1220,8 @@ function MultiPeriodResults({ months, isManager }) {
                   const isSelected = selectedId === snap.userId;
 
                   return (
-                    <>
+                    <Fragment key={snap.userId}>
                       <tr
-                        key={snap.userId}
                         onClick={() => setSelectedId(isSelected ? null : snap.userId)}
                         className={`cursor-pointer transition hover:bg-background/60 ${isSelected ? 'bg-primary-light/40' : ''}`}
                       >
@@ -1262,7 +1261,7 @@ function MultiPeriodResults({ months, isManager }) {
                       </tr>
                       {/* تفاصيل الشهور عند فتح الصف */}
                       {isSelected && (
-                        <tr key={`${snap.userId}-detail`} className="bg-primary-light/20">
+                        <tr className="bg-primary-light/20">
                           <td colSpan={8} className="px-6 py-3">
                             <div className="flex flex-wrap gap-2 text-[10px]">
                               <span className="font-bold text-text-soft">تفصيل الشهور:</span>
@@ -1288,7 +1287,7 @@ function MultiPeriodResults({ months, isManager }) {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>

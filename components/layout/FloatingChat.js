@@ -21,7 +21,6 @@ export default function FloatingChat() {
   const [open, setOpen]           = useState(false);
   const [view, setView]           = useState('list'); // 'list' | 'chat'
   const [contacts, setContacts]   = useState([]);
-  const [convos, setConvos]       = useState([]);   // محادثات مع عدد غير مقروء
   const [activeUser, setActiveUser] = useState(null);
   const [thread, setThread]       = useState([]);
   const [msgText, setMsgText]     = useState('');
@@ -66,11 +65,12 @@ export default function FloatingChat() {
     } catch {}
   }, [user?.id]);
 
-  // ── تحميل thread ──
+  // ── تحميل thread + تعليم الوارد كمقروء ──
   const loadThread = useCallback(async (uid) => {
     if (!uid) return;
     setLoading(true);
     try {
+      // getThread يعلّم الوارد كمقروء تلقائياً على الخادم — لا حاجة لاستدعاء إضافي
       const res = await api.get(`/messages/thread/${uid}`);
       setThread(res.data || []);
     } catch {}
@@ -106,9 +106,10 @@ export default function FloatingChat() {
     setView('chat');
     setThread([]);
     await loadThread(contact.id);
-    // علّم كمقروء
+    // إخفاء فوري للعلامة ثم مزامنة العدّاد الحقيقي من الخادم
     setContacts(prev => prev.map(u => u.id === contact.id ? { ...u, unread: 0 } : u));
     setUnreadTotal(prev => Math.max(0, prev - (contact.unread || 0)));
+    await loadConvos();
   };
 
   const sendMsg = async () => {
@@ -136,7 +137,6 @@ export default function FloatingChat() {
   // لا تظهر في صفحة المراسلات
   if (router.pathname === '/messages') return null;
 
-  const myId = user.id;
 
   return (
     <>
@@ -226,7 +226,8 @@ export default function FloatingChat() {
                   </div>
                 )}
                 {thread.map((msg, i) => {
-                  const isMe = msg.senderId === myId || msg.sender?.id === myId;
+                  // الخادم لا يضع senderId في الرسائل الصادرة — نعتمد على direction
+                  const isMe = msg.direction === 'out';
                   return (
                     <div key={msg.id || i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-xs leading-relaxed shadow-sm ${
@@ -234,9 +235,9 @@ export default function FloatingChat() {
                           ? 'bg-primary text-white rounded-bl-sm'
                           : 'bg-white border border-border text-text-main rounded-br-sm'
                       }`}>
-                        <p>{msg.body || msg.message?.body}</p>
+                        <p>{msg.body}</p>
                         <p className={`text-[9px] mt-0.5 ${isMe ? 'text-white/60 text-left' : 'text-text-soft/60 text-right'}`}>
-                          {timeAgo(msg.createdAt || msg.message?.createdAt)}
+                          {timeAgo(msg.createdAt)}
                         </p>
                       </div>
                     </div>
