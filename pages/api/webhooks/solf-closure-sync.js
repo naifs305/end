@@ -3,20 +3,32 @@
  *
  * يقفل عناصر السلف القادمة من منصة السلف مباشرة بعد الطباعة.
  */
+const crypto = require('crypto');
 const prisma = require('../../../lib/db/prisma');
-const { checkCourseClosure } = require('../../../lib/services/closure');
+const { checkCourseClosure } = require('../../../lib/modules/closure/closure.service');
+const { logAudit } = require('../../../lib/services/audit');
 
 function withMethods(methods, handler) {
   return async (req, res) => {
-    if (!methods.includes(req.method)) return res.status(405).json({ message: 'Method Not Allowed' });
+    if (!methods.includes(req.method)) return res.status(405).json({ message: 'Method Not Allowed', code: 'serverErrors.common.methodNotAllowed' });
     return handler(req, res);
   };
 }
 
-function readSecret(req, body) {
+// مقارنة بزمن ثابت لمنع هجمات التوقيت
+function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+// قراءة السر من ترويسة Authorization أو x-webhook-secret (وليس من جسم الطلب)
+function readSecret(req) {
   const auth = req.headers.authorization || '';
   if (auth.startsWith('Bearer ')) return auth.slice(7);
-  return body?.secret;
+  return req.headers['x-webhook-secret'] || '';
 }
 
 function toDate(value) {
@@ -28,17 +40,17 @@ async function handler(req, res) {
   const body = req.body || {};
   const expectedSecret = process.env.WEBHOOK_SECRET || process.env.SOLF_WEBHOOK_SECRET;
 
-  if (!expectedSecret || readSecret(req, body) !== expectedSecret) {
-    return res.status(401).json({ message: 'Unauthorized' });
+  if (!expectedSecret || !safeEqual(readSecret(req), expectedSecret)) {
+    return res.status(401).json({ message: 'Unauthorized', code: 'serverErrors.common.unauthorized' });
   }
 
   const type = body.type;
   if (!['advance_req', 'settlement'].includes(type)) {
-    return res.status(400).json({ message: 'type must be advance_req or settlement' });
+    return res.status(400).json({ message: 'type must be advance_req or settlement', code: 'serverErrors.webhooks.invalidType' });
   }
 
   if (!body.courseId) {
-    return res.status(400).json({ message: 'courseId مطلوب' });
+    return res.status(400).json({ message: 'courseId مطلوب', code: 'serverErrors.webhooks.courseIdRequired' });
   }
 
   try {
@@ -92,12 +104,21 @@ async function handler(req, res) {
       },
     });
 
+    // تسجيل في سجل التدقيق على مسار النجاح (logAudit يبتلع أخطاءه بنفسه)
+    await logAudit(actorId, 'WEBHOOK', 'WEBHOOK_ELEMENT_APPROVED', {
+      elementKey: tracking.element.key,
+      source: 'solf',
+      type,
+      referenceNumber: body.referenceNumber || null,
+      amount: body.amount ?? null,
+    }, body.courseId);
+
     await checkCourseClosure(body.courseId);
 
     return res.status(200).json({ ok: true, action: 'approved', trackingId: updated.id });
   } catch (err) {
     console.error('[Webhook] solf-closure-sync error:', err);
-    return res.status(500).json({ message: 'خطأ داخلي' });
+    return res.status(500).json({ message: 'خطأ داخلي', code: 'serverErrors.common.serverError' });
   }
 }
 

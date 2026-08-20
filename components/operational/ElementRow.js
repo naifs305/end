@@ -1,44 +1,103 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import {
+  ExternalLink,
+  Send,
+  RotateCcw,
+  Undo2,
+  Bell,
+  CheckCircle2,
+  Check,
+  CornerUpLeft,
+  X,
+  Clock,
+  AlertTriangle,
+  HeartPulse,
+  FileText,
+} from 'lucide-react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
 import useAuth from '../../context/AuthContext';
+import { useTranslation } from '../../lib/i18n';
+import { useSettings } from '../../lib/hooks/useSettings';
 import CourseReportForm from './CourseReportForm';
+import ReasonModal from './ReasonModal';
 
 // ======================================================================
-// مكون صف عنصر الإقفال — المرحلة الرابعة
+// مكون صف عنصر الإقفال
 // ======================================================================
-// تحسينات:
-//   ١. حقل مبرر التأخر للموظف (مخفي افتراضياً، يظهر بالضغط)
-//   ٢. نموذج سبب الإعادة/الرفض inline بدلاً من prompt()
-//   ٣. زر منح تمديد للمدير مع نموذج داخلي
-
 export default function ElementRow({ element, activeRole, isOverdue = false, onUpdate }) {
   const { user } = useAuth();
-  const [loading, setLoading]               = useState(false);
-  const [reminding, setReminding]           = useState(false);
+  const { t } = useTranslation();
+  const { get: getSetting } = useSettings();
+  const [loading, setLoading] = useState(false);
+  const [reminding, setReminding] = useState(false);
   const [showDelayReason, setShowDelayReason] = useState(false);
-  const [delayReason, setDelayReason]       = useState('');
+  const [delayReason, setDelayReason] = useState('');
   const [showReturnForm, setShowReturnForm] = useState(false);
-  const [returnReason, setReturnReason]     = useState('');
+  const [returnReason, setReturnReason] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
-  const [rejectReason, setRejectReason]     = useState('');
+  const [rejectReason, setRejectReason] = useState('');
   const [showExtendForm, setShowExtendForm] = useState(false);
-  const [extHours, setExtHours]             = useState('');
-  const [extReason, setExtReason]           = useState('');
-  const [savingExt, setSavingExt]           = useState(false);
+  const [extHours, setExtHours] = useState('');
+  const [extReason, setExtReason] = useState('');
+  const [savingExt, setSavingExt] = useState(false);
   const isFinancialElement = ['advance_req', 'settlement'].includes(element?.element?.key);
   const isOpeningReport = element?.element?.key === 'opening_report';
   const isClosingReport = element?.element?.key === 'closing_report';
   const isCourseReport = isOpeningReport || isClosingReport;
   const [showReportForm, setShowReportForm] = useState(false);
-  const solfUrl = process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-nif.vercel.app';
+  const solfUrl = getSetting('solf.url', process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-nif.vercel.app');
+
+  // ── نموذج التأمين الطبي ──
+  const [showInsuranceForm, setShowInsuranceForm] = useState(false);
+  const [insuranceForm, setInsuranceForm] = useState({
+    issuedCount: '',
+    totalTrainees: element?.course?.numTrainees || '',
+    notInsuredReason: '',
+    note: '',
+  });
+
+  const handleInsuranceSubmit = async () => {
+    const issued = Number(insuranceForm.issuedCount);
+    const total = Number(insuranceForm.totalTrainees);
+    if (!insuranceForm.issuedCount || isNaN(issued) || issued < 0) {
+      toast.error(t('element.toast.insuranceEnterIssued'));
+      return;
+    }
+    if (issued < total && !insuranceForm.notInsuredReason.trim()) {
+      toast.error(t('element.toast.insuranceReason'));
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.put(`/closure/${element.id}`, {
+        status: 'PENDING_APPROVAL',
+        formData: {
+          issuedCount: issued,
+          totalTrainees: total,
+          notInsuredCount: Math.max(0, total - issued),
+          notInsuredReason: insuranceForm.notInsuredReason.trim() || null,
+          note: insuranceForm.note.trim() || null,
+        },
+        ...(delayReason.trim() ? { delayReason: delayReason.trim() } : {}),
+      });
+      toast.success(t('element.toast.insuranceSubmitted'));
+      setShowInsuranceForm(false);
+      setDelayReason('');
+      onUpdate();
+    } catch (err) {
+      toast.error(err.response?.data?.message || t('element.toast.submitError'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const isEmployee = activeRole === 'EMPLOYEE';
   const isCoordinator = user?.id && user.id === element?.course?.primaryEmployeeId;
   const canExecute = isEmployee || isCoordinator;
   const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
-  const isManager  = activeRole === 'MANAGER';
+  const isManager = activeRole === 'MANAGER';
   const [volunteering, setVolunteering] = useState(false);
   const canVolunteerReport = canExecute && isCourseReport && element.status === 'NOT_APPLICABLE';
 
@@ -49,17 +108,16 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
         type: isOpeningReport ? 'opening' : 'closing',
         enabled: true,
       });
-      toast.success('تم تفعيل التقرير — يمكنك تقديمه الآن، وسيُقدَّر هذا العمل التطوّعي في مؤشرات أدائك');
+      toast.success(t('element.toast.volunteerEnabled'));
       onUpdate();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'تعذر تفعيل التقرير');
+      toast.error(err.response?.data?.message || t('element.toast.volunteerFailed'));
     } finally {
       setVolunteering(false);
     }
   };
 
   // ---- إجراءات الموظف ----
-
   const handleSubmit = async () => {
     setLoading(true);
     try {
@@ -67,12 +125,12 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
         status: 'PENDING_APPROVAL',
         ...(delayReason.trim() ? { delayReason: delayReason.trim() } : {}),
       });
-      toast.success('تم تقديم العنصر');
+      toast.success(t('element.toast.submitted'));
       setDelayReason('');
       setShowDelayReason(false);
       onUpdate();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'حدث خطأ في التقديم');
+      toast.error(err.response?.data?.message || t('element.toast.submitError'));
     } finally {
       setLoading(false);
     }
@@ -82,72 +140,77 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
     setLoading(true);
     try {
       await api.put(`/closure/${element.id}`, { status: 'NOT_STARTED' });
-      toast.success('تم سحب التقديم');
+      toast.success(t('element.toast.withdrawn'));
       onUpdate();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'حدث خطأ');
+      toast.error(err.response?.data?.message || t('common.error'));
     } finally {
       setLoading(false);
     }
   };
 
   // ---- إجراءات المعتمد ----
-
   const handleApprove = async () => {
     setLoading(true);
     try {
       await api.put(`/closure/${element.id}`, { status: 'APPROVED' });
-      toast.success('تم الاعتماد');
+      toast.success(t('element.toast.approved'));
       onUpdate();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'حدث خطأ');
+      toast.error(err.response?.data?.message || t('common.error'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleReturn = async () => {
-    if (!returnReason.trim()) { toast.error('سبب الإعادة مطلوب'); return; }
+    if (!returnReason.trim()) {
+      toast.error(t('element.toast.returnReasonRequired'));
+      return;
+    }
     setLoading(true);
     try {
       await api.put(`/closure/${element.id}`, { status: 'RETURNED', notes: returnReason.trim() });
-      toast.success('تم إعادة العنصر للموظف');
+      toast.success(t('element.toast.returned'));
       setReturnReason('');
       setShowReturnForm(false);
       onUpdate();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'حدث خطأ');
+      toast.error(err.response?.data?.message || t('common.error'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleReject = async () => {
-    if (!rejectReason.trim()) { toast.error('سبب الرفض مطلوب'); return; }
+    if (!rejectReason.trim()) {
+      toast.error(t('element.toast.rejectReasonRequired'));
+      return;
+    }
     setLoading(true);
     try {
       await api.put(`/closure/${element.id}`, { status: 'REJECTED', notes: rejectReason.trim() });
-      toast.success('تم رفض العنصر');
+      toast.success(t('element.toast.rejected'));
       setRejectReason('');
       setShowRejectForm(false);
       onUpdate();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'حدث خطأ');
+      toast.error(err.response?.data?.message || t('common.error'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleManualFinancialClose = async () => {
-    const notes = window.prompt('ملاحظة التقفيل اليدوي (اختياري):', 'تم تنفيذ الإجراء خارج منصة السلف');
-    if (notes === null) return;
+  const [showManualClose, setShowManualClose] = useState(false);
+  const doManualClose = async (notes) => {
     setLoading(true);
     try {
       await api.post(`/closure/${element.id}/manual-financial-close`, { notes });
-      toast.success('تم تقفيل العنصر مباشرة');
+      toast.success(t('element.toast.manualClosed'));
+      setShowManualClose(false);
       onUpdate();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'تعذر تقفيل العنصر');
+      toast.error(err.response?.data?.message || t('element.toast.manualCloseFailed'));
     } finally {
       setLoading(false);
     }
@@ -168,102 +231,122 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   };
 
   // ---- تمديد الموعد (مدير فقط) ----
-
   const handleGrantExtension = async () => {
     const hours = Number(extHours);
-    if (!hours || hours < 1) { toast.error('أدخل عدد ساعات صحيح'); return; }
-    if (!extReason.trim()) { toast.error('سبب التمديد مطلوب'); return; }
+    if (!hours || hours < 1) {
+      toast.error(t('element.toast.extHoursInvalid'));
+      return;
+    }
+    if (!extReason.trim()) {
+      toast.error(t('element.toast.extReasonRequired'));
+      return;
+    }
     setSavingExt(true);
     try {
       await api.post(`/closure/${element.id}/extend`, {
         extensionHours: hours,
         extensionReason: extReason.trim(),
       });
-      toast.success(`تم منح تمديد ${hours} ساعة للموظف`);
+      toast.success(t('element.toast.extGranted', { hours }));
       setExtHours('');
       setExtReason('');
       setShowExtendForm(false);
       onUpdate();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'تعذر منح التمديد');
+      toast.error(err.response?.data?.message || t('element.toast.extFailed'));
     } finally {
       setSavingExt(false);
     }
   };
 
   // ---- تذكير المدير ----
-
   const handleRemind = async () => {
     setReminding(true);
     try {
       const res = await api.get('/messages/users');
-      const approvers = (res.data || []).filter((u) =>
-        Array.isArray(u.roles) && (u.roles.includes('MANAGER') || u.roles.includes('PROJECT_SUPERVISOR'))
+      const approvers = (res.data || []).filter(
+        (u) => Array.isArray(u.roles) && (u.roles.includes('MANAGER') || u.roles.includes('PROJECT_SUPERVISOR'))
       );
-      if (!approvers.length) { toast.error('لا يوجد معتمد متاح'); return; }
+      if (!approvers.length) {
+        toast.error(t('element.toast.noApprover'));
+        return;
+      }
       await api.post('/messages', {
         recipientIds: approvers.map((u) => u.id),
-        subject: `تذكير باعتماد عنصر — ${element?.course?.name || 'دورة'}`,
-        message: `نأمل مراجعة "${element?.element?.name || 'عنصر'}" المرفوع في "${element?.course?.name || 'الدورة'}" وهو بانتظار الاعتماد.`,
+        subject: t('element.remind.subject', { course: element?.course?.name || t('course.form.editTitle') }),
+        message: t('element.remind.body', { element: element?.element?.name || '', course: element?.course?.name || '' }),
         courseId: element?.courseId || undefined,
       });
-      toast.success('تم إرسال التذكير');
+      toast.success(t('element.toast.reminderSent'));
     } catch (err) {
-      toast.error(err.response?.data?.message || 'تعذر إرسال التذكير');
+      toast.error(err.response?.data?.message || t('element.toast.reminderFailed'));
     } finally {
       setReminding(false);
     }
   };
 
+  const Spinner = () => <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />;
+
   // ======================================================================
   // العرض
   // ======================================================================
-
   return (
     <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
-
-      {/* أزرار الموظف — تقديم / سحب */}
+      {/* زر منصة السلف */}
       {canExecute && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
         <button
           type="button"
           onClick={openSolfForCourse}
-          className="w-fit whitespace-nowrap rounded-xl border border-primary/30 bg-white px-3 py-2 text-xs font-bold text-primary shadow-sm hover:bg-primary-light"
+          className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-xl border border-primary/30 bg-white px-3 py-2 text-xs font-bold text-primary shadow-sm hover:bg-primary-light"
         >
-          منصة السلف
+          <ExternalLink size={14} aria-hidden="true" /> {t('element.solfPlatform')}
         </button>
       )}
 
       {canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status) && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            {isCourseReport ? (
-            <button
-              onClick={() => setShowReportForm(true)}
-              disabled={loading}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-primary-dark disabled:opacity-50 transition"
-            >
-              📋 {element.status === 'RETURNED' ? '↩ إعادة تقديم' : element.formData ? '✏️ استكمال المسودة' : 'تقديم'}
-            </button>
+            {isMedicalInsurance ? (
+              <button
+                onClick={() => setShowInsuranceForm((v) => !v)}
+                disabled={loading}
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-primary-dark disabled:opacity-50"
+              >
+                <HeartPulse size={14} aria-hidden="true" />
+                {element.status === 'RETURNED' ? t('element.resubmit') : t('element.submitInsurance')}
+              </button>
+            ) : isCourseReport ? (
+              <button
+                onClick={() => setShowReportForm(true)}
+                disabled={loading}
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-primary-dark disabled:opacity-50"
+              >
+                <FileText size={14} aria-hidden="true" />
+                {element.status === 'RETURNED' ? t('element.resubmit') : element.formData ? t('element.completeDraft') : t('element.submit')}
+              </button>
             ) : (
-            <button
-              onClick={handleSubmit}
-              disabled={loading}
-              className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold shadow-sm disabled:opacity-50 transition ${isFinancialElement ? 'border border-sand/50 bg-white text-warning hover:bg-sand/10' : 'bg-primary text-white hover:bg-primary-dark'}`}
-            >
-              {loading
-                ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> جاري الرفع...</>
-                : isFinancialElement ? 'تقديم خارج المنصة' : element.status === 'RETURNED' ? '↩ إعادة تقديم' : 'تقديم'}
-            </button>
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold shadow-sm transition disabled:opacity-50 ${
+                  isFinancialElement ? 'border border-sand/50 bg-white text-warning hover:bg-sand/10' : 'bg-primary text-white hover:bg-primary-dark'
+                }`}
+              >
+                {loading ? (
+                  <><Spinner /> {t('element.uploading')}</>
+                ) : isFinancialElement ? (
+                  <>{t('element.submitOutsidePlatform')}</>
+                ) : element.status === 'RETURNED' ? (
+                  <><RotateCcw size={14} aria-hidden="true" /> {t('element.resubmit')}</>
+                ) : (
+                  <><Send size={14} aria-hidden="true" /> {t('element.submit')}</>
+                )}
+              </button>
             )}
 
-            {/* زر إضافة مبرر — مخفي بالافتراض */}
             {isOverdue && (
-              <button
-                type="button"
-                onClick={() => setShowDelayReason((v) => !v)}
-                className="text-xs text-text-soft underline hover:text-primary"
-              >
-                {showDelayReason ? 'إخفاء المبرر' : '+ أضف مبرراً للتأخر'}
+              <button type="button" onClick={() => setShowDelayReason((v) => !v)} className="text-xs text-text-soft underline hover:text-primary">
+                {showDelayReason ? t('element.hideDelayReason') : `+ ${t('element.addDelayReason')}`}
               </button>
             )}
           </div>
@@ -275,13 +358,100 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
                 onChange={(e) => setDelayReason(e.target.value)}
                 rows={2}
                 maxLength={400}
-                placeholder="اكتب مبرراً للتأخر (اختياري — سيظهر للمشرف والمدير)"
+                placeholder={t('element.delayReasonPlaceholder')}
                 className="w-full resize-none rounded-lg border border-sand/30 bg-white p-2 text-xs text-text-main outline-none focus:border-primary"
               />
-              <p className="mt-1 text-right text-[10px] text-text-soft">{delayReason.length}/400</p>
+              <p className="mt-1 text-end text-[10px] text-text-soft">{delayReason.length}/400</p>
             </div>
           )}
 
+          {/* ── نموذج التأمين الطبي ── */}
+          {isMedicalInsurance && showInsuranceForm && (
+            <div className="w-full space-y-3 rounded-xl border border-primary/20 bg-primary-light p-4">
+              <p className="flex items-center gap-2 text-sm font-extrabold text-primary">
+                <HeartPulse size={16} aria-hidden="true" /> {t('element.insurance.title')}
+              </p>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold text-text-main">
+                  {t('element.insurance.totalTrainees')} <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={insuranceForm.totalTrainees}
+                  onChange={(e) => setInsuranceForm((p) => ({ ...p, totalTrainees: e.target.value }))}
+                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                  placeholder={t('element.insurance.totalPlaceholder')}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold text-text-main">
+                  {t('element.insurance.issuedCount')} <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={insuranceForm.issuedCount}
+                  onChange={(e) => setInsuranceForm((p) => ({ ...p, issuedCount: e.target.value }))}
+                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                  placeholder={t('element.insurance.issuedPlaceholder')}
+                />
+                {insuranceForm.issuedCount &&
+                  insuranceForm.totalTrainees &&
+                  Number(insuranceForm.issuedCount) < Number(insuranceForm.totalTrainees) && (
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-warning">
+                      <AlertTriangle size={12} aria-hidden="true" />
+                      {t('element.insurance.uninsuredWarning', { count: Number(insuranceForm.totalTrainees) - Number(insuranceForm.issuedCount) })}
+                    </p>
+                  )}
+              </div>
+
+              {insuranceForm.issuedCount &&
+                insuranceForm.totalTrainees &&
+                Number(insuranceForm.issuedCount) < Number(insuranceForm.totalTrainees) && (
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-text-main">
+                      {t('element.insurance.uninsuredReasonLabel', { count: Number(insuranceForm.totalTrainees) - Number(insuranceForm.issuedCount) })} <span className="text-danger">*</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      maxLength={500}
+                      value={insuranceForm.notInsuredReason}
+                      onChange={(e) => setInsuranceForm((p) => ({ ...p, notInsuredReason: e.target.value }))}
+                      placeholder={t('element.insurance.uninsuredReasonPlaceholder')}
+                      className="w-full resize-none rounded-lg border border-border bg-white px-3 py-2 text-xs outline-none focus:border-primary"
+                    />
+                  </div>
+                )}
+
+              <div>
+                <label className="mb-1 block text-xs font-bold text-text-main">{t('element.insurance.noteLabel')}</label>
+                <textarea
+                  rows={2}
+                  maxLength={400}
+                  value={insuranceForm.note}
+                  onChange={(e) => setInsuranceForm((p) => ({ ...p, note: e.target.value }))}
+                  placeholder={t('element.insurance.notePlaceholder')}
+                  className="w-full resize-none rounded-lg border border-border bg-white px-3 py-2 text-xs outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleInsuranceSubmit}
+                  disabled={loading}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary-dark disabled:opacity-50"
+                >
+                  {loading ? '...' : (<><Check size={14} aria-hidden="true" /> {t('element.insurance.submitForApproval')}</>)}
+                </button>
+                <button onClick={() => setShowInsuranceForm(false)} className="rounded-xl border border-border bg-white px-3 py-2 text-xs text-text-soft hover:bg-background">
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -291,9 +461,9 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           onClick={handleVolunteerReport}
           disabled={volunteering}
           className="whitespace-nowrap rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent shadow-sm hover:bg-accent hover:text-white disabled:opacity-50"
-          title="هذا التقرير غير إجباري على هذه الدورة، لكن تقديمه تطوّعاً يُحتسب لك تقديراً في مؤشرات الأداء"
+          title={t('element.volunteerReportHint')}
         >
-          {volunteering ? '...' : '🙋 تطوّع بتقديم هذا التقرير'}
+          {volunteering ? '...' : t('element.volunteerReport')}
         </button>
       )}
 
@@ -302,18 +472,16 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           <button
             onClick={handleWithdraw}
             disabled={loading || reminding}
-            className="whitespace-nowrap rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-xs font-bold text-warning hover:bg-sand/20 disabled:opacity-50 transition"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-xs font-bold text-warning transition hover:bg-sand/20 disabled:opacity-50"
           >
-            سحب التقديم
+            <Undo2 size={14} aria-hidden="true" /> {t('element.withdraw')}
           </button>
           <button
             onClick={handleRemind}
             disabled={loading || reminding}
-            className="whitespace-nowrap rounded-xl border border-primary bg-white px-3 py-2 text-xs font-bold text-primary hover:bg-primary-light disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-primary bg-white px-3 py-2 text-xs font-bold text-primary hover:bg-primary-light disabled:opacity-50"
           >
-            {reminding
-              ? <span className="flex items-center gap-1"><span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" /> إرسال...</span>
-              : '🔔 تذكير المشرف'}
+            {reminding ? (<><Spinner /> {t('element.sending')}</>) : (<><Bell size={14} aria-hidden="true" /> {t('element.remindSupervisor')}</>)}
           </button>
         </div>
       )}
@@ -322,88 +490,127 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       {isApprover && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
         <button
           type="button"
-          onClick={handleManualFinancialClose}
+          onClick={() => setShowManualClose(true)}
           disabled={loading}
-          className="w-fit whitespace-nowrap rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent shadow-sm hover:bg-accent hover:text-white disabled:opacity-50"
+          className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent shadow-sm hover:bg-accent hover:text-white disabled:opacity-50"
         >
-          تقفيل يدوي
+          <CheckCircle2 size={14} aria-hidden="true" /> {t('element.manualClose')}
         </button>
       )}
 
+      <ReasonModal
+        open={showManualClose}
+        title={t('element.manualClose')}
+        label={t('element.toast.manualClosePrompt')}
+        initialValue={t('element.toast.manualCloseDefault')}
+        tone="primary"
+        loading={loading}
+        onConfirm={doManualClose}
+        onCancel={() => setShowManualClose(false)}
+      />
+
+      {/* عرض بيانات التأمين للمعتمد */}
+      {isApprover && isMedicalInsurance && element.status === 'PENDING_APPROVAL' && element.formData && (
+        <div className="mb-1 w-full space-y-1.5 rounded-xl border border-primary/20 bg-primary-light px-4 py-3">
+          <p className="inline-flex items-center gap-1.5 text-xs font-extrabold text-primary">
+            <HeartPulse size={14} aria-hidden="true" /> {t('element.insurance.submittedTitle')}
+          </p>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="rounded-lg border border-border bg-white px-3 py-2 text-center">
+              <p className="mb-0.5 text-text-soft">{t('element.insurance.totalShort')}</p>
+              <p className="text-xl font-extrabold text-text-main">{element.formData.totalTrainees ?? '-'}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-white px-3 py-2 text-center">
+              <p className="mb-0.5 text-text-soft">{t('element.insurance.issuedShort')}</p>
+              <p className="text-xl font-extrabold text-accent">{element.formData.issuedCount ?? '-'}</p>
+            </div>
+            <div className={`rounded-lg border px-3 py-2 text-center ${element.formData.notInsuredCount > 0 ? 'border-burgundy/20 bg-burgundy/5' : 'border-border bg-white'}`}>
+              <p className="mb-0.5 text-text-soft">{t('element.insurance.uninsuredShort')}</p>
+              <p className={`text-xl font-extrabold ${element.formData.notInsuredCount > 0 ? 'text-danger' : 'text-accent'}`}>{element.formData.notInsuredCount ?? 0}</p>
+            </div>
+          </div>
+          {element.formData.notInsuredReason && (
+            <div className="rounded-lg border border-burgundy/20 bg-burgundy/5 px-3 py-2 text-xs text-danger">
+              <span className="font-bold">{t('element.insurance.uninsuredReasonView')} </span>
+              {element.formData.notInsuredReason}
+            </div>
+          )}
+          {element.formData.note && (
+            <div className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-text-soft">
+              <span className="font-bold text-text-main">{t('element.insurance.noteView')} </span>
+              {element.formData.note}
+            </div>
+          )}
+        </div>
+      )}
 
       {isApprover && element.status === 'PENDING_APPROVAL' && (
-        <div className="flex flex-col gap-2 w-full">
+        <div className="flex w-full flex-col gap-2">
           <div className="flex flex-wrap gap-2">
             <button
               onClick={handleApprove}
               disabled={loading}
-              className="whitespace-nowrap rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
             >
-              اعتماد ✓
+              <Check size={14} aria-hidden="true" /> {t('element.approve')}
             </button>
             <button
               type="button"
               onClick={() => { setShowReturnForm((v) => !v); setShowRejectForm(false); }}
               disabled={loading}
-              className="whitespace-nowrap rounded-xl bg-warning px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-warning px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
             >
-              إعادة للموظف
+              <CornerUpLeft size={14} aria-hidden="true" /> {t('element.returnToEmployee')}
             </button>
             <button
               type="button"
               onClick={() => { setShowRejectForm((v) => !v); setShowReturnForm(false); }}
               disabled={loading}
-              className="whitespace-nowrap rounded-xl bg-danger px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-danger px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
             >
-              رفض
+              <X size={14} aria-hidden="true" /> {t('element.reject')}
             </button>
           </div>
 
-          {/* نموذج الإعادة */}
           {showReturnForm && (
             <div className="rounded-xl border border-sand/40 bg-sand/10 p-2">
-              <p className="mb-1 text-xs font-bold text-warning">سبب الإعادة (مطلوب)</p>
+              <p className="mb-1 text-xs font-bold text-warning">{t('element.returnReasonLabel')}</p>
               <textarea
                 value={returnReason}
                 onChange={(e) => setReturnReason(e.target.value)}
                 rows={2}
                 maxLength={400}
-                placeholder="وضّح للموظف ما يجب تصحيحه..."
+                placeholder={t('element.returnReasonPlaceholder')}
                 className="w-full resize-none rounded-lg border border-sand/30 bg-white p-2 text-xs outline-none focus:border-warning"
               />
               <div className="mt-1.5 flex gap-2">
-                <button onClick={handleReturn} disabled={loading}
-                  className="rounded-lg bg-warning px-3 py-1 text-xs font-bold text-white disabled:opacity-50">
-                  تأكيد الإعادة
+                <button onClick={handleReturn} disabled={loading} className="rounded-lg bg-warning px-3 py-1 text-xs font-bold text-white disabled:opacity-50">
+                  {t('element.confirmReturn')}
                 </button>
-                <button onClick={() => { setShowReturnForm(false); setReturnReason(''); }}
-                  className="rounded-lg border border-border px-3 py-1 text-xs text-text-soft">
-                  إلغاء
+                <button onClick={() => { setShowReturnForm(false); setReturnReason(''); }} className="rounded-lg border border-border px-3 py-1 text-xs text-text-soft">
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>
           )}
 
-          {/* نموذج الرفض */}
           {showRejectForm && (
             <div className="rounded-xl border border-burgundy/20 bg-burgundy/5 p-2">
-              <p className="mb-1 text-xs font-bold text-danger">سبب الرفض (مطلوب)</p>
+              <p className="mb-1 text-xs font-bold text-danger">{t('element.rejectReasonLabel')}</p>
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 rows={2}
                 maxLength={400}
-                placeholder="وضّح سبب الرفض النهائي..."
+                placeholder={t('element.rejectReasonPlaceholder')}
                 className="w-full resize-none rounded-lg border border-burgundy/20 bg-white p-2 text-xs outline-none focus:border-danger"
               />
               <div className="mt-1.5 flex gap-2">
-                <button onClick={handleReject} disabled={loading}
-                  className="rounded-lg bg-danger px-3 py-1 text-xs font-bold text-white disabled:opacity-50">
-                  تأكيد الرفض
+                <button onClick={handleReject} disabled={loading} className="rounded-lg bg-danger px-3 py-1 text-xs font-bold text-white disabled:opacity-50">
+                  {t('element.confirmReject')}
                 </button>
-                <button onClick={() => { setShowRejectForm(false); setRejectReason(''); }}
-                  className="rounded-lg border border-border px-3 py-1 text-xs text-text-soft">
-                  إلغاء
+                <button onClick={() => { setShowRejectForm(false); setRejectReason(''); }} className="rounded-lg border border-border px-3 py-1 text-xs text-text-soft">
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>
@@ -411,48 +618,51 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
         </div>
       )}
 
-      {/* زر تمديد الموعد — مدير فقط */}
+      {/* تمديد الموعد — مدير فقط */}
       {isManager && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
         <div className="flex flex-col gap-2">
           <button
             type="button"
             onClick={() => setShowExtendForm((v) => !v)}
-            className="w-fit whitespace-nowrap rounded-xl border border-primary/40 bg-primary-light/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-light"
+            className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-xl border border-primary/40 bg-primary-light/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-light"
           >
-            {showExtendForm ? 'إغلاق' : '⏱ منح تمديد'}
+            {showExtendForm ? t('common.close') : (<><Clock size={14} aria-hidden="true" /> {t('element.grantExtension')}</>)}
           </button>
 
           {showExtendForm && (
             <div className="rounded-xl border border-primary/20 bg-primary-light/30 p-3">
-              <p className="mb-2 text-xs font-bold text-primary">منح تمديد إضافي للموعد</p>
+              <p className="mb-2 text-xs font-bold text-primary">{t('element.grantExtensionTitle')}</p>
               <div className="flex flex-wrap gap-2">
                 <div>
-                  <label className="mb-0.5 block text-[10px] text-text-soft">عدد الساعات</label>
+                  <label className="mb-0.5 block text-[10px] text-text-soft">{t('element.hoursLabel')}</label>
                   <input
-                    type="number" min="1" max="720"
-                    value={extHours} onChange={(e) => setExtHours(e.target.value)}
-                    placeholder="مثال: 24"
+                    type="number"
+                    min="1"
+                    max="720"
+                    value={extHours}
+                    onChange={(e) => setExtHours(e.target.value)}
+                    placeholder={t('element.hoursPlaceholder')}
                     className="w-24 rounded-lg border border-border px-2 py-1.5 text-xs outline-none focus:border-primary"
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="mb-0.5 block text-[10px] text-text-soft">سبب التمديد</label>
+                  <label className="mb-0.5 block text-[10px] text-text-soft">{t('element.extReasonLabel')}</label>
                   <input
-                    type="text" maxLength={300}
-                    value={extReason} onChange={(e) => setExtReason(e.target.value)}
-                    placeholder="الظروف التي استدعت التمديد..."
+                    type="text"
+                    maxLength={300}
+                    value={extReason}
+                    onChange={(e) => setExtReason(e.target.value)}
+                    placeholder={t('element.extReasonPlaceholder')}
                     className="w-full rounded-lg border border-border px-2 py-1.5 text-xs outline-none focus:border-primary"
                   />
                 </div>
               </div>
               <div className="mt-2 flex gap-2">
-                <button onClick={handleGrantExtension} disabled={savingExt}
-                  className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
-                  {savingExt ? '...' : 'منح التمديد'}
+                <button onClick={handleGrantExtension} disabled={savingExt} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
+                  {savingExt ? '...' : t('element.grantExtensionBtn')}
                 </button>
-                <button onClick={() => { setShowExtendForm(false); setExtHours(''); setExtReason(''); }}
-                  className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-soft">
-                  إلغاء
+                <button onClick={() => { setShowExtendForm(false); setExtHours(''); setExtReason(''); }} className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-soft">
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>

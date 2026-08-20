@@ -1,6 +1,6 @@
 // GET /api/kpis/trend/[userId]?periodType=MONTHLY&periodsCount=6
-const { withAuth, withMethods } = require('../../../../lib/middleware/auth');
-const kpis = require('../../../../lib/services/kpis');
+const { withAuth, withMethods, ok, fail } = require('../../../../lib/server/http');
+const kpis = require('../../../../lib/modules/kpi/kpi.service');
 
 async function handler(req, res) {
   const { userId } = req.query;
@@ -12,9 +12,9 @@ async function handler(req, res) {
       userId: req.user.id,
       supervisedProjectIds: req.scope?.supervisedProjectIds || [],
     });
-    return res.status(200).json(data);
+    return ok(res, data);
   } catch (err) {
-    return res.status(err.statusCode || 500).json({ message: err.message });
+    return fail(res, err);
   }
 }
 

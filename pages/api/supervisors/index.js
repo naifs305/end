@@ -1,8 +1,12 @@
-const { withManager, withMethods } = require('../../../lib/middleware/auth');
-const projectsService = require('../../../lib/services/projects');
+const { withManager, withMethods, ok, fail } = require('../../../lib/server/http');
+const identity = require('../../../lib/modules/identity/identity.service');
 
 async function handler(req, res) {
-  return res.status(200).json(await projectsService.listSupervisors());
+  try {
+    return ok(res, await identity.listSupervisors());
+  } catch (e) {
+    return fail(res, e);
+  }
 }
 
 module.exports = withMethods(['GET'], withManager(handler));

@@ -1,6 +1,6 @@
 // GET /api/kpis — مدير: كل الفريق / مشرف: فريقه / موظف: نفسه فقط
-const { withAuth, withMethods } = require('../../../lib/middleware/auth');
-const kpis = require('../../../lib/services/kpis');
+const { withAuth, withMethods, ok } = require('../../../lib/server/http');
+const kpis = require('../../../lib/modules/kpi/kpi.service');
 
 async function handler(req, res) {
   const { periodType, periodLabel } = req.query;
@@ -9,7 +9,7 @@ async function handler(req, res) {
     userId:     req.user.id,
     supervisedProjectIds: req.scope?.supervisedProjectIds || [],
   });
-  return res.status(200).json(snapshots);
+  return ok(res, snapshots);
 }
 
 module.exports = withMethods(['GET'], withAuth(handler));

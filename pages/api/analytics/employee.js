@@ -1,9 +1,9 @@
-const { withAuth, withMethods } = require('../../../lib/middleware/auth');
-const analytics = require('../../../lib/services/analytics');
+const { withAuth, withMethods, ok } = require('../../../lib/server/http');
+const kpis = require('../../../lib/modules/kpi/kpi.service');
 
 async function handler(req, res) {
-  const data = await analytics.getEmployeeDashboard(req.user);
-  return res.status(200).json(data);
+  const data = await kpis.getEmployeeDashboard(req.user);
+  return ok(res, data);
 }
 
 module.exports = withMethods(['GET'], withAuth(handler));

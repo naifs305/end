@@ -1,14 +1,14 @@
 // PUT /api/messages/[messageId]/read
-const { withAuth, withMethods } = require('../../../../lib/middleware/auth');
-const messagesService = require('../../../../lib/services/messages');
+const { withAuth, withMethods, ok, fail } = require('../../../../lib/server/http');
+const messagingService = require('../../../../lib/modules/messaging/messaging.service');
 
 async function handler(req, res) {
   const { messageId } = req.query;
+  const actor = { userId: req.user.id, activeRole: req.activeRole };
   try {
-    const r = await messagesService.markMessageAsRead(messageId, req.user.id);
-    return res.status(200).json(r);
+    return ok(res, await messagingService.markMessageAsRead(messageId, actor));
   } catch (err) {
-    return res.status(err.statusCode || 500).json({ message: err.message });
+    return fail(res, err);
   }
 }
 

@@ -1,4 +1,6 @@
-export default function KPICard({ title, value, color = 'primary' }) {
+import { memo } from 'react';
+
+function KPICard({ title, value, color = 'primary' }) {
   const cfg = {
     primary: { text: 'text-primary',  border: 'border-s-primary',   bg: 'bg-primary-light' },
     red:     { text: 'text-danger',   border: 'border-s-danger',    bg: 'bg-burgundy/5'    },
@@ -25,3 +27,5 @@ export default function KPICard({ title, value, color = 'primary' }) {
     </div>
   );
 }
+
+export default memo(KPICard);

@@ -1,13 +1,13 @@
-const { withManager, withMethods } = require('../../../lib/middleware/auth');
-const projectsService = require('../../../lib/services/projects');
+const { withManager, withMethods, ok, fail } = require('../../../lib/server/http');
+const identity = require('../../../lib/modules/identity/identity.service');
 
 async function handler(req, res) {
   const { userId } = req.query;
-
+  const actor = { userId: req.user.id, activeRole: req.activeRole, user: req.user };
   try {
-    return res.status(200).json(await projectsService.unassignSupervisor(userId, req.user.id));
+    return ok(res, await identity.unassignSupervisor(userId, actor));
   } catch (error) {
-    return res.status(error.statusCode || 500).json({ message: error.message });
+    return fail(res, error);
   }
 }
 

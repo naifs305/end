@@ -2,11 +2,15 @@
 import MainLayout from '../components/layout/MainLayout';
 import api from '../lib/axios';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
+import { FileSpreadsheet, FileText, RotateCcw, FolderOpen, ArrowLeft, Archive as ArchiveIcon } from 'lucide-react';
 import useAuth from '../context/AuthContext';
 import { isAdminRole } from '../lib/roles';
+import { useTranslation } from '../lib/i18n';
 
 export default function Archive() {
   const { activeRole } = useAuth();
+  const { t, locale } = useTranslation();
   const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
   const isAdmin = isAdminRole(activeRole) || isSupervisor;
   const [courses, setCourses] = useState([]);
@@ -129,18 +133,12 @@ export default function Archive() {
 
   const formatDate = (date) => {
     if (!date) return '-';
-    return new Date(date).toLocaleDateString('ar-SA-u-ca-gregory');
+    return new Date(date).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory');
   };
 
   const getStatusLabel = (status) => {
-    const map = {
-      PREPARATION: 'قيد الإعداد',
-      EXECUTION: 'قيد التنفيذ',
-      AWAITING_CLOSURE: 'بانتظار الإغلاق',
-      CLOSED: 'مغلقة',
-      ARCHIVED: 'مؤرشفة',
-    };
-    return map[status] || status;
+    const key = status === 'IN_PROGRESS' ? 'EXECUTION' : status;
+    return t(`courseStatus.${key}`);
   };
 
   const getProjectName = (course) => {
@@ -152,93 +150,103 @@ export default function Archive() {
   };
 
   const exportToExcel = async () => {
-    const XLSX = await import('xlsx');
+    try {
+      const XLSX = await import('xlsx');
 
-    const data = filteredCourses.map((course) => ({
-      'اسم الدورة': course.name || '',
-      'الكود': course.code || '',
-      'المشروع': getProjectName(course),
-      'المدينة': course.city || '',
-      'نوع الدورة': course.courseType === 'internal' ? 'داخلية' : 'خارجية',
-      'الحالة': getStatusLabel(course.status),
-      'تاريخ البداية': formatDate(course.startDate),
-      'تاريخ النهاية': formatDate(course.endDate),
-      'عدد المتدربين': course.numTrainees || 0,
-    }));
+      const data = filteredCourses.map((course) => ({
+        [t('archive.col.courseName')]: course.name || '',
+        [t('archive.col.code')]: course.code || '',
+        [t('archive.col.project')]: getProjectName(course),
+        [t('archive.col.city')]: course.city || '',
+        [t('archive.col.type')]: course.courseType === 'internal' ? t('archive.typeInternal') : t('archive.typeExternal'),
+        [t('archive.col.status')]: getStatusLabel(course.status),
+        [t('archive.col.startDate')]: formatDate(course.startDate),
+        [t('archive.col.endDate')]: formatDate(course.endDate),
+        [t('archive.col.trainees')]: course.numTrainees || 0,
+      }));
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
 
-    worksheet['!cols'] = [
-      { wch: 28 },
-      { wch: 18 },
-      { wch: 22 },
-      { wch: 18 },
-      { wch: 14 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 14 },
-    ];
+      worksheet['!cols'] = [
+        { wch: 28 },
+        { wch: 18 },
+        { wch: 22 },
+        { wch: 18 },
+        { wch: 14 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 14 },
+      ];
 
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'الأرشيف');
-    XLSX.writeFile(workbook, 'course-closure-archive.xlsx');
+      XLSX.utils.book_append_sheet(workbook, worksheet, t('archive.sheetName'));
+      XLSX.writeFile(workbook, 'course-closure-archive.xlsx');
+    } catch (error) {
+      console.error(error);
+      toast.error(t('common.error'));
+    }
   };
 
   const exportToPDF = async () => {
-    const { default: jsPDF } = await import('jspdf');
-    const { default: autoTable } = await import('jspdf-autotable');
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
 
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-    doc.setFontSize(16);
-    doc.text(isAdmin ? 'أرشيف الإقفالات' : 'أرشيف دوراتي', 14, 15);
+      doc.setFontSize(16);
+      doc.text(isAdmin ? t('archive.titleAdmin') : t('archive.titleEmployee'), 14, 15);
 
-    const tableRows = filteredCourses.map((course) => [
-      course.name || '-',
-      course.code || '-',
-      getProjectName(course),
-      course.city || '-',
-      course.courseType === 'internal' ? 'Internal' : 'External',
-      getStatusLabel(course.status),
-      formatDate(course.endDate),
-    ]);
+      const tableRows = filteredCourses.map((course) => [
+        course.name || '-',
+        course.code || '-',
+        getProjectName(course),
+        course.city || '-',
+        course.courseType === 'internal' ? 'Internal' : 'External',
+        getStatusLabel(course.status),
+        formatDate(course.endDate),
+      ]);
 
-    autoTable(doc, {
-      startY: 22,
-      head: [[
-        'Course Name',
-        'Code',
-        'Project',
-        'City',
-        'Type',
-        'Status',
-        'Closure Date',
-      ]],
-      body: tableRows,
-      styles: {
-        fontSize: 8,
-        halign: 'center',
-        valign: 'middle',
-      },
-      headStyles: {
-        fillColor: [37, 60, 50],
-        textColor: 255,
-      },
-      alternateRowStyles: {
-        fillColor: [247, 247, 245],
-      },
-      margin: { top: 22, right: 10, bottom: 10, left: 10 },
-    });
+      autoTable(doc, {
+        startY: 22,
+        head: [[
+          'Course Name',
+          'Code',
+          'Project',
+          'City',
+          'Type',
+          'Status',
+          'Closure Date',
+        ]],
+        body: tableRows,
+        styles: {
+          fontSize: 8,
+          halign: 'center',
+          valign: 'middle',
+        },
+        headStyles: {
+          fillColor: [37, 60, 50],
+          textColor: 255,
+        },
+        alternateRowStyles: {
+          fillColor: [247, 247, 245],
+        },
+        margin: { top: 22, right: 10, bottom: 10, left: 10 },
+      });
 
-    doc.save(isAdmin ? 'course-closure-archive.pdf' : 'my-course-archive.pdf');
+      doc.save(isAdmin ? 'course-closure-archive.pdf' : 'my-course-archive.pdf');
+    } catch (error) {
+      console.error(error);
+      toast.error(t('common.error'));
+    }
   };
 
   if (!['MANAGER', 'PROJECT_SUPERVISOR', 'EMPLOYEE'].includes(activeRole)) {
     return (
       <MainLayout>
         <div className="rounded-2xl border border-danger/20 bg-white p-6 text-danger shadow-card">
-          غير مصرح لك بالدخول إلى هذه الصفحة.
+          {t('archive.unauthorized')}
         </div>
       </MainLayout>
     );
@@ -253,49 +261,48 @@ export default function Archive() {
         <div className="rounded-2xl border border-border bg-white p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-extrabold text-primary">
-                {isAdmin ? 'أرشيف الإقفالات' : 'أرشيفي'}
+              <h1 className="inline-flex items-center gap-2 text-2xl font-extrabold text-primary">
+                <ArchiveIcon size={22} aria-hidden="true" />
+                {isAdmin ? t('archive.titleAdmin') : t('archive.titleEmployee')}
               </h1>
               <p className="mt-1 text-sm text-text-soft">
-                {isAdmin
-                  ? 'عرض وأرشفة الدورات المغلقة والمؤرشفة'
-                  : 'عرض دوراتك المغلقة والمؤرشفة'}
+                {isAdmin ? t('archive.subtitleAdmin') : t('archive.subtitleEmployee')}
               </p>
             </div>
 
             <div className="flex gap-2">
               <button
                 onClick={exportToExcel}
-                className="rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-white transition hover:bg-primary-dark"
+                className="inline-flex items-center gap-1.5 rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-white transition hover:bg-primary-dark"
               >
-                تصدير Excel
+                <FileSpreadsheet size={16} aria-hidden="true" /> {t('archive.exportExcel')}
               </button>
               <button
                 onClick={exportToPDF}
-                className="rounded-2xl bg-accent px-4 py-2 text-sm font-bold text-white transition hover:opacity-90"
+                className="inline-flex items-center gap-1.5 rounded-2xl bg-accent px-4 py-2 text-sm font-bold text-white transition hover:opacity-90"
               >
-                تصدير PDF
+                <FileText size={16} aria-hidden="true" /> {t('archive.exportPdf')}
               </button>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-          <StatCard title="إجمالي الأرشيف" value={stats.total} accent />
-          <StatCard title="مغلقة"           value={stats.closed} />
-          <StatCard title="مؤرشفة"          value={stats.archived} />
-          <StatCard title="داخلية"          value={stats.internal} />
-          <StatCard title="خارجية"          value={stats.external} />
+          <StatCard title={t('archive.statTotal')} value={stats.total} accent />
+          <StatCard title={t('archive.statClosed')} value={stats.closed} />
+          <StatCard title={t('archive.statArchived')} value={stats.archived} />
+          <StatCard title={t('archive.statInternal')} value={stats.internal} />
+          <StatCard title={t('archive.statExternal')} value={stats.external} />
         </div>
 
         <div className="rounded-2xl border border-border bg-white p-4 md:p-6 shadow-card">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-extrabold text-primary">فلاتر الأرشيف</h2>
+            <h2 className="text-lg font-extrabold text-primary">{t('archive.filtersTitle')}</h2>
             <button
               onClick={resetFilters}
-              className="rounded-2xl border border-border bg-white px-3 py-2 text-sm font-bold text-text-main transition hover:bg-background"
+              className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-white px-3 py-2 text-sm font-bold text-text-main transition hover:bg-background"
             >
-              إعادة تعيين
+              <RotateCcw size={15} aria-hidden="true" /> {t('archive.resetFilters')}
             </button>
           </div>
 
@@ -307,7 +314,7 @@ export default function Archive() {
             <input
               type="text"
               name="search"
-              placeholder="بحث باسم الدورة أو الكود"
+              placeholder={t('archive.searchPlaceholder')}
               value={filters.search}
               onChange={handleChange}
               className={inputClass}
@@ -320,7 +327,7 @@ export default function Archive() {
                 onChange={handleChange}
                 className={inputClass}
               >
-                <option value="">كل المشاريع</option>
+                <option value="">{t('archive.allProjects')}</option>
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
@@ -335,15 +342,15 @@ export default function Archive() {
               onChange={handleChange}
               className={inputClass}
             >
-              <option value="">كل الحالات</option>
-              <option value="CLOSED">مغلقة</option>
-              <option value="ARCHIVED">مؤرشفة</option>
+              <option value="">{t('archive.allStatuses')}</option>
+              <option value="CLOSED">{t('courseStatus.CLOSED')}</option>
+              <option value="ARCHIVED">{t('courseStatus.ARCHIVED')}</option>
             </select>
 
             <input
               type="number"
               name="year"
-              placeholder="السنة"
+              placeholder={t('archive.year')}
               value={filters.year}
               onChange={handleChange}
               className={inputClass}
@@ -352,7 +359,7 @@ export default function Archive() {
             <input
               type="text"
               name="city"
-              placeholder="المدينة"
+              placeholder={t('archive.city')}
               value={filters.city}
               onChange={handleChange}
               className={inputClass}
@@ -364,9 +371,9 @@ export default function Archive() {
               onChange={handleChange}
               className={inputClass}
             >
-              <option value="">كل الأنواع</option>
-              <option value="internal">داخلية</option>
-              <option value="external">خارجية</option>
+              <option value="">{t('archive.allTypes')}</option>
+              <option value="internal">{t('archive.typeInternal')}</option>
+              <option value="external">{t('archive.typeExternal')}</option>
             </select>
           </div>
         </div>
@@ -374,35 +381,35 @@ export default function Archive() {
         <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
           <div className="border-b border-border p-4">
             <h2 className="text-lg font-extrabold text-primary">
-              {isAdmin ? 'سجل الإقفالات' : 'سجل دوراتي المؤرشفة'}
+              {isAdmin ? t('archive.logTitleAdmin') : t('archive.logTitleEmployee')}
             </h2>
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-14 text-text-soft">
               <div className="h-6 w-6 animate-spin rounded-full border-3 border-primary border-t-transparent" />
-              <span className="text-sm">جاري التحميل...</span>
+              <span className="text-sm">{t('common.loading')}</span>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-background border-b border-border">
-                  <tr className="text-right">
-                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">الدورة</th>
-                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">الكود</th>
-                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">المشروع</th>
-                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">المدينة</th>
-                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">النوع</th>
-                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">الحالة</th>
-                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">تاريخ الإغلاق</th>
-                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">إجراء</th>
+                  <tr className="text-start">
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">{t('archive.col.courseName')}</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">{t('archive.col.code')}</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">{t('archive.col.project')}</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">{t('archive.col.city')}</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">{t('archive.col.type')}</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">{t('archive.col.status')}</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">{t('archive.col.closureDate')}</th>
+                    <th className="px-4 py-3 text-[11px] font-extrabold uppercase tracking-wide text-text-soft/60">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredCourses.length === 0 ? (
                     <tr>
                       <td colSpan="8" className="px-4 py-12 text-center text-text-soft">
-                        لا توجد نتائج في الأرشيف
+                        {t('archive.noResults')}
                       </td>
                     </tr>
                   ) : (
@@ -417,7 +424,7 @@ export default function Archive() {
                         <td className="px-4 py-3 text-xs text-text-soft">{getProjectName(course)}</td>
                         <td className="px-4 py-3 text-xs text-text-soft">{course.city || '—'}</td>
                         <td className="px-4 py-3 text-xs text-text-soft">
-                          {course.courseType === 'internal' ? 'داخلية' : 'خارجية'}
+                          {course.courseType === 'internal' ? t('archive.typeInternal') : t('archive.typeExternal')}
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${
@@ -431,8 +438,9 @@ export default function Archive() {
                         <td className="px-4 py-3 text-xs text-text-soft">{formatDate(course.endDate)}</td>
                         <td className="px-4 py-3">
                           <Link href={`/courses/${course.id}`}
-                            className="rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-bold text-text-main hover:border-primary hover:text-primary transition">
-                            عرض ←
+                            className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-bold text-text-main hover:border-primary hover:text-primary transition">
+                            <FolderOpen size={13} aria-hidden="true" /> {t('common.view')}
+                            <ArrowLeft size={12} aria-hidden="true" />
                           </Link>
                         </td>
                       </tr>
@@ -444,11 +452,17 @@ export default function Archive() {
           )}
           {filteredCourses.length > 0 ? (
             <div className="flex flex-col gap-3 border-t border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
-              <div className="text-sm text-text-soft">عرض {Math.min((page - 1) * PAGE_SIZE + 1, filteredCourses.length)} إلى {Math.min(page * PAGE_SIZE, filteredCourses.length)} من {filteredCourses.length}</div>
+              <div className="text-sm text-text-soft">
+                {t('archive.pageRange', {
+                  from: Math.min((page - 1) * PAGE_SIZE + 1, filteredCourses.length),
+                  to: Math.min(page * PAGE_SIZE, filteredCourses.length),
+                  total: filteredCourses.length,
+                })}
+              </div>
               <div className="flex items-center gap-2">
-                <button type="button" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))} className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background disabled:opacity-50">السابق</button>
+                <button type="button" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))} className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background disabled:opacity-50">{t('common.previous')}</button>
                 <div className="rounded-xl bg-background px-4 py-2 text-sm font-bold text-text-main">{page} / {totalPages}</div>
-                <button type="button" disabled={page >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))} className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background disabled:opacity-50">التالي</button>
+                <button type="button" disabled={page >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))} className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background disabled:opacity-50">{t('common.next')}</button>
               </div>
             </div>
           ) : null}

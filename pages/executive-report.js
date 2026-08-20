@@ -1,25 +1,25 @@
 ﻿// صفحة التقرير القيادي الشهري — مدير ومشرف مشروع
 import { useState, useEffect, useRef } from 'react';
-import dynamic from 'next/dynamic';
+import { BarChart3, Download, BookOpen, Sparkles, CheckCircle2, AlertTriangle, Hourglass, CircleDot, Trophy, Users } from 'lucide-react';
 import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 import { useRouter } from 'next/router';
+import { useTranslation } from '../lib/i18n';
 
-const TeamBarChart = dynamic(() => import('../components/charts/TeamBarChart'), { ssr: false });
-
-// ── ثوابت ──────────────────────────────────────────────────────────────
-const MONTHS = [
-  'يناير','فبراير','مارس','أبريل','مايو','يونيو',
-  'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر',
+// ── أسماء الأشهر الإنجليزية (تُستخدم داخل PDF بخط لاتيني فقط) ──────────────
+const MONTHS_EN = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const LEVEL_LABEL = {
-  OUTSTANDING:       'متميز',
-  VERY_GOOD:         'جيد جداً',
-  GOOD:              'جيد',
-  NEEDS_IMPROVEMENT: 'يحتاج تحسين',
-  WEAK:              'ضعيف',
+// تسميات المستوى الإنجليزية (لجدول PDF اللاتيني)
+const LEVEL_LABEL_EN = {
+  OUTSTANDING:       'Outstanding',
+  VERY_GOOD:         'Very Good',
+  GOOD:              'Good',
+  NEEDS_IMPROVEMENT: 'Needs Improvement',
+  WEAK:              'Weak',
 };
 
 const LEVEL_CLS = {
@@ -35,13 +35,15 @@ const LEVEL_COLOR = {
   NEEDS_IMPROVEMENT: '#C3B39F', WEAK: '#633646',
 };
 
+const LEVEL_ORDER = ['OUTSTANDING', 'VERY_GOOD', 'GOOD', 'NEEDS_IMPROVEMENT', 'WEAK'];
+
 function fmt(v, d = 1) {
   const n = Number(v);
   return isNaN(n) ? '-' : n.toFixed(d);
 }
 
 // ── مكون: بطاقة إحصائية ────────────────────────────────────────────────
-function StatCard({ label, value, sub, accent = false, danger = false, icon }) {
+function StatCard({ label, value, sub, accent = false, danger = false, Icon }) {
   const bg = danger
     ? 'border-burgundy/20 bg-burgundy/5'
     : accent
@@ -60,7 +62,7 @@ function StatCard({ label, value, sub, accent = false, danger = false, icon }) {
           <p className={`text-3xl font-extrabold ${val}`}>{value}</p>
           {sub && <p className="mt-1 text-[11px] text-text-soft">{sub}</p>}
         </div>
-        {icon && <span className="text-2xl opacity-60">{icon}</span>}
+        {Icon && <Icon size={24} aria-hidden="true" className="text-text-soft/60" />}
       </div>
     </div>
   );
@@ -83,7 +85,7 @@ function ProgressBar({ label, value, total, color = '#253C32' }) {
 }
 
 // ── مكون: جدول الأداء ───────────────────────────────────────────────────
-function PerfRow({ rank, name, project, score, level, color }) {
+function PerfRow({ rank, name, project, score, level, color, t }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5 bg-white">
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white"
@@ -96,9 +98,9 @@ function PerfRow({ rank, name, project, score, level, color }) {
         <div className="h-1.5 w-16 overflow-hidden rounded-full bg-forest-50">
           <div className="h-full rounded-full" style={{ width: `${Math.min(100, Number(score))}%`, backgroundColor: color }} />
         </div>
-        <span className="w-12 text-right text-xs font-extrabold text-text-main">{fmt(score)}%</span>
+        <span className="w-12 text-end text-xs font-extrabold text-text-main">{fmt(score)}%</span>
         <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${LEVEL_CLS[level] || ''}`}>
-          {LEVEL_LABEL[level] || level}
+          {level ? t(`performanceLevel.${level}`) : level}
         </span>
       </div>
     </div>
@@ -109,6 +111,11 @@ function PerfRow({ rank, name, project, score, level, color }) {
 export default function ExecutiveReportPage() {
   const { activeRole } = useAuth();
   const router = useRouter();
+  const { t, locale } = useTranslation();
+
+  const intl = locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory';
+  // اسم الشهر المترجم حسب اللغة الحالية
+  const monthName = (m) => new Date(2000, m - 1, 1).toLocaleDateString(intl, { month: 'long' });
 
   const now = new Date();
   const [year,  setYear]  = useState(now.getFullYear());
@@ -117,6 +124,10 @@ export default function ExecutiveReportPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const reportRef = useRef(null);
+
+  // قائمة السنوات الديناميكية: السنة الحالية والثلاث السابقة
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
 
   // حماية — فقط مدير ومشرف
   useEffect(() => {
@@ -134,7 +145,7 @@ export default function ExecutiveReportPage() {
       .finally(() => setLoading(false));
   }, [year, month]);
 
-  // ── تصدير PDF ──────────────────────────────────────────────────────────
+  // ── تصدير PDF (محتوى لاتيني — يبقى بالإنجليزية لضمان عرض الخط) ───────────
   const handleExportPDF = async () => {
     if (!data) return;
     setExporting(true);
@@ -154,7 +165,7 @@ export default function ExecutiveReportPage() {
       doc.text('Executive Monthly Report', pageW / 2, 12, { align: 'center' });
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`${MONTHS[month - 1]} ${year}  |  Generated: ${new Date().toLocaleDateString('en-SA')}`, pageW / 2, 21, { align: 'center' });
+      doc.text(`${MONTHS_EN[month - 1]} ${year}  |  Generated: ${new Date().toLocaleDateString('en-SA')}`, pageW / 2, 21, { align: 'center' });
 
       let y = 36;
 
@@ -242,7 +253,7 @@ export default function ExecutiveReportPage() {
         autoTable(doc, {
           startY: y,
           head: [['Rank', 'Name', 'Project', 'Score', 'Level']],
-          body: data.kpi.top3.map((e, i) => [i + 1, e.name, e.project, `${e.score}%`, LEVEL_LABEL[e.level] || e.level]),
+          body: data.kpi.top3.map((e, i) => [i + 1, e.name, e.project, `${e.score}%`, LEVEL_LABEL_EN[e.level] || e.level]),
           styles: { fontSize: 10, cellPadding: 3 },
           headStyles: { fillColor: [37, 60, 50], textColor: [255,255,255], fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [235, 243, 238] },
@@ -293,13 +304,12 @@ export default function ExecutiveReportPage() {
   if (activeRole && activeRole !== 'MANAGER' && activeRole !== 'PROJECT_SUPERVISOR') return null;
 
   // ── KPI level distribution للرسم ───────────────────────────────────────
-  const levelData = data ? [
-    { name: LEVEL_LABEL.OUTSTANDING,       value: data.kpi.levelCounts.OUTSTANDING       || 0, fill: LEVEL_COLOR.OUTSTANDING },
-    { name: LEVEL_LABEL.VERY_GOOD,         value: data.kpi.levelCounts.VERY_GOOD         || 0, fill: LEVEL_COLOR.VERY_GOOD },
-    { name: LEVEL_LABEL.GOOD,              value: data.kpi.levelCounts.GOOD              || 0, fill: LEVEL_COLOR.GOOD },
-    { name: LEVEL_LABEL.NEEDS_IMPROVEMENT, value: data.kpi.levelCounts.NEEDS_IMPROVEMENT || 0, fill: LEVEL_COLOR.NEEDS_IMPROVEMENT },
-    { name: LEVEL_LABEL.WEAK,              value: data.kpi.levelCounts.WEAK              || 0, fill: LEVEL_COLOR.WEAK },
-  ].filter(d => d.value > 0) : [];
+  const levelData = data ? LEVEL_ORDER.map((lv) => ({
+    key: lv,
+    name: t(`performanceLevel.${lv}`),
+    value: data.kpi.levelCounts[lv] || 0,
+    fill: LEVEL_COLOR[lv],
+  })).filter(d => d.value > 0) : [];
 
   return (
     <MainLayout>
@@ -309,8 +319,10 @@ export default function ExecutiveReportPage() {
         <div className="rounded-2xl border border-border bg-white px-5 py-4 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-xl font-extrabold text-primary">📊 التقرير القيادي الشهري</h1>
-              <p className="mt-0.5 text-xs text-text-soft">ملخص تنفيذي لأداء الفريق والدورات التدريبية</p>
+              <h1 className="inline-flex items-center gap-2 text-xl font-extrabold text-primary">
+                <BarChart3 size={22} aria-hidden="true" /> {t('exec.title')}
+              </h1>
+              <p className="mt-0.5 text-xs text-text-soft">{t('exec.subtitle')}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {/* اختيار الشهر */}
@@ -319,8 +331,8 @@ export default function ExecutiveReportPage() {
                 onChange={e => setMonth(Number(e.target.value))}
                 className="rounded-xl border border-border bg-white px-3 py-2 text-sm font-medium text-text-main outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
               >
-                {MONTHS.map((m, i) => (
-                  <option key={i+1} value={i+1}>{m}</option>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={m}>{monthName(m)}</option>
                 ))}
               </select>
               {/* اختيار السنة */}
@@ -329,7 +341,7 @@ export default function ExecutiveReportPage() {
                 onChange={e => setYear(Number(e.target.value))}
                 className="rounded-xl border border-border bg-white px-3 py-2 text-sm font-medium text-text-main outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
               >
-                {[2024, 2025, 2026, 2027].map(y => (
+                {yearOptions.map(y => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
@@ -342,15 +354,15 @@ export default function ExecutiveReportPage() {
                 {exporting ? (
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 ) : (
-                  <span>📥</span>
+                  <Download size={16} aria-hidden="true" />
                 )}
-                تصدير PDF
+                {t('exec.exportPdf')}
               </button>
             </div>
           </div>
           {data && (
             <div className="mt-2 text-[11px] text-text-soft/70">
-              تقرير {MONTHS[month - 1]} {year} — تم الإنشاء: {new Date(data.generatedAt).toLocaleString('ar-SA-u-ca-gregory')}
+              {t('exec.reportFor', { month: monthName(month), year })} — {t('exec.generatedAt', { date: new Date(data.generatedAt).toLocaleString(intl) })}
             </div>
           )}
         </div>
@@ -362,37 +374,37 @@ export default function ExecutiveReportPage() {
           </div>
         ) : !data ? (
           <div className="rounded-2xl border border-danger/20 bg-white p-8 text-center shadow-card">
-            <p className="text-danger font-bold">تعذر تحميل بيانات التقرير</p>
-            <p className="mt-1 text-xs text-text-soft">تحقق من الاتصال أو حدد فترة زمنية مختلفة</p>
+            <p className="text-danger font-bold">{t('exec.loadFailed')}</p>
+            <p className="mt-1 text-xs text-text-soft">{t('exec.loadFailedHint')}</p>
           </div>
         ) : (
           <>
             {/* ── قسم الدورات ──────────────────────────────────────────── */}
             <div>
-              <h2 className="mb-2 px-1 text-sm font-extrabold uppercase tracking-widest text-text-soft/60">الدورات التدريبية</h2>
+              <h2 className="mb-2 px-1 text-sm font-extrabold uppercase tracking-widest text-text-soft/60">{t('exec.coursesSection')}</h2>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <StatCard
-                  label="إجمالي الدورات"
+                  label={t('exec.totalCourses')}
                   value={data.courses.total}
-                  icon="📚"
+                  Icon={BookOpen}
                   accent
                 />
                 <StatCard
-                  label="دورات جديدة هذا الشهر"
+                  label={t('exec.newCourses')}
                   value={data.courses.newThisPeriod}
-                  sub={`${MONTHS[month-1]} ${year}`}
-                  icon="✨"
+                  sub={`${monthName(month)} ${year}`}
+                  Icon={Sparkles}
                 />
                 <StatCard
-                  label="مُغلقة هذا الشهر"
+                  label={t('exec.closedThisMonth')}
                   value={data.courses.closedThisPeriod}
-                  icon="✅"
+                  Icon={CheckCircle2}
                   accent={data.courses.closedThisPeriod > 0}
                 />
                 <StatCard
-                  label="دورات متأخرة (غير مغلقة)"
+                  label={t('exec.overdueCourses')}
                   value={data.courses.overdueNotClosed}
-                  icon="⚠️"
+                  Icon={AlertTriangle}
                   danger={data.courses.overdueNotClosed > 0}
                 />
               </div>
@@ -402,57 +414,57 @@ export default function ExecutiveReportPage() {
             <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <h2 className="font-extrabold text-text-main">عناصر الإغلاق</h2>
-                  <p className="text-[11px] text-text-soft">{data.elements.total} عنصر إجمالاً</p>
+                  <h2 className="font-extrabold text-text-main">{t('exec.closureElements')}</h2>
+                  <p className="text-[11px] text-text-soft">{t('exec.elementsTotal', { count: data.elements.total })}</p>
                 </div>
                 <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-light px-4 py-2">
                   <span className="text-2xl font-extrabold text-primary">{data.elements.completionRate}%</span>
-                  <div className="text-[10px] text-text-soft">نسبة<br/>الإنجاز</div>
+                  <div className="text-[10px] text-text-soft">{t('exec.completionRate')}</div>
                 </div>
               </div>
               <div className="space-y-3">
-                <ProgressBar label="مُعتمدة" value={data.elements.approved}   total={data.elements.total} color="#5D8A70" />
-                <ProgressBar label="قيد الاعتماد" value={data.elements.pending}    total={data.elements.total} color="#C3B39F" />
-                <ProgressBar label="لم تبدأ"  value={data.elements.notStarted} total={data.elements.total} color="#9DA3A1" />
-                <ProgressBar label="مُعادة"   value={data.elements.returned}   total={data.elements.total} color="#633646" />
+                <ProgressBar label={t('elementStatus.APPROVED')} value={data.elements.approved}   total={data.elements.total} color="#5D8A70" />
+                <ProgressBar label={t('elementStatus.PENDING_APPROVAL')} value={data.elements.pending}    total={data.elements.total} color="#C3B39F" />
+                <ProgressBar label={t('elementStatus.NOT_STARTED')} value={data.elements.notStarted} total={data.elements.total} color="#9DA3A1" />
+                <ProgressBar label={t('elementStatus.RETURNED')}  value={data.elements.returned}   total={data.elements.total} color="#633646" />
               </div>
               {data.elements.pending > 0 && (
                 <div className="mt-3 flex items-center gap-2 rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-xs text-warning">
-                  <span>⏳</span>
-                  <span>{data.elements.pending} عنصر بانتظار الاعتماد من المشرفين</span>
+                  <Hourglass size={14} aria-hidden="true" className="shrink-0" />
+                  <span>{t('exec.pendingNotice', { count: data.elements.pending })}</span>
                 </div>
               )}
               {data.courses.overdueNotClosed > 0 && (
                 <div className="mt-2 flex items-center gap-2 rounded-xl border border-burgundy/20 bg-burgundy/5 px-3 py-2 text-xs text-danger">
-                  <span>🔴</span>
-                  <span>{data.courses.overdueNotClosed} دورة تجاوزت تاريخ الانتهاء ولم تُغلق</span>
+                  <CircleDot size={14} aria-hidden="true" className="shrink-0" />
+                  <span>{t('exec.overdueNotice', { count: data.courses.overdueNotClosed })}</span>
                 </div>
               )}
             </div>
 
             {/* ── قسم KPI ──────────────────────────────────────────────── */}
             <div>
-              <h2 className="mb-2 px-1 text-sm font-extrabold uppercase tracking-widest text-text-soft/60">مؤشرات الأداء — {MONTHS[month-1]} {year}</h2>
+              <h2 className="mb-2 px-1 text-sm font-extrabold uppercase tracking-widest text-text-soft/60">{t('exec.kpiSection', { month: monthName(month), year })}</h2>
 
               {data.kpi.activeEmployees === 0 ? (
                 <div className="rounded-2xl border border-border bg-white p-8 text-center text-sm text-text-soft shadow-card">
-                  لا توجد تقييمات KPI لهذه الفترة
+                  {t('exec.noKpi')}
                 </div>
               ) : (
                 <>
                   {/* بطاقات KPI */}
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mb-4">
                     <div className="rounded-2xl border border-primary/20 bg-primary p-4 shadow-card text-white">
-                      <p className="text-xs opacity-70">متوسط الفريق</p>
+                      <p className="text-xs opacity-70">{t('exec.teamAvg')}</p>
                       <p className="text-3xl font-extrabold">{fmt(data.kpi.avgScore)}%</p>
-                      <p className="mt-1 text-[11px] opacity-60">{data.kpi.activeEmployees} موظف مُقيَّم</p>
+                      <p className="mt-1 text-[11px] opacity-60">{t('exec.evaluatedEmployees', { count: data.kpi.activeEmployees })}</p>
                     </div>
                     <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
-                      <p className="text-xs text-text-soft">متميز + جيد جداً</p>
+                      <p className="text-xs text-text-soft">{t('exec.outstandingPlusVeryGood')}</p>
                       <p className="text-3xl font-extrabold text-primary">
                         {(data.kpi.levelCounts.OUTSTANDING || 0) + (data.kpi.levelCounts.VERY_GOOD || 0)}
                       </p>
-                      <p className="mt-1 text-[11px] text-text-soft">موظف عالي الأداء</p>
+                      <p className="mt-1 text-[11px] text-text-soft">{t('exec.highPerformers')}</p>
                     </div>
                     <div className={`rounded-2xl border p-4 shadow-card ${
                       (data.kpi.needsAttention?.length || 0) > 0
@@ -460,23 +472,23 @@ export default function ExecutiveReportPage() {
                         : 'border-border bg-white'
                     }`}>
                       <p className={`text-xs ${(data.kpi.needsAttention?.length||0) > 0 ? 'text-danger' : 'text-text-soft'}`}>
-                        يحتاجون متابعة
+                        {t('exec.needsFollowup')}
                       </p>
                       <p className={`text-3xl font-extrabold ${(data.kpi.needsAttention?.length||0) > 0 ? 'text-danger' : 'text-text-main'}`}>
                         {data.kpi.needsAttention?.length || 0}
                       </p>
-                      <p className="mt-1 text-[11px] text-text-soft">أقل من 60%</p>
+                      <p className="mt-1 text-[11px] text-text-soft">{t('exec.below60')}</p>
                     </div>
                   </div>
 
                   {/* توزيع مستويات الأداء */}
                   {levelData.length > 0 && (
                     <div className="mb-4 rounded-2xl border border-border bg-white p-5 shadow-card">
-                      <h3 className="mb-4 font-extrabold text-text-main">توزيع مستويات الأداء</h3>
+                      <h3 className="mb-4 font-extrabold text-text-main">{t('exec.levelDistribution')}</h3>
                       <div className="space-y-2.5">
                         {levelData.map(lv => (
-                          <div key={lv.name} className="flex items-center gap-3">
-                            <span className="w-24 text-right text-xs text-text-main shrink-0">{lv.name}</span>
+                          <div key={lv.key} className="flex items-center gap-3">
+                            <span className="w-24 text-end text-xs text-text-main shrink-0">{lv.name}</span>
                             <div className="flex-1 h-2 overflow-hidden rounded-full bg-forest-50">
                               <div className="h-full rounded-full transition-all"
                                 style={{
@@ -484,7 +496,7 @@ export default function ExecutiveReportPage() {
                                   backgroundColor: lv.fill,
                                 }} />
                             </div>
-                            <span className="w-6 text-right text-xs font-extrabold text-text-soft">{lv.value}</span>
+                            <span className="w-6 text-end text-xs font-extrabold text-text-soft">{lv.value}</span>
                           </div>
                         ))}
                       </div>
@@ -497,7 +509,9 @@ export default function ExecutiveReportPage() {
                     {/* أفضل الأداء */}
                     {data.kpi.top3?.length > 0 && (
                       <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
-                        <h3 className="mb-3 font-extrabold text-text-main">🏆 أفضل الموظفين أداءً</h3>
+                        <h3 className="mb-3 inline-flex items-center gap-1.5 font-extrabold text-text-main">
+                          <Trophy size={16} aria-hidden="true" className="text-accent" /> {t('exec.topPerformers')}
+                        </h3>
                         <div className="space-y-2">
                           {data.kpi.top3.map((e, i) => (
                             <PerfRow
@@ -508,6 +522,7 @@ export default function ExecutiveReportPage() {
                               score={e.score}
                               level={e.level}
                               color={i === 0 ? '#253C32' : i === 1 ? '#5D8A70' : '#9DA3A1'}
+                              t={t}
                             />
                           ))}
                         </div>
@@ -517,7 +532,9 @@ export default function ExecutiveReportPage() {
                     {/* يحتاجون متابعة */}
                     {data.kpi.needsAttention?.length > 0 && (
                       <div className="rounded-2xl border border-burgundy/20 bg-white p-4 shadow-card">
-                        <h3 className="mb-3 font-extrabold text-danger">⚠️ يحتاجون متابعة (أقل من 60%)</h3>
+                        <h3 className="mb-3 inline-flex items-center gap-1.5 font-extrabold text-danger">
+                          <AlertTriangle size={16} aria-hidden="true" /> {t('exec.needsAttentionTitle')}
+                        </h3>
                         <div className="space-y-2">
                           {data.kpi.needsAttention.map((e, i) => (
                             <div key={i} className="flex items-center gap-3 rounded-xl border border-burgundy/10 bg-burgundy/5 px-3 py-2">
@@ -530,7 +547,7 @@ export default function ExecutiveReportPage() {
                                   <div className="h-full rounded-full bg-danger"
                                     style={{ width: `${Math.min(100, Number(e.score))}%` }} />
                                 </div>
-                                <span className="text-xs font-extrabold text-danger w-10 text-right">{fmt(e.score)}%</span>
+                                <span className="text-xs font-extrabold text-danger w-10 text-end">{fmt(e.score)}%</span>
                               </div>
                             </div>
                           ))}
@@ -544,25 +561,27 @@ export default function ExecutiveReportPage() {
 
             {/* ── قسم الفريق ───────────────────────────────────────────── */}
             <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
-              <h2 className="mb-4 font-extrabold text-text-main">👥 الفريق</h2>
+              <h2 className="mb-4 inline-flex items-center gap-1.5 font-extrabold text-text-main">
+                <Users size={18} aria-hidden="true" /> {t('exec.teamSection')}
+              </h2>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-xl border border-border bg-background p-3 text-center">
                   <p className="text-2xl font-extrabold text-primary">{data.team.employees}</p>
-                  <p className="mt-0.5 text-xs text-text-soft">منسق (موظف)</p>
+                  <p className="mt-0.5 text-xs text-text-soft">{t('exec.coordinators')}</p>
                 </div>
                 <div className="rounded-xl border border-border bg-background p-3 text-center">
                   <p className="text-2xl font-extrabold text-primary">{data.team.supervisors}</p>
-                  <p className="mt-0.5 text-xs text-text-soft">مشرف مشروع</p>
+                  <p className="mt-0.5 text-xs text-text-soft">{t('roles.PROJECT_SUPERVISOR')}</p>
                 </div>
                 <div className="rounded-xl border border-border bg-background p-3 text-center">
                   <p className="text-2xl font-extrabold text-primary">
                     {data.team.employees + data.team.supervisors}
                   </p>
-                  <p className="mt-0.5 text-xs text-text-soft">إجمالي النشطين</p>
+                  <p className="mt-0.5 text-xs text-text-soft">{t('exec.totalActive')}</p>
                 </div>
                 <div className="rounded-xl border border-border bg-background p-3 text-center">
                   <p className="text-2xl font-extrabold text-primary">{data.kpi.activeEmployees}</p>
-                  <p className="mt-0.5 text-xs text-text-soft">مُقيَّم هذا الشهر</p>
+                  <p className="mt-0.5 text-xs text-text-soft">{t('exec.evaluatedThisMonth')}</p>
                 </div>
               </div>
             </div>
@@ -570,8 +589,8 @@ export default function ExecutiveReportPage() {
             {/* تذييل التقرير */}
             <div className="rounded-2xl border border-border bg-white px-5 py-3 shadow-card">
               <div className="flex items-center justify-between text-[11px] text-text-soft/60">
-                <span>منصة إقفال الدورات التدريبية — جامعة نايف العربية للعلوم الأمنية</span>
-                <span>تقرير {MONTHS[month-1]} {year}</span>
+                <span>{t('common.appName')} — {t('common.university')}</span>
+                <span>{t('exec.reportFor', { month: monthName(month), year })}</span>
               </div>
             </div>
           </>

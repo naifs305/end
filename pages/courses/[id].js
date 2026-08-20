@@ -1,30 +1,48 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
+import {
+  AlertTriangle,
+  FileText,
+  FileCheck,
+  Coins,
+  Hourglass,
+  Upload,
+  Check,
+  Minus,
+  Printer,
+  Mail,
+  Pencil,
+  ArrowLeft,
+  Undo2,
+} from 'lucide-react';
 import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
 import MainLayout from '../../components/layout/MainLayout';
 import ElementRow from '../../components/operational/ElementRow';
 import CourseNotesReportForm from '../../components/operational/CourseNotesReportForm';
 import toast from 'react-hot-toast';
+import { useTranslation } from '../../lib/i18n';
+import { useOptions } from '../../lib/hooks/useOptions';
+import ReasonModal from '../../components/operational/ReasonModal';
 
-// ── ثوابت الحالات ─────────────────────────────────────────────────────
+// ── أنماط الحالات (التسميات من الترجمة) ───────────────────────────────
 const STATUS_META = {
-  DRAFT:            { label: 'مسودة',           cls: 'bg-border/60 text-text-soft',                  border: '#D7DBDA' },
-  PREPARATION:      { label: 'قيد الإعداد',      cls: 'bg-sand/20 text-warning border-sand/40',       border: '#C3B39F' },
-  EXECUTION:        { label: 'قيد التنفيذ',      cls: 'bg-primary-light text-primary border-primary/20', border: '#253C32' },
-  IN_PROGRESS:      { label: 'قيد التنفيذ',      cls: 'bg-primary-light text-primary border-primary/20', border: '#253C32' },
-  AWAITING_CLOSURE: { label: 'بانتظار الإغلاق',  cls: 'bg-sand/30 text-warning border-sand/50',       border: '#8B7D6B' },
-  CLOSED:           { label: 'مغلقة',             cls: 'bg-forest-50 text-accent border-accent/20',    border: '#5D8A70' },
-  ARCHIVED:         { label: 'مؤرشفة',            cls: 'bg-border text-text-soft border-border',       border: '#9DA3A1' },
+  DRAFT: { cls: 'bg-border/60 text-text-soft', border: '#D7DBDA' },
+  PREPARATION: { cls: 'bg-sand/20 text-warning border-sand/40', border: '#C3B39F' },
+  EXECUTION: { cls: 'bg-primary-light text-primary border-primary/20', border: '#253C32' },
+  IN_PROGRESS: { cls: 'bg-primary-light text-primary border-primary/20', border: '#253C32' },
+  AWAITING_CLOSURE: { cls: 'bg-sand/30 text-warning border-sand/50', border: '#8B7D6B' },
+  CLOSED: { cls: 'bg-forest-50 text-accent border-accent/20', border: '#5D8A70' },
+  ARCHIVED: { cls: 'bg-border text-text-soft border-border', border: '#9DA3A1' },
 };
 
 const EL_STATUS_META = {
-  NOT_STARTED:      { label: 'لم يبدأ',          cls: 'bg-background text-text-soft border-border',          border: '#D7DBDA' },
-  PENDING_APPROVAL: { label: 'قيد الاعتماد',      cls: 'bg-primary-light text-primary border-primary/20',     border: '#253C32' },
-  APPROVED:         { label: 'مُعتمد',            cls: 'bg-forest-50 text-accent border-accent/30',           border: '#5D8A70' },
-  RETURNED:         { label: 'مُعاد',             cls: 'bg-sand/20 text-warning border-sand/40',              border: '#C3B39F' },
-  REJECTED:         { label: 'مرفوض',             cls: 'bg-burgundy/10 text-danger border-burgundy/20',       border: '#633646' },
-  NOT_APPLICABLE:   { label: 'غير منطبق',         cls: 'bg-border/40 text-text-soft/60 border-border/40',    border: '#E5E7E6' },
+  NOT_STARTED: { cls: 'bg-background text-text-soft border-border', border: '#D7DBDA' },
+  PENDING_APPROVAL: { cls: 'bg-primary-light text-primary border-primary/20', border: '#253C32' },
+  APPROVED: { cls: 'bg-forest-50 text-accent border-accent/30', border: '#5D8A70' },
+  RETURNED: { cls: 'bg-sand/20 text-warning border-sand/40', border: '#C3B39F' },
+  REJECTED: { cls: 'bg-burgundy/10 text-danger border-burgundy/20', border: '#633646' },
+  NOT_APPLICABLE: { cls: 'bg-border/40 text-text-soft/60 border-border/40', border: '#E5E7E6' },
 };
 
 const ELEMENT_ORDER = {
@@ -34,13 +52,8 @@ const ELEMENT_ORDER = {
   revenues: 13, materials: 14, settlement: 15,
 };
 
-// العناصر الحرجة التي تستوجب إنذاراً خاصاً
 const CRITICAL_ELEMENTS = new Set(['opening_report', 'closing_report', 'settlement']);
-const CRITICAL_META = {
-  opening_report: { label: 'تقرير الافتتاح',  icon: '📋', urgency: 'high' },
-  closing_report: { label: 'تقرير الاختتام',  icon: '📝', urgency: 'high' },
-  settlement:     { label: 'تسوية السلفة',    icon: '💰', urgency: 'critical' },
-};
+const CRITICAL_ICON = { opening_report: FileText, closing_report: FileCheck, settlement: Coins };
 
 function fmt(date) {
   if (!date) return '-';
@@ -55,39 +68,53 @@ function fmtFull(date) {
 function Pill({ label, value, wide }) {
   return (
     <div className={`rounded-xl border border-border bg-background px-3 py-2 ${wide ? 'col-span-2 sm:col-span-1' : ''}`}>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-text-soft/60 mb-0.5">{label}</p>
-      <p className="text-sm font-bold text-text-main leading-snug break-words">{value}</p>
+      <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wide text-text-soft/60">{label}</p>
+      <div className="text-sm font-bold leading-snug text-text-main break-words">{value}</div>
     </div>
   );
 }
 
-// ── شارة حالة ─────────────────────────────────────────────────────────
-function Badge({ meta, small }) {
-  if (!meta) return null;
+function Badge({ label, cls, small }) {
+  if (!cls) return null;
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-bold ${small ? 'text-[10px]' : 'text-xs'} ${meta.cls}`}>
-      {meta.label}
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-bold ${small ? 'text-[10px]' : 'text-xs'} ${cls}`}>
+      {label}
     </span>
   );
+}
+
+function YesNo({ value }) {
+  return value ? <Check size={14} className="text-accent" aria-hidden="true" /> : <Minus size={14} className="text-text-soft/50" aria-hidden="true" />;
 }
 
 export default function CourseDetail() {
   const router = useRouter();
   const { id } = router.query;
   const { activeRole, user } = useAuth();
+  const { t, locale } = useTranslation();
+  const { options: locationOptions } = useOptions('LOCATION_TYPE');
 
-  const [course,          setCourse]          = useState(null);
-  const [loading,         setLoading]         = useState(true);
-  const [showAll,         setShowAll]         = useState(false);
+  const [course, setCourse] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [showNotesReport, setShowNotesReport] = useState(false);
 
-  const isEmployee   = activeRole === 'EMPLOYEE';
   const isCoordinator = course?.primaryEmployeeId && user?.id === course.primaryEmployeeId;
-  const isApprover   = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
-  const isManager    = activeRole === 'MANAGER';
+  const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
+  const isManager = activeRole === 'MANAGER';
   const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
 
-  useEffect(() => { if (id) fetchCourse(); }, [id]);
+  const intl = locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory';
+  const fmt = (date) => (date ? new Date(date).toLocaleDateString(intl, { day: 'numeric', month: 'short', year: 'numeric' }) : '-');
+  const fmtFull = (date) => (date ? new Date(date).toLocaleString(intl, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-');
+
+  const courseStatusLabel = (status) => t(`courseStatus.${status === 'DRAFT' ? 'PREPARATION' : status === 'IN_PROGRESS' ? 'EXECUTION' : status}`);
+  const elStatusLabel = (status) => t(`elementStatus.${status}`);
+  const criticalLabel = (key) => t(`courseDetail.criticalLabels.${key}`);
+
+  useEffect(() => {
+    if (id) fetchCourse();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const fetchCourse = async () => {
     try {
@@ -100,58 +127,58 @@ export default function CourseDetail() {
     }
   };
 
-  // ── تحميل التقارير ───────────────────────────────────────────────────
   const handleReportDownload = async (elementId) => {
     try {
-      const res = await api.get(`/closure/${elementId}/export`, {
-        responseType: 'text', headers: { Accept: 'text/html' },
-      });
+      const res = await api.get(`/closure/${elementId}/export`, { responseType: 'text', headers: { Accept: 'text/html' } });
       const w = window.open('', '_blank');
-      if (!w) { toast.error('تعذر فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة'); return; }
-      w.document.open(); w.document.write(res.data); w.document.close();
-    } catch { toast.error('تعذر فتح التقرير'); }
+      if (!w) {
+        toast.error(t('courseDetail.printWindowFailed'));
+        return;
+      }
+      w.document.open();
+      w.document.write(res.data);
+      w.document.close();
+    } catch {
+      toast.error(t('courseDetail.openReportFailed'));
+    }
   };
 
   const handleReportEmlDownload = async (elementId, elementKey) => {
     try {
-      const res = await api.get(`/closure/${elementId}/export-eml`, {
-        responseType: 'blob', headers: { Accept: 'message/rfc822' },
-      });
+      const res = await api.get(`/closure/${elementId}/export-eml`, { responseType: 'blob', headers: { Accept: 'message/rfc822' } });
       const fallback = elementKey === 'opening_report' ? 'opening-report.eml' : 'closing-report.eml';
       const disposition = res.headers['content-disposition'] || '';
       const match = disposition.match(/filename="?([^";]+)"?/i);
       const url = window.URL.createObjectURL(res.data);
       const a = document.createElement('a');
-      a.href = url; a.download = match?.[1] || fallback;
-      document.body.appendChild(a); a.click(); a.remove();
+      a.href = url;
+      a.download = match?.[1] || fallback;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
       window.URL.revokeObjectURL(url);
-      toast.success('تم تنزيل الملف');
-    } catch { toast.error('تعذر تنزيل ملف EML'); }
+      toast.success(t('courseDetail.fileDownloaded'));
+    } catch {
+      toast.error(t('courseDetail.emlFailed'));
+    }
   };
 
-  // ── ترتيب وتجميع العناصر ─────────────────────────────────────────────
   const sortedElements = useMemo(() => {
     if (!course?.closureElements) return [];
-    return [...course.closureElements].sort((a, b) =>
-      (ELEMENT_ORDER[a.element?.key] ?? 999) - (ELEMENT_ORDER[b.element?.key] ?? 999)
-    );
+    return [...course.closureElements].sort((a, b) => (ELEMENT_ORDER[a.element?.key] ?? 999) - (ELEMENT_ORDER[b.element?.key] ?? 999));
   }, [course]);
 
-  const activeElements    = useMemo(() => sortedElements.filter(el =>
-    ['NOT_STARTED','RETURNED','REJECTED'].includes(el.status)), [sortedElements]);
-  const completedElements = useMemo(() => sortedElements.filter(el =>
-    ['PENDING_APPROVAL','APPROVED'].includes(el.status)), [sortedElements]);
-  const notApplicableElements = useMemo(() => sortedElements.filter(el =>
-    el.status === 'NOT_APPLICABLE'), [sortedElements]);
+  const activeElements = useMemo(() => sortedElements.filter((el) => ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(el.status)), [sortedElements]);
+  const completedElements = useMemo(() => sortedElements.filter((el) => ['PENDING_APPROVAL', 'APPROVED'].includes(el.status)), [sortedElements]);
+  const notApplicableElements = useMemo(() => sortedElements.filter((el) => el.status === 'NOT_APPLICABLE'), [sortedElements]);
 
   const progress = useMemo(() => {
-    const rel  = sortedElements.filter(el => el.status !== 'NOT_APPLICABLE');
+    const rel = sortedElements.filter((el) => el.status !== 'NOT_APPLICABLE');
     if (!rel.length) return 0;
-    const done = rel.filter(el => ['PENDING_APPROVAL','APPROVED'].includes(el.status)).length;
+    const done = rel.filter((el) => ['PENDING_APPROVAL', 'APPROVED'].includes(el.status)).length;
     return Math.round((done / rel.length) * 100);
   }, [sortedElements]);
 
-  // ── حساب المواعيد ────────────────────────────────────────────────────
   const calcDeadline = (el) => {
     const e = el.element;
     if (!e?.deadlineRefPoint || e.deadlineMaxHours == null || !course) return null;
@@ -165,7 +192,7 @@ export default function CourseDetail() {
     return new Date(ref.getTime() + e.deadlineIdealHours * 3600000);
   };
   const isOverdue = (el) => {
-    if (['APPROVED','NOT_APPLICABLE','PENDING_APPROVAL'].includes(el.status)) return false;
+    if (['APPROVED', 'NOT_APPLICABLE', 'PENDING_APPROVAL'].includes(el.status)) return false;
     const dl = calcDeadline(el);
     return dl && new Date() > dl;
   };
@@ -174,18 +201,10 @@ export default function CourseDetail() {
     return Math.round((Date.now() - new Date(el.executionAt).getTime()) / 3600000);
   };
 
-  // ── عناصر اختيارية وتحكم المدير ──────────────────────────────────────
-  const optionalElements = useMemo(() =>
-    sortedElements.filter(el => el.element?.elementType === 'OPTIONAL'), [sortedElements]);
-
-  const approvedElements = useMemo(() =>
-    sortedElements.filter(el => el.status === 'APPROVED'), [sortedElements]);
-
-  const exemptableElements = useMemo(() =>
-    sortedElements.filter(el => el.status !== 'NOT_APPLICABLE'), [sortedElements]);
-
-  const exemptedByManager = useMemo(() =>
-    sortedElements.filter(el => el.status === 'NOT_APPLICABLE' && el.overriddenById), [sortedElements]);
+  const optionalElements = useMemo(() => sortedElements.filter((el) => el.element?.elementType === 'OPTIONAL'), [sortedElements]);
+  const approvedElements = useMemo(() => sortedElements.filter((el) => el.status === 'APPROVED'), [sortedElements]);
+  const exemptableElements = useMemo(() => sortedElements.filter((el) => el.status !== 'NOT_APPLICABLE'), [sortedElements]);
+  const exemptedByManager = useMemo(() => sortedElements.filter((el) => el.status === 'NOT_APPLICABLE' && el.overriddenById), [sortedElements]);
 
   const reportElements = useMemo(() =>
     sortedElements.filter(el => ['opening_report','closing_report'].includes(el.element?.key)), [sortedElements]);
@@ -203,32 +222,34 @@ export default function CourseDetail() {
   const toggleOptionalElement = async (trackingId, enabled) => {
     try {
       await api.post(`/courses/${id}/toggle-element`, { trackingId, enabled });
-      toast.success(enabled ? 'تم تفعيل العنصر' : 'تم إلغاء تفعيل العنصر');
+      toast.success(enabled ? t('courseDetail.toggleEnabled') : t('courseDetail.toggleDisabled'));
       fetchCourse();
     } catch (e) {
-      toast.error(e.response?.data?.message || 'تعذر التحديث');
+      toast.error(e.response?.data?.message || t('courseDetail.updateFailed'));
     }
   };
 
-  const overrideElement = async (trackingId, action, needsReason) => {
-    let reason;
-    if (needsReason) {
-      const promptText = action === 'revert' ? 'سبب استرجاع العنصر (إلزامي):'
-        : action === 'force-reset' ? 'سبب إعادة فتح العنصر (إلزامي):'
-        : 'سبب الاستثناء (إلزامي):';
-      reason = window.prompt(promptText);
-      if (!reason || !reason.trim()) {
-        if (reason !== null) toast.error('السبب مطلوب');
-        return;
-      }
-    }
+  const [overrideModal, setOverrideModal] = useState(null); // { trackingId, action }
+  const [overrideBusy, setOverrideBusy] = useState(false);
+
+  const doOverride = async (trackingId, action, reason) => {
     try {
       await api.post(`/courses/${id}/override-element`, { trackingId, action, reason });
-      toast.success('تم تنفيذ الإجراء');
+      toast.success(t('courseDetail.actionDone'));
       fetchCourse();
+      return true;
     } catch (e) {
-      toast.error(e.response?.data?.message || 'تعذر التنفيذ');
+      toast.error(e.response?.data?.message || t('courseDetail.actionFailed'));
+      return false;
     }
+  };
+
+  const confirmOverride = async (reason) => {
+    if (!overrideModal) return;
+    setOverrideBusy(true);
+    const ok = await doOverride(overrideModal.trackingId, overrideModal.action, reason);
+    setOverrideBusy(false);
+    if (ok) setOverrideModal(null);
   };
 
   // أدوات المدير: إرسال رسالة موجّهة
@@ -259,16 +280,14 @@ export default function CourseDetail() {
   const isReportKey = (key) => key === 'opening_report' || key === 'closing_report' || key === 'report';
 
   const renderAction = (el) => {
-    if (isReportKey(el.element.key) && ['PENDING_APPROVAL','APPROVED'].includes(el.status)) {
+    if (isReportKey(el.element.key) && ['PENDING_APPROVAL', 'APPROVED'].includes(el.status)) {
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => handleReportDownload(el.id)}
-            className="text-xs font-bold text-primary hover:text-primary-dark transition">
-            🖨️ طباعة
+          <button onClick={() => handleReportDownload(el.id)} className="inline-flex items-center gap-1 text-xs font-bold text-primary transition hover:text-primary-dark">
+            <Printer size={14} aria-hidden="true" /> {t('courseDetail.print')}
           </button>
-          <button onClick={() => handleReportEmlDownload(el.id, el.element.key)}
-            className="rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary-dark transition">
-            📧 EML
+          <button onClick={() => handleReportEmlDownload(el.id, el.element.key)} className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:bg-primary-dark">
+            <Mail size={14} aria-hidden="true" /> EML
           </button>
         </div>
       );
@@ -276,67 +295,63 @@ export default function CourseDetail() {
     return null;
   };
 
-  // ── بطاقة عنصر إغلاق ─────────────────────────────────────────────────
   const renderElementCard = (el) => {
-    const meta      = EL_STATUS_META[el.status] || EL_STATUS_META.NOT_STARTED;
-    const deadline  = calcDeadline(el);
-    const idealDl   = calcIdealDeadline(el);
-    const overdue   = isOverdue(el);
-    const waitH     = supervisorWaitHours(el);
-    const hasExt    = (el.extensionHours || 0) > 0;
+    const meta = EL_STATUS_META[el.status] || EL_STATUS_META.NOT_STARTED;
+    const deadline = calcDeadline(el);
+    const idealDl = calcIdealDeadline(el);
+    const overdue = isOverdue(el);
+    const waitH = supervisorWaitHours(el);
+    const hasExt = (el.extensionHours || 0) > 0;
 
-    const isCritical   = CRITICAL_ELEMENTS.has(el.element?.key);
-    const criticalMeta = CRITICAL_META[el.element?.key];
-    const isRedAlert   = isCritical && overdue && !['APPROVED','PENDING_APPROVAL'].includes(el.status);
+    const isCritical = CRITICAL_ELEMENTS.has(el.element?.key);
+    const CritIcon = CRITICAL_ICON[el.element?.key];
+    const isRedAlert = isCritical && overdue && !['APPROVED', 'PENDING_APPROVAL'].includes(el.status);
     const isSettlement = el.element?.key === 'settlement';
-    const palette = el.status === 'APPROVED'
-      ? { bg: 'linear-gradient(135deg,#F0F8F4 0%,#FFFFFF 60%)', border: '#5D8A70', glow: 'rgba(93,138,112,0.16)' }
-      : el.status === 'PENDING_APPROVAL'
+    const palette =
+      el.status === 'APPROVED'
+        ? { bg: 'linear-gradient(135deg,#F0F8F4 0%,#FFFFFF 60%)', border: '#5D8A70', glow: 'rgba(93,138,112,0.16)' }
+        : el.status === 'PENDING_APPROVAL'
         ? { bg: 'linear-gradient(135deg,#EEF5F2 0%,#FFFFFF 62%)', border: '#253C32', glow: 'rgba(37,60,50,0.14)' }
         : overdue || isRedAlert
-          ? { bg: 'linear-gradient(135deg,#FFF5EF 0%,#FFFFFF 62%)', border: '#633646', glow: 'rgba(99,54,70,0.14)' }
-          : { bg: 'linear-gradient(135deg,#FBF8F2 0%,#FFFFFF 62%)', border: '#C3B39F', glow: 'rgba(195,179,159,0.18)' };
+        ? { bg: 'linear-gradient(135deg,#FFF5EF 0%,#FFFFFF 62%)', border: '#633646', glow: 'rgba(99,54,70,0.14)' }
+        : { bg: 'linear-gradient(135deg,#FBF8F2 0%,#FFFFFF 62%)', border: '#C3B39F', glow: 'rgba(195,179,159,0.18)' };
+
+    const waitDuration = waitH != null ? (waitH < 24 ? t('courseDetail.hours', { n: waitH }) : t('courseDetail.days', { n: Math.floor(waitH / 24) })) : '';
 
     return (
-      <div key={el.id}
-        className={`rounded-2xl border overflow-visible transition hover:-translate-y-0.5 min-h-[128px]
-          ${isRedAlert ? 'border-danger shadow-[0_0_0_2px_rgba(99,54,70,0.15)]' : 'border-border'}`}
-        style={{ borderInlineStart: `5px solid ${isRedAlert ? '#633646' : palette.border}`, background: palette.bg, boxShadow: `0 10px 24px ${palette.glow}` }}>
-
-        {/* شريط الإنذار الأحمر للعناصر الحرجة المتأخرة */}
+      <div
+        key={el.id}
+        className={`min-h-[128px] overflow-visible rounded-2xl border transition hover:-translate-y-0.5 ${isRedAlert ? 'border-danger shadow-[0_0_0_2px_rgba(99,54,70,0.15)]' : 'border-border'}`}
+        style={{ borderInlineStart: `5px solid ${isRedAlert ? '#633646' : palette.border}`, background: palette.bg, boxShadow: `0 10px 24px ${palette.glow}` }}
+      >
         {isRedAlert && (
-          <div className={`flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold text-white
-            ${isSettlement ? 'bg-danger' : 'bg-burgundy/80'}`}>
-            <span className="animate-pulse">🚨</span>
-            <span>إنذار {isSettlement ? 'حرج' : 'عاجل'}: {criticalMeta?.label} متأخر عن الموعد الأقصى</span>
-            {isSettlement && <span className="mr-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px]">يستوجب متابعة فورية</span>}
+          <div className={`flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold text-white ${isSettlement ? 'bg-danger' : 'bg-burgundy/80'}`}>
+            <AlertTriangle size={14} aria-hidden="true" className="animate-pulse" />
+            <span>{t('courseDetail.alertBanner', { level: isSettlement ? t('courseDetail.alertCritical') : t('courseDetail.alertUrgent'), label: criticalLabel(el.element?.key) })}</span>
+            {isSettlement && <span className="ms-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px]">{t('courseDetail.needsImmediate')}</span>}
           </div>
         )}
 
-        {/* شارة العنصر الحرج (قبل الاستحقاق) */}
-        {isCritical && !isRedAlert && !['APPROVED','NOT_APPLICABLE'].includes(el.status) && (
-          <div className={`flex items-center gap-1.5 px-4 py-1.5 text-[10px] font-bold
-            ${isSettlement ? 'bg-burgundy/8 text-danger border-b border-burgundy/15' : 'bg-sand/10 text-warning border-b border-sand/20'}`}>
-            <span>{criticalMeta?.icon}</span>
-            <span>عنصر حرج — {criticalMeta?.label}</span>
+        {isCritical && !isRedAlert && !['APPROVED', 'NOT_APPLICABLE'].includes(el.status) && (
+          <div className={`flex items-center gap-1.5 px-4 py-1.5 text-[10px] font-bold ${isSettlement ? 'border-b border-burgundy/15 bg-burgundy/8 text-danger' : 'border-b border-sand/20 bg-sand/10 text-warning'}`}>
+            {CritIcon && <CritIcon size={12} aria-hidden="true" />}
+            <span>{t('courseDetail.criticalElement')} — {criticalLabel(el.element?.key)}</span>
           </div>
         )}
 
-        <div className="p-3 space-y-2.5">
-
-          {/* رأس العنصر */}
+        <div className="space-y-2.5 p-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <h4 className="font-extrabold text-[15px] text-text-main leading-snug">{el.element.name}</h4>
-              <Badge meta={meta} small />
+              <h4 className="text-[15px] font-extrabold leading-snug text-text-main">{el.element.name}</h4>
+              <Badge label={elStatusLabel(el.status)} cls={meta.cls} small />
               {overdue && !isRedAlert && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-burgundy/10 px-2 py-0.5 text-[10px] font-bold text-danger border border-burgundy/20">
-                  ⚠ متأخر
+                <span className="inline-flex items-center gap-1 rounded-full border border-burgundy/20 bg-burgundy/10 px-2 py-0.5 text-[10px] font-bold text-danger">
+                  <AlertTriangle size={11} aria-hidden="true" /> {t('courseDetail.overdue')}
                 </span>
               )}
               {hasExt && (
-                <span className="inline-flex rounded-full bg-primary-light px-2 py-0.5 text-[10px] font-bold text-primary border border-primary/20">
-                  تمديد +{el.extensionHours}س
+                <span className="inline-flex rounded-full border border-primary/20 bg-primary-light px-2 py-0.5 text-[10px] font-bold text-primary">
+                  {t('courseDetail.extensionBadge', { hours: el.extensionHours })}
                 </span>
               )}
             </div>
@@ -346,64 +361,61 @@ export default function CourseDetail() {
             </div>
           </div>
 
-          {/* المواعيد */}
-          {deadline && !['APPROVED','NOT_APPLICABLE'].includes(el.status) && (
-            <div className="flex flex-wrap gap-2 text-[11px] rounded-xl bg-white/70 px-2.5 py-1.5 border border-white/70">
+          {deadline && !['APPROVED', 'NOT_APPLICABLE'].includes(el.status) && (
+            <div className="flex flex-wrap gap-2 rounded-xl border border-white/70 bg-white/70 px-2.5 py-1.5 text-[11px]">
               {idealDl && (
                 <span className="text-text-soft">
-                  مثالي: <span className="font-bold text-accent">{fmt(idealDl)}</span>
+                  {t('courseDetail.ideal')}: <span className="font-bold text-accent">{fmt(idealDl)}</span>
                 </span>
               )}
               <span className={`font-bold ${overdue ? 'text-danger' : 'text-text-main'}`}>
-                أقصاه: {fmt(deadline)}
-                {el.element?.isDeadlineWorkingDays ? ' (أيام عمل)' : ''}
+                {t('courseDetail.max')}: {fmt(deadline)}
+                {el.element?.isDeadlineWorkingDays ? ` ${t('courseDetail.workingDays')}` : ''}
               </span>
             </div>
           )}
 
-          {/* انتظار المشرف */}
           {waitH !== null && (
-            <div className={`flex items-center gap-1.5 text-[11px] rounded-xl px-2.5 py-1.5 w-fit
-              ${waitH > 48 ? 'bg-sand/20 text-warning border border-sand/40' : 'bg-background text-text-soft border border-border'}`}>
-              <span>⏳</span>
-              <span>انتظار اعتماد منذ {waitH < 24 ? `${waitH} ساعة` : `${Math.floor(waitH/24)} يوم`}</span>
-              {waitH > 48 && <span className="font-extrabold">— يستحق المتابعة</span>}
+            <div className={`flex w-fit items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11px] ${waitH > 48 ? 'border border-sand/40 bg-sand/20 text-warning' : 'border border-border bg-background text-text-soft'}`}>
+              <Hourglass size={12} aria-hidden="true" />
+              <span>{t('courseDetail.waitingSince', { duration: waitDuration })}</span>
+              {waitH > 48 && <span className="font-extrabold">{t('courseDetail.deservesFollowup')}</span>}
             </div>
           )}
 
-          {/* تاريخ التقديم */}
           {el.executionAt && (
-            <div className="text-[11px] text-text-soft flex flex-wrap gap-3">
-              <span>📤 رُفع: <strong className="text-primary">{fmtFull(el.executionAt)}</strong></span>
+            <div className="flex flex-wrap gap-3 text-[11px] text-text-soft">
+              <span className="inline-flex items-center gap-1">
+                <Upload size={12} aria-hidden="true" /> {t('courseDetail.uploadedAt')}: <strong className="text-primary">{fmtFull(el.executionAt)}</strong>
+              </span>
               {el.executor && (
-                <span>بواسطة: <strong className="text-text-main">{el.executor.firstName} {el.executor.lastName}</strong></span>
+                <span>
+                  {t('courseDetail.by')}: <strong className="text-text-main">{el.executor.firstName} {el.executor.lastName}</strong>
+                </span>
               )}
             </div>
           )}
 
-          {/* مبرر التأخر */}
           {el.delayReason && (
             <div className="rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-[11px]">
-              <span className="font-bold text-warning">مبرر: </span>
+              <span className="font-bold text-warning">{t('courseDetail.justification')}: </span>
               <span className="text-text-main">{el.delayReason}</span>
             </div>
           )}
 
-          {/* تمديد */}
           {hasExt && el.extensionReason && (
             <div className="rounded-xl border border-primary/20 bg-primary-light/50 px-3 py-2 text-[11px]">
-              <span className="font-bold text-primary">تمديد +{el.extensionHours}س: </span>
+              <span className="font-bold text-primary">{t('courseDetail.extensionBadge', { hours: el.extensionHours })}: </span>
               <span className="text-text-main">{el.extensionReason}</span>
-              {el.extensionGrantedAt && <span className="text-text-soft mr-2">— {fmt(el.extensionGrantedAt)}</span>}
+              {el.extensionGrantedAt && <span className="ms-2 text-text-soft">— {fmt(el.extensionGrantedAt)}</span>}
             </div>
           )}
 
-          {/* اعتماد */}
           {el.status === 'APPROVED' && el.decisionAt && (
-            <div className="flex items-center gap-1.5 text-[11px] text-accent font-bold">
-              <span>✓</span>
-              <span>تم الاعتماد: {fmtFull(el.decisionAt)}</span>
-              {el.decider && <span className="text-text-soft font-normal">— {el.decider.firstName} {el.decider.lastName}</span>}
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-accent">
+              <Check size={13} aria-hidden="true" />
+              <span>{t('courseDetail.approvedAt')}: {fmtFull(el.decisionAt)}</span>
+              {el.decider && <span className="font-normal text-text-soft">— {el.decider.firstName} {el.decider.lastName}</span>}
             </div>
           )}
 
@@ -419,17 +431,16 @@ export default function CourseDetail() {
           {/* إعادة */}
           {el.status === 'RETURNED' && (
             <div className="rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-[11px]">
-              <p className="font-bold text-warning mb-0.5">سبب الإعادة:</p>
-              <p className="text-text-main">{el.rejectionReason || el.notes || 'لم يُحدد'}</p>
+              <p className="mb-0.5 font-bold text-warning">{t('courseDetail.returnReasonView')}</p>
+              <p className="text-text-main">{el.rejectionReason || el.notes || t('courseDetail.notSpecified')}</p>
               {el.decisionAt && <p className="mt-1 text-text-soft">{fmtFull(el.decisionAt)}</p>}
             </div>
           )}
 
-          {/* رفض */}
           {el.status === 'REJECTED' && (
             <div className="rounded-xl border border-burgundy/20 bg-burgundy/5 px-3 py-2 text-[11px]">
-              <p className="font-bold text-danger mb-0.5">سبب الرفض:</p>
-              <p className="text-text-main">{el.rejectionReason || el.notes || 'لم يُحدد'}</p>
+              <p className="mb-0.5 font-bold text-danger">{t('courseDetail.rejectReasonView')}</p>
+              <p className="text-text-main">{el.rejectionReason || el.notes || t('courseDetail.notSpecified')}</p>
               {el.decisionAt && <p className="mt-1 text-text-soft">{fmtFull(el.decisionAt)}</p>}
             </div>
           )}
@@ -438,152 +449,147 @@ export default function CourseDetail() {
     );
   };
 
-  // ── شاشات التحميل والخطأ ─────────────────────────────────────────────
-  if (loading) return (
-    <MainLayout>
-      <div className="flex items-center justify-center rounded-2xl border border-border bg-white py-20 shadow-card">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    </MainLayout>
-  );
+  if (loading)
+    return (
+      <MainLayout breadcrumb={[{ label: t('nav.courses'), href: '/courses' }, { label: t('common.loading') }]}>
+        <div className="flex items-center justify-center rounded-2xl border border-border bg-white py-20 shadow-card">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      </MainLayout>
+    );
 
-  if (!course) return (
-    <MainLayout>
-      <div className="rounded-2xl border border-danger/20 bg-white p-10 text-center text-danger shadow-card">
-        الدورة غير موجودة
-      </div>
-    </MainLayout>
-  );
+  if (!course)
+    return (
+      <MainLayout breadcrumb={[{ label: t('nav.courses'), href: '/courses' }, { label: t('courseDetail.notFound') }]}>
+        <div className="rounded-2xl border border-danger/20 bg-white p-10 text-center text-danger shadow-card">{t('courseDetail.notFound')}</div>
+      </MainLayout>
+    );
 
   const courseStatus = STATUS_META[course.status] || STATUS_META.DRAFT;
+  const locationLabel = locationOptions.find((o) => o.value === course.locationType)?.label || course.locationType;
 
-  // العناصر الحرجة المتأخرة
-  const criticalOverdue = sortedElements.filter(el =>
-    CRITICAL_ELEMENTS.has(el.element?.key) &&
-    isOverdue(el) &&
-    !['APPROVED','PENDING_APPROVAL','NOT_APPLICABLE'].includes(el.status)
+  const criticalOverdue = sortedElements.filter(
+    (el) => CRITICAL_ELEMENTS.has(el.element?.key) && isOverdue(el) && !['APPROVED', 'PENDING_APPROVAL', 'NOT_APPLICABLE'].includes(el.status)
   );
-  const settlementOverdue = criticalOverdue.find(el => el.element?.key === 'settlement');
+  const settlementOverdue = criticalOverdue.find((el) => el.element?.key === 'settlement');
 
   return (
-    <MainLayout>
+    <MainLayout breadcrumb={[{ label: t('nav.courses'), href: '/courses' }, { label: course.name }]}>
       <div className="space-y-4">
-
-        {/* 🚨 بانر الإنذارات الحرجة */}
+        {/* بانر الإنذارات الحرجة */}
         {criticalOverdue.length > 0 && (
-          <div className={`rounded-2xl border p-4 shadow-card
-            ${settlementOverdue ? 'border-danger/40 bg-danger/5' : 'border-burgundy/30 bg-burgundy/5'}`}>
+          <div className={`rounded-2xl border p-4 shadow-card ${settlementOverdue ? 'border-danger/40 bg-danger/5' : 'border-burgundy/30 bg-burgundy/5'}`}>
             <div className="flex items-start gap-3">
-              <span className="text-2xl animate-pulse shrink-0">🚨</span>
+              <AlertTriangle size={24} aria-hidden="true" className="shrink-0 animate-pulse text-danger" />
               <div className="flex-1">
-                <p className={`font-extrabold text-sm mb-1 ${settlementOverdue ? 'text-danger' : 'text-danger'}`}>
-                  {settlementOverdue
-                    ? 'إنذار حرج — تسوية السلفة متأخرة وتستوجب متابعة فورية'
-                    : `${criticalOverdue.length} عنصر حرج متأخر في هذه الدورة`}
+                <p className="mb-1 text-sm font-extrabold text-danger">
+                  {settlementOverdue ? t('courseDetail.bannerSettlement') : t('courseDetail.bannerCount', { count: criticalOverdue.length })}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {criticalOverdue.map(el => (
-                    <span key={el.id}
-                      className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold
-                        ${el.element?.key === 'settlement'
-                          ? 'bg-danger/10 text-danger border-danger/20'
-                          : 'bg-burgundy/10 text-danger border-burgundy/20'}`}>
-                      <span>{CRITICAL_META[el.element?.key]?.icon}</span>
-                      <span>{el.element.name}</span>
-                    </span>
-                  ))}
+                  {criticalOverdue.map((el) => {
+                    const CritIcon = CRITICAL_ICON[el.element?.key];
+                    return (
+                      <span
+                        key={el.id}
+                        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${el.element?.key === 'settlement' ? 'border-danger/20 bg-danger/10 text-danger' : 'border-burgundy/20 bg-burgundy/10 text-danger'}`}
+                      >
+                        {CritIcon && <CritIcon size={12} aria-hidden="true" />}
+                        <span>{el.element.name}</span>
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── رأس الصفحة ──────────────────────────────────────────────── */}
-        <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden"
-          style={{ borderTop: `3px solid ${courseStatus.border}` }}>
-          <div className="px-5 py-4 space-y-4">
-
-            {/* سطر العنوان */}
+        {/* رأس الصفحة */}
+        <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card" style={{ borderTop: `3px solid ${courseStatus.border}` }}>
+          <div className="space-y-4 px-5 py-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <Badge meta={courseStatus} />
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <Badge label={courseStatusLabel(course.status)} cls={courseStatus.cls} />
                   <span className="text-xs text-text-soft/60">
-                    {course.courseType === 'internal' ? 'داخلية' : 'خارجية'}
+                    {course.courseType === 'internal' ? t('course.typeInternal') : t('course.typeExternal')}
                     {course.code ? ` · ${course.code}` : ''}
                   </span>
                 </div>
-                <h1 className="text-xl font-extrabold text-text-main leading-tight">{course.name}</h1>
+                <h1 className="text-xl font-extrabold leading-tight text-text-main">{course.name}</h1>
                 {course.beneficiaryEntity && (
-                  <p className="mt-0.5 text-xs text-text-soft">{course.beneficiaryEntity}{course.city ? ` · ${course.city}` : ''}</p>
+                  <p className="mt-0.5 text-xs text-text-soft">
+                    {course.beneficiaryEntity}
+                    {course.city ? ` · ${course.city}` : ''}
+                  </p>
                 )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex shrink-0 items-center gap-2">
                 <button
                   onClick={() => setShowNotesReport(true)}
-                  className="flex items-center gap-1.5 rounded-xl border border-accent/30 bg-forest-50 px-3 py-2 text-xs font-extrabold text-accent hover:bg-accent hover:text-white transition shadow-sm">
-                  📝 تقرير عام
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-accent/30 bg-forest-50 px-3 py-2 text-xs font-extrabold text-accent shadow-sm transition hover:bg-accent hover:text-white"
+                >
+                  <FileText size={14} aria-hidden="true" /> {t('courseDetail.generalReport')}
                 </button>
                 {(isManager || isSupervisor) && (
                   <button
                     onClick={() => router.push(`/courses/${id}/edit`)}
-                    className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-text-soft hover:border-primary hover:text-primary transition">
-                    ✏️ تعديل
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-text-soft transition hover:border-primary hover:text-primary"
+                  >
+                    <Pencil size={14} aria-hidden="true" /> {t('common.edit')}
                   </button>
                 )}
                 <button
                   onClick={() => router.back()}
-                  className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-text-soft hover:bg-background transition">
-                  ← رجوع
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-text-soft transition hover:bg-background"
+                >
+                  <ArrowLeft size={14} aria-hidden="true" /> {t('common.back')}
                 </button>
               </div>
             </div>
 
-            {/* تفاصيل الدورة */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              <Pill label="المشروع"   value={course.operationalProject?.name || '-'} />
-              <Pill label="المسؤول"   value={`${course.primaryEmployee?.firstName || ''} ${course.primaryEmployee?.lastName || ''}`.trim() || '-'} />
-              <Pill label="من"        value={fmt(course.startDate)} />
-              <Pill label="إلى"       value={fmt(course.endDate)} />
-              <Pill label="متدربون"   value={course.numTrainees ?? '-'} />
-              {course.locationType && <Pill label="مقر التنفيذ"  value={course.locationType} />}
-              <Pill label="سلفة"      value={course.requiresAdvance ? '✓' : '—'} />
-              <Pill label="إيرادات"   value={course.requiresRevenue ? '✓' : '—'} />
-              <Pill label="تسوية"     value={course.requiresAdvanceSettlement ? '✓' : '—'} />
-              <Pill label="مواد"      value={course.materialsIssued ? '✓' : '—'} />
+              <Pill label={t('course.project')} value={course.operationalProject?.name || '-'} />
+              <Pill label={t('course.owner')} value={`${course.primaryEmployee?.firstName || ''} ${course.primaryEmployee?.lastName || ''}`.trim() || '-'} />
+              <Pill label={t('course.form.from')} value={fmt(course.startDate)} />
+              <Pill label={t('course.form.to')} value={fmt(course.endDate)} />
+              <Pill label={t('courseDetail.trainees')} value={course.numTrainees ?? '-'} />
+              {course.locationType && <Pill label={t('course.form.locationType')} value={locationLabel} />}
+              <Pill label={t('courseDetail.advance')} value={<YesNo value={course.requiresAdvance} />} />
+              <Pill label={t('courseDetail.revenue')} value={<YesNo value={course.requiresRevenue} />} />
+              <Pill label={t('courseDetail.settlement')} value={<YesNo value={course.requiresAdvanceSettlement} />} />
+              <Pill label={t('courseDetail.materials')} value={<YesNo value={course.materialsIssued} />} />
             </div>
 
-            {/* شريط الإنجاز */}
             <div className="rounded-xl border border-border bg-background px-4 py-3">
               <div className="mb-2 flex items-center justify-between text-xs">
-                <span className="font-extrabold text-text-main">تقدم الإغلاق</span>
+                <span className="font-extrabold text-text-main">{t('courseDetail.closureProgress')}</span>
                 <div className="flex items-center gap-3">
                   <span className="text-text-soft">
                     <span className="font-bold text-accent">{completedElements.length}</span>
-                    <span className="text-text-soft/60"> / {sortedElements.filter(e=>e.status!=='NOT_APPLICABLE').length} عنصر</span>
+                    <span className="text-text-soft/60"> / {sortedElements.filter((e) => e.status !== 'NOT_APPLICABLE').length} {t('courseDetail.elementUnit')}</span>
                   </span>
                   <span className="font-extrabold text-primary">{progress}%</span>
                 </div>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-forest-50">
-                <div className="h-full rounded-full bg-primary transition-all duration-500"
-                  style={{ width: `${progress}%` }} />
+                <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }} />
               </div>
               {activeElements.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                  {activeElements.filter(e=>e.status==='RETURNED').length > 0 && (
-                    <span className="rounded-full bg-sand/20 px-2 py-0.5 text-warning font-bold border border-sand/40">
-                      {activeElements.filter(e=>e.status==='RETURNED').length} مُعاد
+                  {activeElements.filter((e) => e.status === 'RETURNED').length > 0 && (
+                    <span className="rounded-full border border-sand/40 bg-sand/20 px-2 py-0.5 font-bold text-warning">
+                      {t('courseDetail.returnedCount', { count: activeElements.filter((e) => e.status === 'RETURNED').length })}
                     </span>
                   )}
-                  {activeElements.filter(e=>isOverdue(e)).length > 0 && (
-                    <span className="rounded-full bg-burgundy/10 px-2 py-0.5 text-danger font-bold border border-burgundy/20">
-                      {activeElements.filter(e=>isOverdue(e)).length} متأخر
+                  {activeElements.filter((e) => isOverdue(e)).length > 0 && (
+                    <span className="rounded-full border border-burgundy/20 bg-burgundy/10 px-2 py-0.5 font-bold text-danger">
+                      {t('courseDetail.overdueCount', { count: activeElements.filter((e) => isOverdue(e)).length })}
                     </span>
                   )}
-                  {activeElements.filter(e=>e.status==='NOT_STARTED').length > 0 && (
-                    <span className="rounded-full bg-background px-2 py-0.5 text-text-soft border border-border">
-                      {activeElements.filter(e=>e.status==='NOT_STARTED').length} لم يبدأ
+                  {activeElements.filter((e) => e.status === 'NOT_STARTED').length > 0 && (
+                    <span className="rounded-full border border-border bg-background px-2 py-0.5 text-text-soft">
+                      {t('courseDetail.notStartedCount', { count: activeElements.filter((e) => e.status === 'NOT_STARTED').length })}
                     </span>
                   )}
                 </div>
@@ -593,70 +599,63 @@ export default function CourseDetail() {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
+          <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
-                <h2 className="font-extrabold text-text-main">العناصر غير المكتملة</h2>
-                <p className="text-[11px] text-text-soft mt-0.5">حسب تسلسل الإقفال</p>
+                <h2 className="font-extrabold text-text-main">{t('courseDetail.incompleteElements')}</h2>
+                <p className="mt-0.5 text-[11px] text-text-soft">{t('courseDetail.bySequence')}</p>
               </div>
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-sand/20 text-sm font-extrabold text-warning border border-sand/40">{activeElements.length}</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full border border-sand/40 bg-sand/20 text-sm font-extrabold text-warning">{activeElements.length}</span>
             </div>
-            <div className="p-3 space-y-2">
-              {activeElements.length > 0 ? activeElements.map(el => renderElementCard(el)) : <p className="py-8 text-center text-sm text-text-soft">لا توجد عناصر غير مكتملة</p>}
+            <div className="space-y-2 p-3">
+              {activeElements.length > 0 ? activeElements.map((el) => renderElementCard(el)) : <p className="py-8 text-center text-sm text-text-soft">{t('courseDetail.noIncomplete')}</p>}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
+          <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
-                <h2 className="font-extrabold text-text-main">العناصر المكتملة</h2>
-                <p className="text-[11px] text-text-soft mt-0.5">مرفوعة أو مُعتمدة</p>
+                <h2 className="font-extrabold text-text-main">{t('courseDetail.completedElements')}</h2>
+                <p className="mt-0.5 text-[11px] text-text-soft">{t('courseDetail.submittedOrApproved')}</p>
               </div>
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-forest-50 text-sm font-extrabold text-accent border border-accent/20">{completedElements.length}</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full border border-accent/20 bg-forest-50 text-sm font-extrabold text-accent">{completedElements.length}</span>
             </div>
-            <div className="p-3 space-y-2">
-              {completedElements.length > 0 ? completedElements.map(el => renderElementCard(el)) : <p className="py-8 text-center text-sm text-text-soft">لا توجد عناصر مكتملة</p>}
+            <div className="space-y-2 p-3">
+              {completedElements.length > 0 ? completedElements.map((el) => renderElementCard(el)) : <p className="py-8 text-center text-sm text-text-soft">{t('courseDetail.noCompleted')}</p>}
             </div>
           </div>
         </div>
 
-        {/* ── عناصر غير منطبقة على هذه الدورة ──────────────────────────── */}
         {notApplicableElements.length > 0 && (
-          <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
+          <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
-                <h2 className="font-extrabold text-text-main">عناصر غير منطبقة</h2>
-                <p className="text-[11px] text-text-soft mt-0.5">لا تُحسب ضمن متطلبات إغلاق هذه الدورة</p>
+                <h2 className="font-extrabold text-text-main">{t('courseDetail.notApplicableTitle')}</h2>
+                <p className="mt-0.5 text-[11px] text-text-soft">{t('courseDetail.notApplicableDesc')}</p>
               </div>
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-border/40 text-sm font-extrabold text-text-soft/60 border border-border/40">{notApplicableElements.length}</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-border/40 text-sm font-extrabold text-text-soft/60">{notApplicableElements.length}</span>
             </div>
-            <div className="p-3 space-y-2">
-              {notApplicableElements.map(el => renderElementCard(el))}
-            </div>
+            <div className="space-y-2 p-3">{notApplicableElements.map((el) => renderElementCard(el))}</div>
           </div>
         )}
 
-        {/* ── عناصر اختيارية لهذه الدورة ──────────────────────────────── */}
         {optionalElements.length > 0 && (isCoordinator || isApprover) && (
-          <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
+          <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
             <div className="border-b border-border px-4 py-3">
-              <h2 className="font-extrabold text-text-main">عناصر اختيارية لهذه الدورة</h2>
-              <p className="text-[11px] text-text-soft mt-0.5">فعّل العناصر التي تنطبق على هذه الدورة فقط</p>
+              <h2 className="font-extrabold text-text-main">{t('courseDetail.optionalTitle')}</h2>
+              <p className="mt-0.5 text-[11px] text-text-soft">{t('courseDetail.optionalDesc')}</p>
             </div>
-            <div className="p-3 space-y-2">
+            <div className="space-y-2 p-3">
               {optionalElements.map((el) => {
                 const enabled = el.status !== 'NOT_APPLICABLE';
                 const locked = ['APPROVED', 'PENDING_APPROVAL'].includes(el.status);
                 return (
-                  <label key={el.id}
-                    className={`flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2.5 ${locked ? '' : 'cursor-pointer hover:bg-background'}`}>
+                  <label key={el.id} className={`flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2.5 ${locked ? '' : 'cursor-pointer hover:bg-background'}`}>
                     <div className="flex items-center gap-3">
-                      <input type="checkbox" checked={enabled} disabled={locked}
-                        onChange={(e) => toggleOptionalElement(el.id, e.target.checked)}
-                        className="h-4 w-4 accent-primary" />
+                      <input type="checkbox" checked={enabled} disabled={locked} onChange={(e) => toggleOptionalElement(el.id, e.target.checked)} className="h-4 w-4 accent-primary" />
                       <span className="text-sm font-bold text-text-main">{el.element.name}</span>
                     </div>
-                    <Badge meta={EL_STATUS_META[el.status] || EL_STATUS_META.NOT_STARTED} small />
+                    <Badge label={elStatusLabel(el.status)} cls={(EL_STATUS_META[el.status] || EL_STATUS_META.NOT_STARTED).cls} small />
                   </label>
                 );
               })}
@@ -700,26 +699,23 @@ export default function CourseDetail() {
 
         {/* ── تحكم المدير في عناصر الإقفال ─────────────────────────────── */}
         {isManager && (
-          <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
+          <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
             <div className="border-b border-border px-4 py-3">
-              <h2 className="font-extrabold text-text-main">تحكم المدير في عناصر الإقفال</h2>
-              <p className="text-[11px] text-text-soft mt-0.5">استرجاع عناصر معتمدة أو استثناء عناصر من متطلبات الدورة — يتطلب سبباً ويُسجّل في سجل المراجعة</p>
+              <h2 className="font-extrabold text-text-main">{t('courseDetail.managerControlTitle')}</h2>
+              <p className="mt-0.5 text-[11px] text-text-soft">{t('courseDetail.managerControlDesc')}</p>
             </div>
-            <div className="p-3 space-y-4">
-
-              {/* استرجاع عنصر معتمد */}
+            <div className="space-y-4 p-3">
               <div>
-                <h4 className="mb-2 text-xs font-extrabold text-text-soft">عناصر معتمدة (يمكن استرجاعها)</h4>
+                <h4 className="mb-2 text-xs font-extrabold text-text-soft">{t('courseDetail.approvedRevertable')}</h4>
                 {approvedElements.length === 0 ? (
-                  <p className="text-xs text-text-soft">لا توجد عناصر معتمدة</p>
+                  <p className="text-xs text-text-soft">{t('courseDetail.noApproved')}</p>
                 ) : (
                   <div className="space-y-1.5">
                     {approvedElements.map((el) => (
                       <div key={el.id} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2">
                         <span className="text-sm font-bold text-text-main">{el.element.name}</span>
-                        <button onClick={() => overrideElement(el.id, 'revert', true)}
-                          className="rounded-lg border border-burgundy/20 px-2 py-1 text-[11px] font-bold text-danger hover:bg-burgundy/5">
-                          ↩️ استرجاع
+                        <button onClick={() => setOverrideModal({ trackingId: el.id, action: 'revert' })} className="inline-flex items-center gap-1 rounded-lg border border-burgundy/20 px-2 py-1 text-[11px] font-bold text-danger hover:bg-burgundy/5">
+                          <Undo2 size={12} aria-hidden="true" /> {t('courseDetail.revert')}
                         </button>
                       </div>
                     ))}
@@ -761,7 +757,7 @@ export default function CourseDetail() {
                         <span className="text-sm font-bold text-text-main block truncate">{el.element.name}</span>
                         <span className="text-[10px] text-warning">{el.status === 'APPROVED' ? '✅ معتمد' : el.status === 'PENDING_APPROVAL' ? '⏳ معلّق' : el.status === 'RETURNED' ? '↩ مُعاد' : el.status}</span>
                       </div>
-                      <button onClick={() => overrideElement(el.id, 'force-reset', true)}
+                      <button onClick={() => setOverrideModal({ trackingId: el.id, action: 'force-reset' })}
                         className="shrink-0 rounded-lg border border-danger/20 px-2 py-1 text-[11px] font-bold text-danger hover:bg-burgundy/10">
                         🔓 فتح
                       </button>
@@ -775,20 +771,19 @@ export default function CourseDetail() {
 
               {/* استثناء عنصر */}
               <div>
-                <h4 className="mb-2 text-xs font-extrabold text-text-soft">استثناء عنصر من هذه الدورة</h4>
+                <h4 className="mb-2 text-xs font-extrabold text-text-soft">{t('courseDetail.exemptTitle')}</h4>
                 {exemptableElements.length === 0 ? (
-                  <p className="text-xs text-text-soft">لا توجد عناصر يمكن استثناؤها</p>
+                  <p className="text-xs text-text-soft">{t('courseDetail.noExemptable')}</p>
                 ) : (
                   <div className="space-y-1.5">
                     {exemptableElements.map((el) => (
                       <div key={el.id} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-text-main">{el.element.name}</span>
-                          <Badge meta={EL_STATUS_META[el.status] || EL_STATUS_META.NOT_STARTED} small />
+                          <Badge label={elStatusLabel(el.status)} cls={(EL_STATUS_META[el.status] || EL_STATUS_META.NOT_STARTED).cls} small />
                         </div>
-                        <button onClick={() => overrideElement(el.id, 'exempt', true)}
-                          className="rounded-lg border border-border px-2 py-1 text-[11px] font-bold text-text-soft hover:bg-white">
-                          استثناء
+                        <button onClick={() => setOverrideModal({ trackingId: el.id, action: 'exempt' })} className="rounded-lg border border-border px-2 py-1 text-[11px] font-bold text-text-soft hover:bg-white">
+                          {t('courseDetail.exempt')}
                         </button>
                       </div>
                     ))}
@@ -796,23 +791,19 @@ export default function CourseDetail() {
                 )}
               </div>
 
-              {/* عناصر مُستثناة من المدير */}
               {exemptedByManager.length > 0 && (
                 <div>
-                  <h4 className="mb-2 text-xs font-extrabold text-text-soft">عناصر مُستثناة من المدير</h4>
+                  <h4 className="mb-2 text-xs font-extrabold text-text-soft">{t('courseDetail.exemptedByManager')}</h4>
                   <div className="space-y-1.5">
                     {exemptedByManager.map((el) => (
                       <div key={el.id} className="rounded-xl border border-border bg-background px-3 py-2">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-sm font-bold text-text-main">{el.element.name}</span>
-                          <button onClick={() => overrideElement(el.id, 'restore', false)}
-                            className="rounded-lg border border-border px-2 py-1 text-[11px] font-bold text-text-soft hover:bg-white">
-                            إلغاء الاستثناء
+                          <button onClick={() => doOverride(el.id, 'restore', null)} className="rounded-lg border border-border px-2 py-1 text-[11px] font-bold text-text-soft hover:bg-white">
+                            {t('courseDetail.cancelExemption')}
                           </button>
                         </div>
-                        {el.overrideReason && (
-                          <p className="mt-1 text-[11px] text-text-soft">السبب: {el.overrideReason}</p>
-                        )}
+                        {el.overrideReason && <p className="mt-1 text-[11px] text-text-soft">{t('courseDetail.reasonLabel')} {el.overrideReason}</p>}
                       </div>
                     ))}
                   </div>
@@ -822,14 +813,25 @@ export default function CourseDetail() {
           </div>
         )}
 
-        {/* ── لا توجد عناصر ────────────────────────────────────────────── */}
         {sortedElements.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-border bg-white p-10 text-center text-sm text-text-soft shadow-card">
-            لا توجد عناصر إغلاق لهذه الدورة
-          </div>
+          <div className="rounded-2xl border border-dashed border-border bg-white p-10 text-center text-sm text-text-soft shadow-card">{t('courseDetail.noElements')}</div>
         )}
       </div>
 
+      <ReasonModal
+        open={!!overrideModal}
+        title={overrideModal?.action === 'revert' ? t('courseDetail.revert')
+          : overrideModal?.action === 'force-reset' ? t('courseDetail.forceReset')
+          : t('courseDetail.exempt')}
+        label={overrideModal?.action === 'revert' ? t('courseDetail.revertPrompt')
+          : overrideModal?.action === 'force-reset' ? t('courseDetail.forceResetPrompt')
+          : t('courseDetail.exemptPrompt')}
+        required
+        tone={['revert', 'force-reset'].includes(overrideModal?.action) ? 'danger' : 'warning'}
+        loading={overrideBusy}
+        onConfirm={confirmOverride}
+        onCancel={() => setOverrideModal(null)}
+      />
       {showNotesReport && (
         <CourseNotesReportForm
           courseId={id}

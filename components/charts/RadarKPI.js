@@ -1,11 +1,15 @@
+import { memo } from 'react';
 import {
   RadarChart, PolarGrid, PolarAngleAxis, Radar,
   ResponsiveContainer, Tooltip
 } from 'recharts';
+import { useTranslation } from '../../lib/i18n';
 
-export default function RadarKPI({ data = [] }) {
+function RadarKPI({ data = [] }) {
+  const { t } = useTranslation();
+
   if (!data.length) return (
-    <div className="flex h-full items-center justify-center text-sm text-text-soft">لا توجد بيانات</div>
+    <div className="flex h-full items-center justify-center text-sm text-text-soft">{t('common.noData')}</div>
   );
 
   return (
@@ -17,7 +21,7 @@ export default function RadarKPI({ data = [] }) {
           tick={{ fontFamily: 'Cairo, sans-serif', fontSize: 11, fill: '#6E767A' }}
         />
         <Radar
-          name="الأداء"
+          name={t('charts.performance')}
           dataKey="score"
           stroke="#253C32"
           fill="#5D8A70"
@@ -25,10 +29,12 @@ export default function RadarKPI({ data = [] }) {
           strokeWidth={2}
         />
         <Tooltip
-          formatter={(value) => [`${Number(value).toFixed(1)}%`, 'الدرجة']}
+          formatter={(value) => [`${Number(value).toFixed(1)}%`, t('charts.score')]}
           contentStyle={{ fontFamily: 'Cairo, sans-serif', fontSize: 12, borderRadius: 12, border: '1px solid #D8DDDA' }}
         />
       </RadarChart>
     </ResponsiveContainer>
   );
 }
+
+export default memo(RadarKPI);

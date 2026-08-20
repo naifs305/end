@@ -1,109 +1,23 @@
 ﻿import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Camera, ArrowLeft, Trash2, Check } from 'lucide-react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
 import { isAcceptableImageFile, normalizeImageFile } from '../../lib/clientImage';
+import { useTranslation } from '../../lib/i18n';
 
-const ratings = [
-  { value: 'excellent', label: 'ممتاز' },
-  { value: 'good', label: 'جيد' },
-  { value: 'needs_improvement', label: 'يحتاج تحسين' },
-  { value: 'weak', label: 'ضعيف' },
-  { value: 'requires_development', label: 'يحتاج تطوير' },
-  { value: 'not_applicable', label: 'غير منطبق' },
-];
+const RATING_VALUES = ['excellent', 'good', 'needs_improvement', 'weak', 'requires_development', 'not_applicable'];
 
 const ratingValuesRequiringComment = ['needs_improvement', 'weak', 'requires_development'];
 
-const openingGuides = {
-  training_environment: [
-    'جاهزية القاعة أو مقر التنفيذ',
-    'النظافة والترتيب والانضباط العام',
-    'سلامة التكييف والإنارة والتهوية',
-    'سلامة المقاعد والطاولات وتجهيزات المتدربين',
-    'مدى مناسبة البيئة التدريبية لبداية التنفيذ',
-  ],
-  trainer_evaluation: [
-    'جاهزية المدرب في بداية الدورة',
-    'الالتزام بالوقت والتعليمات التنظيمية',
-    'وضوح أسلوب العرض والتقديم',
-    'التعاون مع فريق التشغيل',
-    'الاستعداد لبداية التنفيذ',
-  ],
-  trainee_evaluation: [
-    'انتظام الحضور في اليوم الأول',
-    'سلامة التسجيل ودخول المشاركين',
-    'التزام المتدربين بالتعليمات الأولية',
-    'وضوح الاستقبال والتنظيم عند البداية',
-    'انطباع أولي عن انضباط المجموعة',
-  ],
-  content_evaluation: [
-    'وضوح المحتوى العلمي منذ البداية',
-    'مدى ارتباط المحتوى بالبرنامج',
-    'سلامة المادة العلمية والمرفقات',
-    'تسلسل العناصر العلمية',
-    'ملاءمة المحتوى للفئة المستهدفة',
-  ],
-  lms_evaluation: [
-    'جاهزية منصة LMS وبنود البرنامج',
-    'وضوح التعليمات داخل المنصة',
-    'توفر الملفات والروابط الأساسية',
-    'سلامة الوصول للمحتوى والاختبارات',
-    'تطابق المحتوى على المنصة مع التنفيذ',
-  ],
-  support_services_evaluation: [
-    'إدارة السفر في الحجوزات اللازمة للطيران والسكن وغيرها',
-    'إدارة تطوير الأعمال في تسليم الأسماء مبكرًا والتعامل مع القضايا الطارئة',
-    'إدارة تصميم البرامج التدريبية في التفاعل السريع مع محتوى البرنامج على منصة LMS',
-    'إدارة شؤون المدربين في تعديل الأدلة والتوقيتات وأسماء المدربين عند الحاجة',
-    'تعاون الإدارات المساندة الأخرى مثل الخدمات المساندة والضيافة والإسكان والمراسم والعيادة الطبية',
-  ],
-};
-
-const closingGuides = {
-  training_environment: [
-    'جاهزية القاعة أو مقر التنفيذ',
-    'النظافة والترتيب والانضباط العام',
-    'سلامة التكييف والإنارة والتهوية',
-    'سلامة المقاعد والطاولات وتجهيزات المتدربين',
-    'مدى مناسبة البيئة التدريبية لتنفيذ البرنامج',
-  ],
-  trainer_evaluation: [
-    'الالتزام بالحضور والانصراف',
-    'الجاهزية العلمية والقدرة على الشرح',
-    'التفاعل مع المتدربين وإدارة النقاش',
-    'الالتزام بالجدول الزمني',
-    'التعاون مع فريق التشغيل',
-  ],
-  trainee_evaluation: [
-    'الانضباط بالحضور والالتزام',
-    'التفاعل والمشاركة أثناء التنفيذ',
-    'الالتزام بالتعليمات',
-    'الجدية في الأنشطة والاختبارات',
-    'السلوك العام داخل البيئة التدريبية',
-  ],
-  content_evaluation: [
-    'جودة المادة العلمية وتكاملها',
-    'سلامة تسلسل المحتوى أثناء التنفيذ',
-    'مناسبة المحتوى للأهداف التدريبية',
-    'وضوح الحقائب والمرفقات العلمية',
-    'مدى تحقيق المحتوى لقيمة تعليمية فعلية',
-  ],
-  lms_evaluation: [
-    'اكتمال المحتوى على منصة LMS',
-    'وضوح التعليمات داخل المنصة',
-    'توفر الاختبارات أو الأنشطة المطلوبة',
-    'سلامة الملفات والروابط والمرفقات',
-    'مدى توافق المنصة مع البرنامج المنفذ',
-  ],
-  support_services_evaluation: [
-    'إدارة السفر في الحجوزات اللازمة للطيران والسكن وغيرها',
-    'إدارة تطوير الأعمال في تسليم الأسماء مبكرًا والتعامل مع القضايا الطارئة',
-    'إدارة تصميم البرامج التدريبية في التفاعل السريع مع محتوى البرنامج على منصة LMS',
-    'إدارة شؤون المدربين في تعديل الأدلة والتوقيتات وأسماء المدربين عند الحاجة',
-    'تعاون الإدارات المساندة الأخرى مثل الخدمات المساندة والضيافة والإسكان والمراسم والعيادة الطبية',
-  ],
-};
+const SECTION_KEYS = [
+  'training_environment',
+  'trainer_evaluation',
+  'trainee_evaluation',
+  'content_evaluation',
+  'lms_evaluation',
+  'support_services_evaluation',
+];
 
 function emptySection() {
   return { rating: '', comment: '' };
@@ -147,7 +61,7 @@ function getInitialForm(reportType) {
   };
 }
 
-function RatingBadgePreview({ value }) {
+function RatingBadgePreview({ value, t }) {
   if (!value) return null;
   const map = {
     excellent:            'bg-forest-50 text-accent border-accent/20',
@@ -157,22 +71,22 @@ function RatingBadgePreview({ value }) {
     requires_development: 'bg-sand/10 text-warning border-sand/30',
     not_applicable:       'bg-background text-text-soft border-border',
   };
-  const label = ratings.find((r) => r.value === value)?.label || value;
+  const label = t(`reportForm.ratings.${value}`);
   return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${map[value] || 'bg-background text-text-soft border-border'}`}>{label}</span>;
 }
 
-function Section({ title, name, data, onChange, required = false, helperItems = [] }) {
+function Section({ title, name, data, onChange, required = false, helperItems = [], t }) {
   const needsComment = ratingValuesRequiringComment.includes(data?.rating || '');
   return (
     <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
       <div className="mb-4 flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-base font-extrabold text-text-main">{title}{required ? <span className="mr-1 text-danger">*</span> : null}</h4>
-          <RatingBadgePreview value={data?.rating} />
+          <h4 className="text-base font-extrabold text-text-main">{title}{required ? <span className="ms-1 text-danger">*</span> : null}</h4>
+          <RatingBadgePreview value={data?.rating} t={t} />
         </div>
         {helperItems.length > 0 && (
           <div className="rounded-2xl border border-border bg-background p-4">
-            <div className="mb-2 text-xs font-bold text-text-main">محاور التقييم المقترحة</div>
+            <div className="mb-2 text-xs font-bold text-text-main">{t('reportForm.suggestedAxes')}</div>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {helperItems.map((item, index) => (
                 <div key={`${name}-guide-${index}`} className="flex items-start gap-2 text-xs text-text-soft">
@@ -186,16 +100,16 @@ function Section({ title, name, data, onChange, required = false, helperItems = 
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-1">
-          <label className="mb-1.5 block text-xs font-bold text-text-soft">التقييم العام{required ? <span className="mr-1 text-danger">*</span> : null}</label>
+          <label className="mb-1.5 block text-xs font-bold text-text-soft">{t('reportForm.overallRating')}{required ? <span className="ms-1 text-danger">*</span> : null}</label>
           <select name={`${name}.rating`} value={data?.rating || ''} onChange={onChange} className="w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" required={required}>
-            <option value="">اختر التقييم</option>
-            {ratings.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            <option value="">{t('reportForm.selectRating')}</option>
+            {RATING_VALUES.map((r) => <option key={r} value={r}>{t(`reportForm.ratings.${r}`)}</option>)}
           </select>
         </div>
         <div className="lg:col-span-2">
-          <label className="mb-1.5 block text-xs font-bold text-text-soft">الوصف التفصيلي والملاحظات{needsComment ? <span className="mr-1 text-danger">*</span> : null}</label>
-          <textarea name={`${name}.comment`} value={data?.comment || ''} onChange={onChange} className="min-h-[120px] w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" placeholder="اكتب وصفًا واضحًا لما تم رصده في هذا المحور، مع ذكر الملاحظات أو جوانب القوة أو جوانب التحسين" required={needsComment} />
-          <div className="mt-2 text-[11px] text-text-soft">عند اختيار: يحتاج تحسين / ضعيف / يحتاج تطوير، تصبح الملاحظة إلزامية.</div>
+          <label className="mb-1.5 block text-xs font-bold text-text-soft">{t('reportForm.detailedDescription')}{needsComment ? <span className="ms-1 text-danger">*</span> : null}</label>
+          <textarea name={`${name}.comment`} value={data?.comment || ''} onChange={onChange} className="min-h-[120px] w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" placeholder={t('reportForm.commentPlaceholder')} required={needsComment} />
+          <div className="mt-2 text-[11px] text-text-soft">{t('reportForm.commentRequiredHint')}</div>
         </div>
       </div>
     </div>
@@ -206,13 +120,15 @@ function ReadOnlyField({ label, value }) {
   return <div className="rounded-2xl border border-border bg-white p-3"><div className="mb-1 text-[11px] font-bold text-text-soft">{label}</div><div className="break-words text-sm font-bold text-text-main">{value || '-'}</div></div>;
 }
 
-function AttachmentCard({ file, index, onRemove }) {
+function AttachmentCard({ file, index, onRemove, t }) {
   return (
     <div className="rounded-2xl border border-border bg-background p-2">
       <img src={file.content} alt={file.name} className="mb-2 h-28 w-full rounded-xl object-cover" />
       <div className="mb-1 truncate text-xs font-medium text-text-main">{file.name}</div>
       <div className="mb-2 text-[11px] text-text-soft">{file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : ''}</div>
-      <button type="button" onClick={() => onRemove(index)} className="text-xs font-bold text-danger hover:underline">حذف</button>
+      <button type="button" onClick={() => onRemove(index)} className="inline-flex items-center gap-1 text-xs font-bold text-danger hover:underline">
+        <Trash2 size={12} aria-hidden="true" /> {t('common.delete')}
+      </button>
     </div>
   );
 }
@@ -220,7 +136,7 @@ function AttachmentCard({ file, index, onRemove }) {
 function TextField({ label, name, value, onChange, placeholder, required = false, type = 'text', min, disabled = false }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-bold text-text-soft">{label}{required ? <span className="mr-1 text-danger">*</span> : null}</label>
+      <label className="mb-1.5 block text-xs font-bold text-text-soft">{label}{required ? <span className="ms-1 text-danger">*</span> : null}</label>
       <input type={type} min={min} name={name} value={value} onChange={onChange} placeholder={placeholder} disabled={disabled} className="w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:bg-background" required={required} />
     </div>
   );
@@ -229,22 +145,38 @@ function TextField({ label, name, value, onChange, placeholder, required = false
 function TextAreaField({ label, name, value, onChange, placeholder, required = false, minHeight = '120px' }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-bold text-text-soft">{label}{required ? <span className="mr-1 text-danger">*</span> : null}</label>
+      <label className="mb-1.5 block text-xs font-bold text-text-soft">{label}{required ? <span className="ms-1 text-danger">*</span> : null}</label>
       <textarea name={name} value={value} onChange={onChange} placeholder={placeholder} className="w-full rounded-2xl border border-border bg-white p-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" style={{ minHeight }} required={required} />
     </div>
   );
 }
 
-function formatLocationType(value) {
-  const map = { INTERNAL: 'داخلي', EXTERNAL: 'خارجي', REMOTE: 'عن بُعد' };
-  return map[value] || value || '-';
-}
-
 export default function CourseReportForm({ trackingId, onClose, onSuccess, course, reportType = 'closing_report', delayReason = '', initialData = null }) {
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory';
   const normalizedType = reportType === 'opening_report' ? 'opening_report' : 'closing_report';
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [form, setForm] = useState({ ...getInitialForm(normalizedType), ...(initialData || {}) });
+
+  const guides = useMemo(() => {
+    const prefix = normalizedType === 'opening_report' ? 'openingGuides' : 'closingGuides';
+    const out = {};
+    for (const key of SECTION_KEYS) {
+      const items = t(`reportForm.${prefix}.${key}`);
+      out[key] = Array.isArray(items) ? items : [];
+    }
+    return out;
+  }, [normalizedType, t]);
+
+  const formatLocationType = (value) => {
+    const map = {
+      INTERNAL: t('reportForm.locationType.INTERNAL'),
+      EXTERNAL: t('reportForm.locationType.EXTERNAL'),
+      REMOTE: t('reportForm.locationType.REMOTE'),
+    };
+    return map[value] || value || '-';
+  };
 
   const courseInfo = useMemo(() => {
     if (!course) return null;
@@ -254,12 +186,12 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
       project: course.operationalProject?.name || '-',
       city: course.city || '-',
       locationType: course.locationType || '-',
-      startDate: course.startDate ? new Date(course.startDate).toLocaleDateString('ar-SA-u-ca-gregory') : '-',
-      endDate: course.endDate ? new Date(course.endDate).toLocaleDateString('ar-SA-u-ca-gregory') : '-',
+      startDate: course.startDate ? new Date(course.startDate).toLocaleDateString(dateLocale) : '-',
+      endDate: course.endDate ? new Date(course.endDate).toLocaleDateString(dateLocale) : '-',
       traineesCount: course.numTrainees ?? '-',
       supervisor: `${course.primaryEmployee?.firstName || ''} ${course.primaryEmployee?.lastName || ''}`.trim() || '-',
     };
-  }, [course]);
+  }, [course, dateLocale]);
 
   const attendanceRate = useMemo(() => {
     const registered = Number(form.registered_trainees_count);
@@ -279,12 +211,10 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
   }, [form.actual_attendance_count, form.passed_count, normalizedType]);
 
   const completionStats = useMemo(() => {
-    const keys = normalizedType === 'opening_report'
-      ? ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation', 'support_services_evaluation']
-      : ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation', 'support_services_evaluation'];
+    const keys = SECTION_KEYS;
     const completed = keys.filter((key) => form[key]?.rating).length;
     return { completed, total: keys.length, percent: Math.round((completed / keys.length) * 100) };
-  }, [form, normalizedType]);
+  }, [form]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -332,19 +262,19 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
       const files = Array.from(e.target.files || []);
       if (!files.length) return;
       if (form.attachments.length + files.length > 6) {
-        toast.error('الحد الأقصى 6 صور فقط');
+        toast.error(t('reportForm.maxImages'));
         e.target.value = '';
         return;
       }
       const invalidFile = files.find((file) => !isAcceptableImageFile(file));
       if (invalidFile) {
-        toast.error('يسمح فقط برفع الصور');
+        toast.error(t('reportForm.imagesOnly'));
         e.target.value = '';
         return;
       }
       const oversized = files.find((file) => file.size > 4 * 1024 * 1024);
       if (oversized) {
-        toast.error('حجم الصورة الواحدة يجب ألا يتجاوز 4MB');
+        toast.error(t('reportForm.imageTooLarge'));
         e.target.value = '';
         return;
       }
@@ -352,36 +282,34 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
       setForm((prev) => ({ ...prev, attachments: [...prev.attachments, ...convertedFiles] }));
       e.target.value = '';
     } catch {
-      toast.error('تعذر رفع الصور');
+      toast.error(t('reportForm.uploadFailed'));
     }
   };
 
   const handleRemoveAttachment = (index) => setForm((prev) => ({ ...prev, attachments: prev.attachments.filter((_, i) => i !== index) }));
 
   const validateForm = () => {
-    const requiredSections = normalizedType === 'opening_report'
-      ? ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation', 'support_services_evaluation']
-      : ['training_environment', 'trainer_evaluation', 'trainee_evaluation', 'content_evaluation', 'lms_evaluation', 'support_services_evaluation'];
+    const requiredSections = SECTION_KEYS;
 
     for (const key of requiredSections) {
       const section = form[key];
       if (!section?.rating?.trim()) {
-        toast.error('لا يمكن تقديم التقرير قبل استكمال جميع التقييمات الأساسية');
+        toast.error(t('reportForm.completeAllRatings'));
         return false;
       }
       if (ratingValuesRequiringComment.includes(section.rating) && !section.comment?.trim()) {
-        toast.error('يوجد تقييم يتطلب ملاحظة تفسيرية');
+        toast.error(t('reportForm.commentRequired'));
         return false;
       }
     }
 
     if (form.registered_trainees_count === '' || (normalizedType === 'opening_report' ? form.initial_attendance_count === '' : form.actual_attendance_count === '')) {
-      toast.error('أكمل بيانات المشاركة الأساسية');
+      toast.error(t('reportForm.completeAttendance'));
       return false;
     }
 
     if (!form.declarationConfirmed) {
-      toast.error('يجب الإقرار بصحة البيانات قبل التقديم');
+      toast.error(t('reportForm.declarationRequired'));
       return false;
     }
     return true;
@@ -415,11 +343,11 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
         generatedCourseInfo: courseInfo,
         ...(delayReason.trim() ? { delayReason: delayReason.trim() } : {}),
       });
-      toast.success('تم تقديم التقرير');
+      toast.success(t('reportForm.submitSuccess'));
       onSuccess();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'حدث خطأ');
+      toast.error(err.response?.data?.message || t('common.error'));
     } finally {
       setLoading(false);
     }
@@ -434,55 +362,55 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
         passing_rate: passingRate,
         generatedCourseInfo: courseInfo,
       });
-      toast.success('تم حفظ التقرير كمسودة، يمكنك إكماله لاحقاً');
+      toast.success(t('reportForm.draftSaved'));
       onSuccess();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'تعذر حفظ المسودة');
+      toast.error(err.response?.data?.message || t('reportForm.draftFailed'));
     } finally {
       setSavingDraft(false);
     }
   };
 
-  const title = normalizedType === 'opening_report' ? 'تقرير افتتاح الدورة' : 'تقرير اختتام الدورة';
+  const title = normalizedType === 'opening_report' ? t('reportForm.openingTitle') : t('reportForm.closingTitle');
   const subtitle = normalizedType === 'opening_report'
-    ? 'نموذج تفصيلي لمتابعة الجاهزية التشغيلية والحضور الأولي عند افتتاح البرنامج'
-    : 'نموذج تفصيلي لتقييم التنفيذ التشغيلي وجودة البرنامج والبيئة التدريبية عند الاختتام';
+    ? t('reportForm.openingSubtitle')
+    : t('reportForm.closingSubtitle');
 
   return (
     <>
     {/* نافذة تذكير الصور */}
     {showPhotoReminder && typeof document !== 'undefined' && createPortal(
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
         <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-border bg-white shadow-deep">
           <div className="bg-sand/20 px-5 py-4 border-b border-sand/30">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">📷</span>
+              <Camera size={28} className="text-warning" aria-hidden="true" />
               <div>
-                <h3 className="font-extrabold text-text-main">هل نسيت إرفاق الصور؟</h3>
-                <p className="text-xs text-text-soft mt-0.5">التقرير لا يحتوي على أي صور</p>
+                <h3 className="font-extrabold text-text-main">{t('reportForm.photoReminderTitle')}</h3>
+                <p className="text-xs text-text-soft mt-0.5">{t('reportForm.photoReminderSubtitle')}</p>
               </div>
             </div>
           </div>
           <div className="px-5 py-4">
             <p className="text-sm text-text-soft leading-relaxed">
-              الصور توثّق سير الدورة وتُقوّي تقريرك. إذا كانت لديك صور، يُفضّل إرفاقها الآن.
+              {t('reportForm.photoReminderBody')}
             </p>
           </div>
           <div className="flex gap-2 px-5 pb-5">
             <button
               type="button"
               onClick={() => setShowPhotoReminder(false)}
-              className="flex-1 rounded-xl border border-border bg-background py-2.5 text-sm font-bold text-text-main hover:bg-forest-50 transition"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-background py-2.5 text-sm font-bold text-text-main hover:bg-forest-50 transition"
             >
-              ← إضافة صور
+              <ArrowLeft size={16} aria-hidden="true" /> {t('reportForm.addPhotos')}
             </button>
             <button
               type="button"
               onClick={() => { setShowPhotoReminder(false); doSubmit(); }}
               className="flex-1 rounded-xl border border-sand/40 bg-sand/10 py-2.5 text-sm font-bold text-warning hover:bg-sand/20 transition"
             >
-              إرسال بدون صور
+              {t('reportForm.sendWithoutPhotos')}
             </button>
           </div>
         </div>
@@ -497,90 +425,83 @@ export default function CourseReportForm({ trackingId, onClose, onSuccess, cours
             <p className="mt-1 text-sm text-text-soft">{subtitle}</p>
           </div>
           <div className="min-w-[220px] rounded-3xl border border-border bg-background p-4">
-            <div className="mb-2 flex items-center justify-between"><span className="text-xs font-bold text-text-soft">استكمال النموذج</span><span className="text-sm font-extrabold text-primary">{completionStats.percent}%</span></div>
+            <div className="mb-2 flex items-center justify-between"><span className="text-xs font-bold text-text-soft">{t('reportForm.formCompletion')}</span><span className="text-sm font-extrabold text-primary">{completionStats.percent}%</span></div>
             <div className="h-2.5 w-full overflow-hidden rounded-full bg-border"><div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${completionStats.percent}%` }} /></div>
-            <div className="mt-2 text-[11px] text-text-soft">{completionStats.completed} من {completionStats.total} محاور مكتملة</div>
+            <div className="mt-2 text-[11px] text-text-soft">{t('reportForm.axesCompleted', { completed: completionStats.completed, total: completionStats.total })}</div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <ReadOnlyField label="اسم الدورة" value={courseInfo?.name} />
-          <ReadOnlyField label="كود الدورة" value={courseInfo?.code} />
-          <ReadOnlyField label="المشروع التشغيلي" value={courseInfo?.project} />
-          <ReadOnlyField label="المدينة" value={courseInfo?.city} />
-          <ReadOnlyField label="مقر التنفيذ" value={formatLocationType(courseInfo?.locationType)} />
-          <ReadOnlyField label="تاريخ البداية" value={courseInfo?.startDate} />
-          <ReadOnlyField label="تاريخ النهاية" value={courseInfo?.endDate} />
-          <ReadOnlyField label="عدد المتدربين" value={courseInfo?.traineesCount} />
-          <ReadOnlyField label="المشرف / المنسق" value={courseInfo?.supervisor} />
+          <ReadOnlyField label={t('reportForm.courseName')} value={courseInfo?.name} />
+          <ReadOnlyField label={t('reportForm.courseCode')} value={courseInfo?.code} />
+          <ReadOnlyField label={t('reportForm.project')} value={courseInfo?.project} />
+          <ReadOnlyField label={t('reportForm.city')} value={courseInfo?.city} />
+          <ReadOnlyField label={t('reportForm.location')} value={formatLocationType(courseInfo?.locationType)} />
+          <ReadOnlyField label={t('reportForm.startDate')} value={courseInfo?.startDate} />
+          <ReadOnlyField label={t('reportForm.endDate')} value={courseInfo?.endDate} />
+          <ReadOnlyField label={t('reportForm.traineesCount')} value={courseInfo?.traineesCount} />
+          <ReadOnlyField label={t('reportForm.supervisor')} value={courseInfo?.supervisor} />
         </div>
       </div>
 
       <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
-        <div className="mb-4"><h4 className="text-base font-extrabold text-text-main">إحصائيات {normalizedType === 'opening_report' ? 'الافتتاح والحضور الأولي' : 'المشاركة والنتائج النهائية'}</h4></div>
-        <div className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${normalizedType === 'opening_report' ? 'xl:grid-cols-4' : 'xl:grid-cols-4'}`}>
-          <TextField label="عدد المشاركين المسجلين" name="registered_trainees_count" value={form.registered_trainees_count} onChange={handleChange} placeholder="مثال: 14" type="number" min="0" required />
+        <div className="mb-4"><h4 className="text-base font-extrabold text-text-main">{normalizedType === 'opening_report' ? t('reportForm.openingStats') : t('reportForm.closingStats')}</h4></div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <TextField label={t('reportForm.registeredCount')} name="registered_trainees_count" value={form.registered_trainees_count} onChange={handleChange} placeholder={t('reportForm.exampleCount', { n: 14 })} type="number" min="0" required />
           {normalizedType === 'opening_report' ? (
-            <TextField label="عدد الحضور في اليوم الأول" name="initial_attendance_count" value={form.initial_attendance_count} onChange={handleChange} placeholder="مثال: 14" type="number" min="0" required />
+            <TextField label={t('reportForm.firstDayAttendance')} name="initial_attendance_count" value={form.initial_attendance_count} onChange={handleChange} placeholder={t('reportForm.exampleCount', { n: 14 })} type="number" min="0" required />
           ) : (
-            <TextField label="عدد الحضور الفعلي" name="actual_attendance_count" value={form.actual_attendance_count} onChange={handleChange} placeholder="مثال: 14" type="number" min="0" required />
+            <TextField label={t('reportForm.actualAttendance')} name="actual_attendance_count" value={form.actual_attendance_count} onChange={handleChange} placeholder={t('reportForm.exampleCount', { n: 14 })} type="number" min="0" required />
           )}
-          <TextField label="عدد المدربين" name="trainers_count" value={form.trainers_count} onChange={handleChange} placeholder="مثال: 3" type="number" min="0" />
-          <TextField label="عدد المترجمين" name="translators_count" value={form.translators_count} onChange={handleChange} placeholder="مثال: 1" type="number" min="0" />
-          <TextField label={normalizedType === 'opening_report' ? 'نسبة الحضور الأولية' : 'نسبة الحضور'} name="attendance_rate_preview" value={attendanceRate} onChange={() => {}} disabled />
+          <TextField label={t('reportForm.trainersCount')} name="trainers_count" value={form.trainers_count} onChange={handleChange} placeholder={t('reportForm.exampleCount', { n: 3 })} type="number" min="0" />
+          <TextField label={t('reportForm.translatorsCount')} name="translators_count" value={form.translators_count} onChange={handleChange} placeholder={t('reportForm.exampleCount', { n: 1 })} type="number" min="0" />
+          <TextField label={normalizedType === 'opening_report' ? t('reportForm.initialAttendanceRate') : t('reportForm.attendanceRate')} name="attendance_rate_preview" value={attendanceRate} onChange={() => {}} disabled />
           {normalizedType === 'closing_report' && (
             <>
-              <TextField label="عدد المجتازين" name="passed_count" value={form.passed_count} onChange={handleChange} placeholder="مثال: 12" type="number" min="0" />
-              <TextField label="عدد غير المجتازين" name="failed_count" value={form.failed_count} onChange={handleChange} placeholder="مثال: 2" type="number" min="0" />
-              <TextField label="نسبة الاجتياز" name="passing_rate_preview" value={passingRate} onChange={() => {}} disabled />
+              <TextField label={t('reportForm.passedCount')} name="passed_count" value={form.passed_count} onChange={handleChange} placeholder={t('reportForm.exampleCount', { n: 12 })} type="number" min="0" />
+              <TextField label={t('reportForm.failedCount')} name="failed_count" value={form.failed_count} onChange={handleChange} placeholder={t('reportForm.exampleCount', { n: 2 })} type="number" min="0" />
+              <TextField label={t('reportForm.passingRate')} name="passing_rate_preview" value={passingRate} onChange={() => {}} disabled />
             </>
           )}
         </div>
       </div>
 
+      <Section title={t('reportForm.sections.training_environment')} name="training_environment" data={form.training_environment} onChange={handleChange} required helperItems={guides.training_environment} t={t} />
+      <Section title={t('reportForm.sections.trainer_evaluation')} name="trainer_evaluation" data={form.trainer_evaluation} onChange={handleChange} required helperItems={guides.trainer_evaluation} t={t} />
+      <Section title={t('reportForm.sections.trainee_evaluation')} name="trainee_evaluation" data={form.trainee_evaluation} onChange={handleChange} required helperItems={guides.trainee_evaluation} t={t} />
+      <Section title={t('reportForm.sections.content_evaluation')} name="content_evaluation" data={form.content_evaluation} onChange={handleChange} required helperItems={guides.content_evaluation} t={t} />
+      <Section title={t('reportForm.sections.lms_evaluation')} name="lms_evaluation" data={form.lms_evaluation} onChange={handleChange} required helperItems={guides.lms_evaluation} t={t} />
+      <Section title={t('reportForm.sections.support_services_evaluation')} name="support_services_evaluation" data={form.support_services_evaluation} onChange={handleChange} required helperItems={guides.support_services_evaluation} t={t} />
+
       {normalizedType === 'opening_report' ? (
-        <>
-          <Section title="تقييم البيئة التدريبية" name="training_environment" data={form.training_environment} onChange={handleChange} required helperItems={openingGuides.training_environment} />
-          <Section title="تقييم المدرب" name="trainer_evaluation" data={form.trainer_evaluation} onChange={handleChange} required helperItems={openingGuides.trainer_evaluation} />
-          <Section title="تقييم المتدرب" name="trainee_evaluation" data={form.trainee_evaluation} onChange={handleChange} required helperItems={openingGuides.trainee_evaluation} />
-          <Section title="تقييم المحتوى" name="content_evaluation" data={form.content_evaluation} onChange={handleChange} required helperItems={openingGuides.content_evaluation} />
-          <Section title="تقييم منصة LMS" name="lms_evaluation" data={form.lms_evaluation} onChange={handleChange} required helperItems={openingGuides.lms_evaluation} />
-          <Section title="تقييم الإدارات المساندة" name="support_services_evaluation" data={form.support_services_evaluation} onChange={handleChange} required helperItems={openingGuides.support_services_evaluation} />
-          <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
-            <TextAreaField label="ملاحظات وتوصيات عند الافتتاح" name="readiness_notes" value={form.readiness_notes} onChange={handleChange} placeholder="اكتب أبرز الملاحظات والتوصيات الميدانية عند افتتاح الدورة" minHeight="140px" />
-          </div>
-        </>
+        <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
+          <TextAreaField label={t('reportForm.readinessNotes')} name="readiness_notes" value={form.readiness_notes} onChange={handleChange} placeholder={t('reportForm.readinessNotesPlaceholder')} minHeight="140px" />
+        </div>
       ) : (
-        <>
-          <Section title="تقييم البيئة التدريبية" name="training_environment" data={form.training_environment} onChange={handleChange} required helperItems={closingGuides.training_environment} />
-          <Section title="تقييم المدرب" name="trainer_evaluation" data={form.trainer_evaluation} onChange={handleChange} required helperItems={closingGuides.trainer_evaluation} />
-          <Section title="تقييم المتدرب" name="trainee_evaluation" data={form.trainee_evaluation} onChange={handleChange} required helperItems={closingGuides.trainee_evaluation} />
-          <Section title="تقييم المحتوى" name="content_evaluation" data={form.content_evaluation} onChange={handleChange} required helperItems={closingGuides.content_evaluation} />
-          <Section title="تقييم منصة LMS" name="lms_evaluation" data={form.lms_evaluation} onChange={handleChange} required helperItems={closingGuides.lms_evaluation} />
-          <Section title="تقييم الإدارات المساندة" name="support_services_evaluation" data={form.support_services_evaluation} onChange={handleChange} required helperItems={closingGuides.support_services_evaluation} />
-          <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
-            <TextAreaField label="التوصيات والمقترحات" name="recommendations" value={form.recommendations} onChange={handleChange} placeholder="اكتب التوصيات والمقترحات التي خرج بها فريق الإشراف عند اختتام البرنامج" minHeight="140px" />
-          </div>
-        </>
+        <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
+          <TextAreaField label={t('reportForm.recommendations')} name="recommendations" value={form.recommendations} onChange={handleChange} placeholder={t('reportForm.recommendationsPlaceholder')} minHeight="140px" />
+        </div>
       )}
 
       <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
-        <div className="mb-4 flex items-center justify-between"><h4 className="text-base font-extrabold text-text-main">مرفقات وصور داعمة</h4><span className="text-xs text-text-soft">اختياري — حتى 6 صور</span></div>
-        <div className="mb-4"><input type="file" accept="image/*" multiple onChange={handleAttachmentsChange} className="block w-full text-sm text-text-soft file:ml-4 file:rounded-2xl file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-bold file:text-white hover:file:opacity-90" /></div>
-        {form.attachments.length > 0 ? <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{form.attachments.map((file, index) => <AttachmentCard key={`${file.name}-${index}`} file={file} index={index} onRemove={handleRemoveAttachment} />)}</div> : <div className="rounded-2xl border border-dashed border-border bg-background p-4 text-sm text-text-soft">لم يتم إرفاق أي صور حتى الآن</div>}
+        <div className="mb-4 flex items-center justify-between"><h4 className="text-base font-extrabold text-text-main">{t('reportForm.attachmentsTitle')}</h4><span className="text-xs text-text-soft">{t('reportForm.attachmentsHint')}</span></div>
+        <div className="mb-4"><input type="file" accept="image/*" multiple onChange={handleAttachmentsChange} className="block w-full text-sm text-text-soft file:me-4 file:rounded-2xl file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-bold file:text-white hover:file:opacity-90" /></div>
+        {form.attachments.length > 0 ? <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{form.attachments.map((file, index) => <AttachmentCard key={`${file.name}-${index}`} file={file} index={index} onRemove={handleRemoveAttachment} t={t} />)}</div> : <div className="rounded-2xl border border-dashed border-border bg-background p-4 text-sm text-text-soft">{t('reportForm.noAttachments')}</div>}
       </div>
 
       <div className="rounded-3xl border border-border bg-white p-5 shadow-card">
         <label className="flex items-start gap-3 text-sm text-text-main">
           <input type="checkbox" name="declarationConfirmed" checked={form.declarationConfirmed} onChange={handleChange} className="mt-1 h-5 w-5 rounded border-border text-primary focus:ring-primary" />
-          <span>أقر بصحة البيانات المدخلة في هذا التقرير، وأنها تعبّر عن الحالة الميدانية الفعلية للدورة لحظة الرفع.</span>
+          <span>{t('reportForm.declaration')}</span>
         </label>
       </div>
 
       <div className="flex flex-col-reverse gap-3 pt-2 md:flex-row md:justify-end">
-        <button type="button" onClick={onClose} className="rounded-2xl border border-border bg-white px-5 py-3 text-sm font-bold text-text-main transition hover:bg-background">إغلاق</button>
-        <button type="button" onClick={handleSaveDraft} disabled={savingDraft || loading} className="rounded-2xl border border-primary/30 bg-primary-light px-5 py-3 text-sm font-bold text-primary transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{savingDraft ? 'جاري الحفظ...' : 'حفظ كمسودة'}</button>
-        <button type="submit" disabled={loading || savingDraft} className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{loading ? 'جاري الحفظ...' : 'حفظ وتقديم التقرير'}</button>
+        <button type="button" onClick={onClose} className="rounded-2xl border border-border bg-white px-5 py-3 text-sm font-bold text-text-main transition hover:bg-background">{t('common.close')}</button>
+        <button type="button" onClick={handleSaveDraft} disabled={savingDraft || loading} className="rounded-2xl border border-primary/30 bg-primary-light px-5 py-3 text-sm font-bold text-primary transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{savingDraft ? t('common.saving') : t('reportForm.saveAsDraft')}</button>
+        <button type="submit" disabled={loading || savingDraft} className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
+          {loading ? t('common.saving') : (<><Check size={16} aria-hidden="true" /> {t('reportForm.saveAndSubmit')}</>)}
+        </button>
       </div>
     </form>
     </>

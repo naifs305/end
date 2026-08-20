@@ -1,12 +1,12 @@
-const { withAuth, withMethods } = require('../../../../lib/middleware/auth');
-const messagesService = require('../../../../lib/services/messages');
+const { withAuth, withMethods, ok, fail } = require('../../../../lib/server/http');
+const messagingService = require('../../../../lib/modules/messaging/messaging.service');
 
 async function handler(req, res) {
+  const actor = { userId: req.user.id, activeRole: req.activeRole };
   try {
-    const thread = await messagesService.getThread(req.user.id, req.query.userId);
-    return res.status(200).json(thread);
+    return ok(res, await messagingService.getThread(actor, req.query.userId));
   } catch (err) {
-    return res.status(err.statusCode || 500).json({ message: err.message });
+    return fail(res, err);
   }
 }
 

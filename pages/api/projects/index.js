@@ -1,46 +1,37 @@
-const prisma = require('../../../lib/db/prisma');
+// GET  /api/projects  — قائمة المشاريع (مختصرة للعامة، كاملة للمدير)
+// POST /api/projects  — إنشاء مشروع (مدير فقط)
+const { withMethods, withManager, withValidation, ok, created, fail } = require('../../../lib/server/http');
 const { getUserFromRequest } = require('../../../lib/auth/jwt');
-const { withMethods, withManager } = require('../../../lib/middleware/auth');
-const projectsService = require('../../../lib/services/projects');
-const { validateProject } = require('../../../lib/middleware/validate');
+const prisma = require('../../../lib/db/prisma');
+const projects = require('../../../lib/modules/projects/projects.service');
+const { createProjectSchema } = require('../../../lib/modules/projects/projects.schema');
 
 async function handler(req, res) {
+  if (req.method === 'POST') {
+    return withManager(
+      withValidation(createProjectSchema, async (r, s) => {
+        try {
+          const project = await projects.create(r.valid, { userId: r.user.id, activeRole: r.activeRole });
+          return created(s, project);
+        } catch (e) {
+          return fail(s, e);
+        }
+      })
+    )(req, res);
+  }
+
+  // GET — المدير يرى القائمة الكاملة، وغيره القائمة المختصرة (للعامة)
   try {
-    if (req.method === 'GET') {
-      const payload = getUserFromRequest(req);
-
-      if (!payload) {
-        const list = await prisma.operationalProject.findMany({
-          orderBy: { name: 'asc' },
-          select: { id: true, name: true },
-        });
-        return res.status(200).json(list);
-      }
-
-      const user = await prisma.user.findUnique({
-        where: { id: payload.sub },
-        select: { roles: true, isActive: true },
-      });
-
+    const payload = getUserFromRequest(req);
+    if (payload) {
+      const user = await prisma.user.findUnique({ where: { id: payload.sub }, select: { roles: true, isActive: true } });
       if (user?.isActive && user.roles.includes('MANAGER')) {
-        return res.status(200).json(await projectsService.listProjects());
+        return ok(res, await projects.list());
       }
-
-      const list = await prisma.operationalProject.findMany({
-        orderBy: { name: 'asc' },
-        select: { id: true, name: true },
-      });
-      return res.status(200).json(list);
     }
-
-    return withManager(async (r, s) => {
-      const v = validateProject({ name: r.body?.name });
-      if (!v.valid) return s.status(400).json({ message: v.message });
-      const project = await projectsService.createProject(r.body?.name, r.user.id);
-      return s.status(201).json(project);
-    })(req, res);
-  } catch (error) {
-    return res.status(error.statusCode || 500).json({ message: error.message });
+    return ok(res, await projects.publicList());
+  } catch (e) {
+    return fail(res, e);
   }
 }
 

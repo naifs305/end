@@ -1,7 +1,7 @@
 // GET /api/analytics/oversight
 // لوحة مراقبة المدير — جميع الموظفين مع حالة دوراتهم وعناصر الإقفال
 const prisma   = require('../../../lib/db/prisma');
-const { withManagerOrSupervisor, withMethods } = require('../../../lib/middleware/auth');
+const { withManagerOrSupervisor, withMethods, ok } = require('../../../lib/server/http');
 const { getSupervisedProjectIds } = require('../../../lib/services/permissions');
 
 async function handler(req, res) {
@@ -108,7 +108,7 @@ async function handler(req, res) {
       return scoreB - scoreA;
     });
 
-  return res.status(200).json({ employees: result });
+  return ok(res, { employees: result });
 }
 
 module.exports = withMethods(['GET'], withManagerOrSupervisor(handler));

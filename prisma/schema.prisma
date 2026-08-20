@@ -103,6 +103,7 @@ model User {
   termsAcceptedAt      DateTime?
   resetToken           String?
   resetTokenExpiry     DateTime?
+  tokenVersion         Int      @default(0)
 
   primaryCourses       Course[]                @relation("PrimaryResponsible")
   supportingCourses    CourseSupport[]         @relation("SupportingMember")
@@ -202,9 +203,15 @@ model Course {
 
   createdAt                      DateTime @default(now())
   updatedAt                      DateTime @updatedAt
+  // لحظة الإقفال الفعلي (تُضبط عند الانتقال إلى CLOSED) — مرجع دقيق لحساب تأخر الإقفال
+  closedAt                       DateTime?
+
+  @@index([operationalProjectId])
+  @@index([primaryEmployeeId])
+  @@index([status])
 }
 
-// تقارير اختيارية — متعددة لكل دورة، لا تؤثر على KPI سلباً
+// تقارير اختيارية — متعددة لكل دورة, لا تؤثر على KPI سلباً
 model CourseOptionalReport {
   id        String   @id @default(uuid())
   courseId  String
@@ -215,6 +222,8 @@ model CourseOptionalReport {
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([courseId])
 }
 
 model CourseSupport {
@@ -300,18 +309,26 @@ model CourseClosureTracking {
   element         ClosureElement @relation(fields: [elementId], references: [id])
 
   @@unique([courseId, elementId])
+  @@index([status])
+  @@index([executedById])
+  @@index([decidedById])
+  @@index([elementId])
 }
 
 model AuditLog {
   id          String @id @default(uuid())
   courseId    String?
   course      Course? @relation(fields: [courseId], references: [id])
-  userId      String
-  user        User   @relation(fields: [userId], references: [id])
+  userId      String?
+  user        User?  @relation(fields: [userId], references: [id])
   roleContext String
   action      String
   details     Json?
   createdAt   DateTime @default(now())
+
+  @@index([courseId])
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Notification {
@@ -325,6 +342,9 @@ model Notification {
   createdAt DateTime @default(now())
 
   user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
 }
 
 model Message {
@@ -339,6 +359,9 @@ model Message {
   sender      User               @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   course      Course?            @relation(fields: [courseId], references: [id], onDelete: SetNull)
   recipients  MessageRecipient[]
+
+  @@index([senderId])
+  @@index([courseId])
 }
 
 model MessageRecipient {
@@ -355,6 +378,7 @@ model MessageRecipient {
   readBy        User?     @relation("MessageReadBy", fields: [readById], references: [id], onDelete: SetNull)
 
   @@unique([messageId, recipientId])
+  @@index([recipientId, isRead])
 }
 
 model CourseAssignmentRegister {
@@ -630,3 +654,52 @@ model MonthlyPledge {
   @@index([periodLabel])
 }
 
+// =============================================================
+// طبقة الإعدادات والمحتوى المُدار من قاعدة البيانات
+// -------------------------------------------------------------
+// لا شيء مكتوب بشكل ثابت في الكود: الترجمات + القوائم + الإعدادات
+// =============================================================
+
+// ── ترجمات الواجهة (قابلة للتحرير من لوحة الإدارة) ────────────
+// مفتاح واحد لكل سلسلة (مثل "common.save") مع قيمته بكل لغة.
+// ملفات JSON المجمّعة تبقى كبذرة/احتياطي إن تعذّر الوصول لقاعدة البيانات.
+model Translation {
+  id        String   @id @default(uuid())
+  key       String   @unique          // مسار منقّط، مثل "nav.courses"
+  ar        String                     // النص بالعربية
+  en        String                     // النص بالإنجليزية
+  category  String?                    // مساحة الاسم، مثل "common" أو "nav"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+}
+
+// ── قوائم الخيارات (المدن، أنواع الدورات، أنواع المواقع...) ────
+model OptionItem {
+  id        String   @id @default(uuid())
+  category  String                     // "CITY" | "COURSE_TYPE" | "LOCATION_TYPE" | "COURSE_KIND" ...
+  value     String                     // القيمة المخزّنة (مثل "external")
+  labelAr   String
+  labelEn   String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([category, value])
+  @@index([category, isActive, sortOrder])
+}
+
+// ── إعدادات النظام (مفتاح/قيمة) ──────────────────────────────
+// مثل عناوين بريد التقارير، بريد المُرسِل، بداية احتساب الأداء...
+model AppSetting {
+  key       String   @id              // مثل "report.email.to"
+  value     String
+  category  String?
+  label     String?                    // وصف مقروء للوحة الإدارة
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([category])
+}

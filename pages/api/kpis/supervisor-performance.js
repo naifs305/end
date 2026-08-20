@@ -1,18 +1,45 @@
 // GET /api/kpis/supervisor-performance?periodType=MONTHLY&periodLabel=2026-05
 // للمدير فقط — يُظهر أداء كل مشرف في سرعة البت والاعتمادات
 const prisma = require('../../../lib/db/prisma');
-const { withManager, withMethods } = require('../../../lib/middleware/auth');
+const { withManager, withMethods, ok } = require('../../../lib/server/http');
 
 async function handler(req, res) {
   const { periodLabel, periodType = 'MONTHLY' } = req.query;
 
-  // تحديد نطاق الفترة
+  // تحديد نطاق الفترة لجميع الأنواع (شهري / ربعي / سنوي)
   let start, end;
   if (periodLabel) {
-    if (periodType === 'MONTHLY') {
-      const [y, m] = periodLabel.split('-').map(Number);
-      start = new Date(y, m - 1, 1);
-      end   = new Date(y, m, 0, 23, 59, 59, 999);
+    if (periodType === 'QUARTERLY') {
+      // الصيغة: 2026-Q2
+      const [yStr, qStr] = String(periodLabel).split('-Q');
+      const y = Number(yStr);
+      const q = Number(qStr);
+      if (y && q >= 1 && q <= 4) {
+        const startMonth = (q - 1) * 3;
+        start = new Date(y, startMonth, 1, 0, 0, 0, 0);
+        end   = new Date(y, startMonth + 3, 0, 23, 59, 59, 999);
+      }
+    } else if (periodType === 'YEARLY') {
+      // الصيغة: 2026
+      const y = Number(periodLabel);
+      if (y) {
+        start = new Date(y, 0, 1, 0, 0, 0, 0);
+        end   = new Date(y, 11, 31, 23, 59, 59, 999);
+      }
+    } else {
+      // MONTHLY (افتراضي): الصيغة 2026-05
+      const [y, m] = String(periodLabel).split('-').map(Number);
+      if (y && m) {
+        start = new Date(y, m - 1, 1, 0, 0, 0, 0);
+        end   = new Date(y, m, 0, 23, 59, 59, 999);
+      }
+    }
+
+    // تسمية موجودة لكن غير صالحة لنوعها → نلجأ للشهر الحالي بدل عرض كل الفترات
+    if (!start || !end) {
+      const nowDate = new Date();
+      start = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1, 0, 0, 0, 0);
+      end   = new Date(nowDate.getFullYear(), nowDate.getMonth() + 1, 0, 23, 59, 59, 999);
     }
   }
 
@@ -140,7 +167,7 @@ async function handler(req, res) {
     };
   }).sort((a, b) => (a.avgResponseHours ?? 999) - (b.avgResponseHours ?? 999));
 
-  return res.status(200).json(result);
+  return ok(res, result);
 }
 
 module.exports = withMethods(['GET'], withManager(handler));

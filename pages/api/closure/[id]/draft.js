@@ -1,15 +1,14 @@
 // POST /api/closure/[id]/draft
 // حفظ مسودة لتقرير الافتتاح/الاختتام دون تقديمه للاعتماد
-const { withAuth, withMethods } = require('../../../../lib/middleware/auth');
-const closureService = require('../../../../lib/services/closure');
+const { withMethods, withAuth, ok, fail } = require('../../../../lib/server/http');
+const svc = require('../../../../lib/modules/closure/closure.service');
 
 async function handler(req, res) {
   const { id } = req.query;
   try {
-    const result = await closureService.saveReportDraft(id, req.body || {}, req.user, req.activeRole);
-    return res.status(200).json(result);
-  } catch (err) {
-    return res.status(err.statusCode || 500).json({ message: err.message });
+    return ok(res, await svc.saveReportDraft(id, req.body || {}, req.user, req.activeRole));
+  } catch (error) {
+    return fail(res, error);
   }
 }
 
