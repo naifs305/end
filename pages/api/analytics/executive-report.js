@@ -1,7 +1,7 @@
 // GET /api/analytics/executive-report?year=2026&month=5
 // تقرير قيادي شهري — مدير ومشرف مشروع
 const prisma = require('../../../lib/db/prisma');
-const { withManagerOrSupervisor, withMethods } = require('../../../lib/middleware/auth');
+const { withManagerOrSupervisor, withMethods, ok } = require('../../../lib/server/http');
 const permissions = require('../../../lib/services/permissions');
 
 async function handler(req, res) {
@@ -83,7 +83,7 @@ async function handler(req, res) {
   const employees  = users.filter(u => u.roles.includes('EMPLOYEE')).length;
   const supervisors = users.filter(u => u.roles.includes('PROJECT_SUPERVISOR')).length;
 
-  return res.status(200).json({
+  return ok(res, {
     period:      { year, month, label: periodLabel, start: start.toISOString(), end: end.toISOString() },
     courses:     { total: totalCourses, newThisPeriod: newCourses, closedThisPeriod: closedInPeriod, overdueNotClosed },
     elements:    { total: totalEl, approved: approvedEl, pending: pendingEl, notStarted, returned: returnedEl, completionRate },

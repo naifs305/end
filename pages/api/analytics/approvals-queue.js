@@ -1,12 +1,12 @@
-const { withManagerOrSupervisor, withMethods } = require('../../../lib/middleware/auth');
-const analytics = require('../../../lib/services/analytics');
+const { withManagerOrSupervisor, withMethods, ok, fail } = require('../../../lib/server/http');
+const kpis = require('../../../lib/modules/kpi/kpi.service');
 
 async function handler(req, res) {
   try {
-    const data = await analytics.getPendingApprovalsQueue(req.user, req.activeRole);
-    return res.status(200).json(data);
+    const data = await kpis.getPendingApprovalsQueue(req.user, req.activeRole);
+    return ok(res, data);
   } catch (error) {
-    return res.status(error.statusCode || 500).json({ message: error.message });
+    return fail(res, error);
   }
 }
 

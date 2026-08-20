@@ -2,37 +2,49 @@ import { useState, useEffect, useCallback } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
+import {
+  Bell,
+  AlertCircle,
+  AlertTriangle,
+  Undo2,
+  BarChart3,
+  MessageSquare,
+  Check,
+} from 'lucide-react';
+import { useTranslation } from '../lib/i18n';
 
 const TYPE_META = {
-  ESCALATION:           { label: 'تصعيد',         cls: 'bg-burgundy/10 text-danger border-burgundy/20',  icon: '🔴', dot: 'bg-danger' },
-  EMPLOYEE_LOW_SCORE:   { label: 'أداء منخفض',    cls: 'bg-burgundy/10 text-danger border-burgundy/20',  icon: '⚠️', dot: 'bg-danger' },
-  ELEMENT_RETURNED:     { label: 'عنصر مُعاد',    cls: 'bg-sand/20 text-warning border-sand/40',          icon: '↩️', dot: 'bg-warning' },
-  REMINDER:             { label: 'تذكير',          cls: 'bg-primary-light text-primary border-primary/20', icon: '🔔', dot: 'bg-primary' },
-  KPI_CALCULATED:       { label: 'KPI جديد',       cls: 'bg-forest-50 text-accent border-accent/20',      icon: '📊', dot: 'bg-accent' },
-  DEFAULT:              { label: 'تنبيه',          cls: 'bg-sand/20 text-warning border-sand/40',          icon: '💬', dot: 'bg-warning' },
+  ESCALATION:           { key: 'ESCALATION',         cls: 'bg-burgundy/10 text-danger border-burgundy/20',  Icon: AlertCircle,    dot: 'bg-danger' },
+  EMPLOYEE_LOW_SCORE:   { key: 'EMPLOYEE_LOW_SCORE', cls: 'bg-burgundy/10 text-danger border-burgundy/20',  Icon: AlertTriangle,  dot: 'bg-danger' },
+  ELEMENT_RETURNED:     { key: 'ELEMENT_RETURNED',   cls: 'bg-sand/20 text-warning border-sand/40',          Icon: Undo2,          dot: 'bg-warning' },
+  REMINDER:             { key: 'REMINDER',           cls: 'bg-primary-light text-primary border-primary/20', Icon: Bell,           dot: 'bg-primary' },
+  KPI_CALCULATED:       { key: 'KPI_CALCULATED',     cls: 'bg-forest-50 text-accent border-accent/20',      Icon: BarChart3,      dot: 'bg-accent' },
+  DEFAULT:              { key: 'DEFAULT',            cls: 'bg-sand/20 text-warning border-sand/40',          Icon: MessageSquare,  dot: 'bg-warning' },
 };
 
 function getMeta(type) {
   return TYPE_META[type] || TYPE_META.DEFAULT;
 }
 
-function fmtRelative(v) {
-  if (!v) return '—';
-  const diff = Date.now() - new Date(v).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1)   return 'الآن';
-  if (min < 60)  return `منذ ${min} دقيقة`;
-  const hrs = Math.floor(min / 60);
-  if (hrs < 24)  return `منذ ${hrs} ساعة`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7)  return `منذ ${days} يوم`;
-  return new Date(v).toLocaleDateString('ar-SA', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
 export default function Notifications() {
+  const { t, locale } = useTranslation();
+  const intl = locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory';
   const [items,   setItems]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState(false);
+
+  const fmtRelative = (v) => {
+    if (!v) return '—';
+    const diff = Date.now() - new Date(v).getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1)   return t('notificationsPage.now');
+    if (min < 60)  return t('notificationsPage.minutesAgo', { count: min });
+    const hrs = Math.floor(min / 60);
+    if (hrs < 24)  return t('notificationsPage.hoursAgo', { count: hrs });
+    const days = Math.floor(hrs / 24);
+    if (days < 7)  return t('notificationsPage.daysAgo', { count: days });
+    return new Date(v).toLocaleDateString(intl, { day: 'numeric', month: 'short', year: 'numeric' });
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -57,11 +69,11 @@ export default function Notifications() {
     if (!unread.length) return;
     setMarking(true);
     try {
-      await Promise.all(unread.map(n => api.post(`/notifications/${n.id}/read`)));
+      await api.post('/notifications/read-all');
       setItems(prev => prev.map(n => ({ ...n, isRead: true })));
-      toast.success('تم تحديد الكل كمقروء');
+      toast.success(t('notificationsPage.markedAll'));
     } catch {
-      toast.error('حدث خطأ');
+      toast.error(t('common.error'));
     } finally {
       setMarking(false);
     }
@@ -77,11 +89,13 @@ export default function Notifications() {
         <div className="rounded-2xl border border-border bg-white px-5 py-4 shadow-card">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="text-xl font-extrabold text-primary">🔔 الإشعارات</h1>
+              <h1 className="inline-flex items-center gap-2 text-xl font-extrabold text-primary">
+                <Bell size={20} aria-hidden="true" /> {t('notificationsPage.title')}
+              </h1>
               <p className="mt-0.5 text-xs text-text-soft">
                 {loading ? '...' : unreadCount > 0
-                  ? `${unreadCount} إشعار غير مقروء`
-                  : 'جميع الإشعارات مقروءة'}
+                  ? t('notificationsPage.unreadCount', { count: unreadCount })
+                  : t('notificationsPage.allRead')}
               </p>
             </div>
             {!loading && unreadCount > 0 && (
@@ -91,8 +105,8 @@ export default function Notifications() {
                 className="flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-xs font-bold text-text-main hover:border-primary hover:text-primary disabled:opacity-50 transition">
                 {marking
                   ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                  : '✓'}
-                تحديد الكل كمقروء
+                  : <Check size={14} aria-hidden="true" />}
+                {t('notificationsPage.markAll')}
               </button>
             )}
           </div>
@@ -105,14 +119,15 @@ export default function Notifications() {
           </div>
         ) : items.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-white py-16 text-center shadow-card">
-            <p className="text-3xl mb-3">🔔</p>
-            <p className="font-bold text-text-main">لا توجد إشعارات</p>
-            <p className="mt-1 text-sm text-text-soft">ستظهر هنا التنبيهات والإشعارات التشغيلية</p>
+            <Bell size={36} aria-hidden="true" className="mx-auto mb-3 text-text-soft/50" />
+            <p className="font-bold text-text-main">{t('notificationsPage.empty')}</p>
+            <p className="mt-1 text-sm text-text-soft">{t('notificationsPage.emptyHint')}</p>
           </div>
         ) : (
           <div className="space-y-2">
             {items.map(n => {
               const meta = getMeta(n.type);
+              const MetaIcon = meta.Icon;
               return (
                 <div key={n.id}
                   onClick={() => !n.isRead && handleRead(n.id)}
@@ -129,13 +144,13 @@ export default function Notifications() {
                   <div className="px-5 py-4">
                     <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-lg">{meta.icon}</span>
+                        <MetaIcon size={18} aria-hidden="true" />
                         <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${meta.cls}`}>
-                          {meta.label}
+                          {t(`notificationsPage.types.${meta.key}`)}
                         </span>
                         {!n.isRead && (
                           <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white">
-                            جديد
+                            {t('notificationsPage.new')}
                           </span>
                         )}
                       </div>

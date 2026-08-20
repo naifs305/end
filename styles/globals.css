@@ -1,45 +1,74 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
+/* خط Cairo يُحمَّل عبر <link> في _document.js (preconnect + display=swap)
+   — أزلنا @import لأنه يحجب العرض (render-blocking) ويُسلسل الطلبات */
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --color-primary:       #253C32;
-  --color-primary-dark:  #14221D;
-  --color-primary-light: #EBF3EE;
-  --color-accent:        #5D8A70;
-  --color-background:    #FAFBFB;
+  /* ── الهوية ── */
+  --color-primary:       #2E6066;
+  --color-primary-dark:  #244E53;
+  --color-primary-light: #E7F0F0;
+  --color-accent:        #C6AA76;
+  --color-accent-dark:   #B2925A;
+
+  --color-background:    #F7F9F9;
   --color-card:          #FFFFFF;
-  --color-border:        #D7DBDA;
-  --color-text-main:     #14221D;
-  --color-text-soft:     #4B5952;
-  --color-success:       #5D8A70;
-  --color-warning:       #8B7D6B;
-  --color-danger:        #633646;
-  --color-sand:          #C3B39F;
-  --color-linen:         #D1C8B6;
-  --color-forest-50:     #EBF3EE;
-  --color-forest-100:    #D7DBDA;
-  --color-forest-200:    #BAC7C8;
-  --color-forest-300:    #9DA3A1;
-  --color-forest-500:    #394F49;
-  --color-forest-800:    #192922;
-  --color-forest-900:    #14221D;
+  --color-border:        #E3E7E7;
+  --color-text-main:     #1C2E30;
+  --color-text-soft:     #5E6F70;
+
+  --color-success:       #2E6066;
+  --color-warning:       #B2925A;
+  --color-danger:        #895B60;
+
+  --color-sand:          #C6AA76;
+  --color-linen:         #DDD0B5;
+
+  /* ألوان الدعم — للمسات فقط */
+  --color-support-blue:  #385676;
+  --color-support-mauve: #895B60;
+  --color-support-gray:  #8A7E78;
+
+  /* تدرّج الهوية */
+  --color-forest-50:  #EAF2F2;
+  --color-forest-100: #DCE8E8;
+  --color-forest-200: #C2D6D7;
+  --color-forest-300: #9BB8BA;
+  --color-forest-500: #3F7479;
+  --color-forest-800: #20454A;
+  --color-forest-900: #173033;
+
+  /* نظام التصميم الموحّد */
+  --radius-sm: 0.625rem;
+  --radius:    0.875rem;
+  --radius-lg: 1.25rem;
+  --shadow-card: 0 2px 12px rgba(46, 96, 102, 0.07);
+  --shadow-soft: 0 8px 24px rgba(46, 96, 102, 0.10);
 }
 
+/* الاتجاه يُحدَّد عبر سمة dir على <html> (يتحكم بها مزوّد اللغة i18n) */
 html {
-  direction: rtl;
   overflow-x: hidden;
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   padding: 0;
   background-color: var(--color-background);
+  /* خلفية «سائلة» — بقع لونية ناعمة بهوية الجامعة */
+  background-image:
+    radial-gradient(38rem 38rem at 112% -8%, rgba(46, 96, 102, 0.12), transparent 60%),
+    radial-gradient(32rem 32rem at -8% 8%, rgba(198, 170, 118, 0.12), transparent 60%),
+    radial-gradient(40rem 40rem at 50% 118%, rgba(56, 86, 118, 0.08), transparent 60%);
+  background-attachment: fixed;
   color: var(--color-text-main);
   font-family: 'Cairo', sans-serif;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #__next {
@@ -79,11 +108,22 @@ a {
   color: #ffffff;
 }
 
-/* ── Scrollbar مخصص ── */
-::-webkit-scrollbar        { width: 6px; height: 6px; }
-::-webkit-scrollbar-track  { background: #FAFBFB; }
-::-webkit-scrollbar-thumb  { background: #BAC7C8; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #5D8A70; }
+/* حالة التركيز الموحّدة (لوحة المفاتيح) */
+a:focus-visible,
+button:focus-visible,
+[role='button']:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ── شريط التمرير ── */
+::-webkit-scrollbar        { width: 7px; height: 7px; }
+::-webkit-scrollbar-track  { background: var(--color-background); }
+::-webkit-scrollbar-thumb  { background: var(--color-forest-200); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
 
 /* ── أنيميشن ── */
 @keyframes fadeIn {
@@ -97,6 +137,94 @@ a {
 }
 .animate-spin { animation: spin 1s linear infinite; }
 
+/* احترام تفضيل تقليل الحركة */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ── Recharts RTL ── */
 .recharts-wrapper { direction: ltr; }
 .recharts-legend-wrapper { direction: rtl; }
+
+/* ── عكس الأيقونات الاتجاهية تلقائياً في الوضع RTL ──
+   (الأسهم وعلامات chevron تتبع اتجاه القراءة؛ الأيقونات تُؤلَّف بنمط LTR
+    ثم تُعكس هنا — لا حاجة لإضافة أصناف يدوية لكل أيقونة) */
+[dir='rtl'] .lucide-arrow-left,
+[dir='rtl'] .lucide-arrow-right,
+[dir='rtl'] .lucide-chevron-left,
+[dir='rtl'] .lucide-chevron-right,
+[dir='rtl'] .lucide-chevrons-left,
+[dir='rtl'] .lucide-chevrons-right,
+[dir='rtl'] .lucide-corner-up-left,
+[dir='rtl'] .lucide-corner-down-left,
+[dir='rtl'] .lucide-corner-up-right,
+[dir='rtl'] .lucide-corner-down-right,
+[dir='rtl'] .lucide-move-left,
+[dir='rtl'] .lucide-move-right,
+[dir='rtl'] .lucide-panel-left,
+[dir='rtl'] .lucide-panel-right {
+  transform: scaleX(-1);
+}
+
+/* ===================================================================
+   نظام التصميم الموحّد — أصناف قابلة لإعادة الاستخدام
+   (الأزرار/المدخلات/البطاقات/الجداول تتبع نمطاً واحداً)
+   =================================================================== */
+@layer components {
+  /* الأزرار */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-bold
+           transition-all duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-primary   { @apply btn bg-primary text-white shadow-sm hover:bg-primary-dark active:scale-[.98]; }
+  .btn-secondary { @apply btn bg-accent text-white shadow-sm hover:bg-accent-dark active:scale-[.98]; }
+  .btn-ghost     { @apply btn border border-border bg-white text-text-main hover:border-primary hover:text-primary; }
+  .btn-danger    { @apply btn bg-danger text-white shadow-sm hover:opacity-90 active:scale-[.98]; }
+
+  /* المدخلات */
+  .input {
+    @apply w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-text-main outline-none
+           transition focus:border-primary focus:ring-4 focus:ring-primary/10 placeholder:text-text-soft/60;
+  }
+  .label { @apply mb-1.5 block text-sm font-bold text-text-main; }
+
+  /* البطاقات */
+  .card {
+    @apply rounded-2xl border border-border bg-card shadow-card transition;
+  }
+  .card-hover { @apply card hover:-translate-y-0.5 hover:shadow-soft; }
+
+  /* الجداول */
+  .table-base { @apply w-full border-collapse text-sm; }
+  .table-base thead th {
+    @apply bg-background px-4 py-3 text-start text-xs font-extrabold uppercase tracking-wide text-text-soft;
+  }
+  .table-base tbody td { @apply border-t border-border px-4 py-3 text-text-main; }
+  .table-base tbody tr { @apply transition hover:bg-background; }
+
+  /* الشارات */
+  .badge { @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold; }
+
+  /* أسطح زجاجية (glassmorphism) */
+  .glass {
+    @apply border border-white/50 bg-white/60 backdrop-blur-xl;
+  }
+  .glass-card {
+    @apply rounded-2xl border border-white/50 bg-white/70 shadow-soft backdrop-blur-xl;
+  }
+  .glass-overlay {
+    @apply bg-primary-dark/30 backdrop-blur-sm;
+  }
+}
+
+/* ── بقع سائلة متحركة للخلفية (تُستخدم خلف المحتوى) ── */
+@keyframes blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(3%, -4%) scale(1.08); }
+  66% { transform: translate(-3%, 3%) scale(0.95); }
+}
+.animate-blob { animation: blob 18s ease-in-out infinite; }

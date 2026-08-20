@@ -1,6 +1,6 @@
 // PUT/DELETE /api/scheduled-jobs/[id]
 const { withManager, withMethods } = require('../../../lib/middleware/auth');
-const scheduler = require('../../../lib/services/scheduler');
+const scheduler = require('../../../lib/modules/scheduling/scheduling.service');
 
 async function handler(req, res) {
   const { id } = req.query;
@@ -16,7 +16,7 @@ async function handler(req, res) {
       return res.status(200).json(result);
     }
   } catch (err) {
-    return res.status(err.statusCode || 500).json({ message: err.message });
+    return res.status(err.statusCode || 500).json({ code: 'serverErrors.common.serverError', message: err.message });
   }
 }
 

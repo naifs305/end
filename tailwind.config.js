@@ -10,57 +10,83 @@ module.exports = {
         cairo: ['Cairo', 'sans-serif'],
       },
       colors: {
-        // ── الألوان الأساسية ──────────────────────────────
-        primary:         '#253C32',  // أخضر غابة متوسط
-        'primary-dark':  '#14221D',  // أخضر غابة عميق
-        'primary-light': '#EBF3EE',  // أخضر فاتح جداً
-        accent:          '#5D8A70',  // sage / حكيمي
+        // ── الهوية الأساسية ───────────────────────────────
+        primary:         '#2E6066',  // أساسي — أزرق مخضرّ
+        'primary-dark':  '#244E53',  // درجة أغمق (hover/active)
+        'primary-light': '#E7F0F0',  // خلفية فاتحة جداً
+        accent:          '#C6AA76',  // ثانوي — ذهبي
+        'accent-dark':   '#B2925A',
 
-        // ── لوحة الغابة الكاملة ───────────────────────────
+        // ── تدرّج الهوية (أزرق مخضرّ) ──────────────────────
         forest: {
-          50:  '#EBF3EE',
-          100: '#D7DBDA',
-          200: '#BAC7C8',
-          300: '#9DA3A1',
-          400: '#5D8A70',
-          500: '#394F49',
-          600: '#253C32',
-          700: '#21362C',
-          800: '#192922',
-          900: '#14221D',
+          50:  '#EAF2F2',
+          100: '#DCE8E8',
+          200: '#C2D6D7',
+          300: '#9BB8BA',
+          400: '#5A9296',
+          500: '#3F7479',
+          600: '#2E6066',
+          700: '#285459',
+          800: '#20454A',
+          900: '#173033',
         },
 
-        // ── ألوان الخلفية والحدود ─────────────────────────
-        background: '#FAFBFB',
+        // ── الخلفية والحدود ───────────────────────────────
+        background: '#F7F9F9',
         card:       '#FFFFFF',
-        border:     '#D7DBDA',
+        border:     '#E3E7E7',
 
         // ── النصوص ───────────────────────────────────────
-        'text-main': '#14221D',
-        'text-soft': '#4B5952',
+        'text-main': '#1C2E30',
+        'text-soft': '#5E6F70',
 
-        // ── حالات العمل ───────────────────────────────────
-        success: '#5D8A70',
-        warning: '#8B7D6B',
-        danger:  '#633646',
+        // ── حالات العمل (دلالية ضمن الهوية) ───────────────
+        success: '#2E6066',  // معتمد/إيجابي — أساسي
+        warning: '#B2925A',  // تنبيه — ذهبي غامق
+        danger:  '#895B60',  // رفض/حذف — أرجواني داعم
 
-        // ── ألوان إضافية من اللوحة ────────────────────────
-        sand:     '#C3B39F',
-        linen:    '#D1C8B6',
-        burgundy: '#633646',
-        'cool-gray':'#9DA3A1',
-        'slate-g':  '#4B5952',
-        'warm-gray':'#BAC7C8',
+        // ── درجات ذهبية ───────────────────────────────────
+        sand:     '#C6AA76',
+        linen:    '#DDD0B5',
+        burgundy: '#895B60',
+
+        // ── ألوان الدعم (للمسات فقط) ──────────────────────
+        'support-blue':  '#385676',
+        'support-mauve': '#895B60',
+        'support-gray':  '#8A7E78',
+        'cool-gray':     '#8A7E78',
+        'slate-g':       '#5E6F70',
+        'warm-gray':     '#C2D6D7',
       },
 
       boxShadow: {
-        soft: '0 8px 24px rgba(20, 34, 29, 0.10)',
-        card: '0 2px 12px rgba(20, 34, 29, 0.07)',
-        deep: '0 16px 40px rgba(20, 34, 29, 0.15)',
+        soft: '0 8px 24px rgba(46, 96, 102, 0.10)',
+        card: '0 2px 12px rgba(46, 96, 102, 0.07)',
+        deep: '0 16px 40px rgba(46, 96, 102, 0.16)',
       },
 
       borderRadius: {
         xl2: '1rem',
+      },
+
+      keyframes: {
+        fadeIn: {
+          from: { opacity: '0', transform: 'translateY(6px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideUp: {
+          from: { opacity: '0', transform: 'translateY(12px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        popIn: {
+          '0%': { opacity: '0', transform: 'scale(.96)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+      },
+      animation: {
+        'fade-in': 'fadeIn .25s ease both',
+        'slide-up': 'slideUp .3s ease both',
+        'pop-in': 'popIn .18s ease both',
       },
     },
   },

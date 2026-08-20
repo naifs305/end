@@ -44,7 +44,7 @@ async function handler(req, res) {
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({ message: error.message });
+    return res.status(error.statusCode || 500).json({ code: 'serverErrors.common.serverError', message: error.message });
   }
 }
 

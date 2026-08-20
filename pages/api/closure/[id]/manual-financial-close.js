@@ -1,17 +1,13 @@
-const { withAuth, withMethods } = require('../../../../lib/middleware/auth');
-const closureService = require('../../../../lib/services/closure');
+const { withMethods, withAuth, withValidation, ok, fail } = require('../../../../lib/server/http');
+const svc = require('../../../../lib/modules/closure/closure.service');
+const { manualFinancialCloseSchema } = require('../../../../lib/modules/closure/closure.schema');
 
 async function handler(req, res) {
   try {
-    const result = await closureService.approveFinancialElementDirectly(
-      req.query.id,
-      req.body || {},
-      req.user,
-      req.activeRole,
-    );
-    return res.status(200).json(result);
-  } catch (err) {
-    return res.status(err.statusCode || 500).json({ message: err.message });
+    return await withValidation(manualFinancialCloseSchema, (r, s) =>
+      svc.approveFinancialElementDirectly(r.query.id, r.valid, r.user, r.activeRole).then((x) => ok(s, x)))(req, res);
+  } catch (error) {
+    return fail(res, error);
   }
 }
 

@@ -1,9 +1,39 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  BarChart3,
+  Package,
+  Clock,
+  Star,
+  Target,
+  Zap,
+  Shield,
+  CheckCircle2,
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  ClipboardList,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Settings,
+  X,
+  Pencil,
+  Check,
+  Trophy,
+  Crown,
+  TrendingUp,
+  TrendingDown,
+  ArrowRight,
+  Lightbulb,
+  HelpCircle,
+} from 'lucide-react';
 import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
+import { useTranslation } from '../lib/i18n';
 
 const RadarKPI     = dynamic(() => import('../components/charts/RadarKPI'),     { ssr: false });
 const TeamBarChart = dynamic(() => import('../components/charts/TeamBarChart'), { ssr: false });
@@ -16,70 +46,64 @@ function fmt(v, d = 1) {
   return isNaN(n) ? '-' : n.toFixed(d);
 }
 
-// ساعات → "X ساعة" أو "X يوم" حسب الحجم
-function fmtDur(hours) {
+// ساعات → نص مدّة محلي حسب الحجم
+function fmtDur(t, hours) {
   if (hours == null || isNaN(Number(hours))) return '—';
   const h = Number(hours);
-  if (h === 0)  return 'فوري';
-  if (h < 1)    return 'أقل من ساعة';
-  if (h < 24)   return `${Math.round(h)} ساعة`;
+  if (h === 0)  return t('kpi.duration.instant');
+  if (h < 1)    return t('kpi.duration.lessThanHour');
+  if (h < 24)   return t('kpi.duration.hours', { n: Math.round(h) });
   const d = h / 24;
-  return `${d < 2 ? d.toFixed(1) : Math.round(d)} يوم`;
+  return t('kpi.duration.days', { n: d < 2 ? d.toFixed(1) : Math.round(d) });
 }
 
-function fmtRelative(v) {
+function fmtRelative(t, locale, v) {
   if (!v) return '-';
   const diffHours = (Date.now() - new Date(v).getTime()) / 3_600_000;
-  if (diffHours < 1)   return 'منذ أقل من ساعة';
-  if (diffHours < 24)  return `منذ ${Math.round(diffHours)} ساعة`;
-  if (diffHours < 168) return `منذ ${Math.floor(diffHours / 24)} يوم`;
-  return new Date(v).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' });
+  if (diffHours < 1)   return t('kpi.relative.lessThanHour');
+  if (diffHours < 24)  return t('kpi.relative.hoursAgo', { n: Math.round(diffHours) });
+  if (diffHours < 168) return t('kpi.relative.daysAgo', { n: Math.floor(diffHours / 24) });
+  return new Date(v).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function initials(firstName, lastName) {
   return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
 }
 
-const AR_MONTHS = [
-  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
-];
+// أسماء الأشهر محلية الاتجاه — الفهرس 1..12
+function monthName(locale, month, year) {
+  const d = new Date(year, month - 1, 1);
+  return d.toLocaleString(locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory', { month: 'long' });
+}
 
 // ─── ثوابت التصميم ────────────────────────────────────────────────────────────
 
 const LEVEL_CFG = {
-  OUTSTANDING:       { label: 'متميز',        color: '#253C32', bg: 'bg-forest-50',     border: 'border-primary/30',   text: 'text-primary'   },
-  VERY_GOOD:         { label: 'جيد جداً',      color: '#394F49', bg: 'bg-primary-light', border: 'border-primary/20',   text: 'text-primary'   },
-  GOOD:              { label: 'جيد',          color: '#4B5952', bg: 'bg-forest-100',    border: 'border-forest-200',   text: 'text-text-main' },
-  NEEDS_IMPROVEMENT: { label: 'يحتاج تحسين',  color: '#8B7D6B', bg: 'bg-sand/20',       border: 'border-sand/50',      text: 'text-warning'   },
-  WEAK:              { label: 'ضعيف',         color: '#633646', bg: 'bg-burgundy/10',   border: 'border-burgundy/30',  text: 'text-danger'    },
+  OUTSTANDING:       { color: '#253C32', bg: 'bg-forest-50',     border: 'border-primary/30',   text: 'text-primary'   },
+  VERY_GOOD:         { color: '#394F49', bg: 'bg-primary-light', border: 'border-primary/20',   text: 'text-primary'   },
+  GOOD:              { color: '#4B5952', bg: 'bg-forest-100',    border: 'border-forest-200',   text: 'text-text-main' },
+  NEEDS_IMPROVEMENT: { color: '#8B7D6B', bg: 'bg-sand/20',       border: 'border-sand/50',      text: 'text-warning'   },
+  WEAK:              { color: '#633646', bg: 'bg-burgundy/10',   border: 'border-burgundy/30',  text: 'text-danger'    },
 };
 
 const LEVEL_ORDER = ['OUTSTANDING', 'VERY_GOOD', 'GOOD', 'NEEDS_IMPROVEMENT', 'WEAK'];
 
+// المؤشرات الست — التسميات والتلميحات من الترجمة (kpi.indicators.<key>)
 const IND_CFG = [
-  { key: 'productivityScore', icon: '📦', label: 'الإنتاجية',      weight: 25, tip: 'نسبة إتمام عناصر الإقفال المطلوبة' },
-  { key: 'timelinessScore',   icon: '🕐', label: 'التوقيت',        weight: 20, tip: 'الالتزام بمواعيد تقديم العناصر' },
-  { key: 'qualityScore',      icon: '⭐', label: 'الجودة',         weight: 20, tip: 'نسبة القبول من أول مرة بدون إعادة' },
-  { key: 'criticalScore',     icon: '🎯', label: 'العناصر الحرجة', weight: 20, tip: 'أداء التقارير والمستحقات والتسوية' },
-  { key: 'speedScore',        icon: '⚡', label: 'الاستجابة',      weight: 10, tip: 'سرعة التصحيح بعد الإعادة' },
-  { key: 'disciplineScore',   icon: '🛡️', label: 'الانضباط',       weight: 5,  tip: 'غياب التأخر والركود' },
+  { key: 'productivityScore', Icon: Package, weight: 25 },
+  { key: 'timelinessScore',   Icon: Clock,   weight: 20 },
+  { key: 'qualityScore',      Icon: Star,    weight: 20 },
+  { key: 'criticalScore',     Icon: Target,  weight: 20 },
+  { key: 'speedScore',        Icon: Zap,     weight: 10 },
+  { key: 'disciplineScore',   Icon: Shield,  weight: 5  },
 ];
 
-const INSIGHT_ICON = { positive: '✅', warning: '⚠️', critical: '🔴', info: 'ℹ️' };
+const INSIGHT_ICON = { positive: CheckCircle2, warning: AlertTriangle, critical: AlertCircle, info: Info };
 const INSIGHT_BG   = {
   positive: 'bg-forest-50 border-accent/20 text-accent',
   warning:  'bg-sand/20 border-sand/40 text-warning',
   critical: 'bg-burgundy/10 border-burgundy/20 text-danger',
   info:     'bg-primary-light border-primary/20 text-primary',
-};
-
-const ENCOURAGE = {
-  OUTSTANDING:       'أداء رائع جداً! أنت في القمة هذا الشهر — استمر في هذا المستوى المتميز.',
-  VERY_GOOD:         'أداء قوي جداً! قريب جداً من القمة، ركّز على رفع مستوى واحد أو اثنين للوصول إليها.',
-  GOOD:              'أداء جيد ومقبول. توجد فرص واضحة للتحسين يمكنك استغلالها الشهر القادم.',
-  NEEDS_IMPROVEMENT: 'تحتاج إلى مزيد من الجهد. راجع المؤشرات المتأخرة وتواصل مع مشرفك للدعم.',
-  WEAK:              'هذا الشهر كان صعباً. لا بأس، حدّد نقاط الضعف وابدأ خطوة بخطوة نحو التحسين.',
 };
 
 function scoreColor(val) {
@@ -127,12 +151,12 @@ function Tip({ text }) {
         type="button"
         onMouseEnter={() => setShow(true)}
         onMouseLeave={() => setShow(false)}
-        className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-border text-[9px] font-bold text-text-soft hover:bg-primary/20 hover:text-primary transition"
+        className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-border text-text-soft hover:bg-primary/20 hover:text-primary transition"
       >
-        ?
+        <HelpCircle size={11} aria-hidden="true" />
       </button>
       {show && (
-        <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-1.5 w-52 rounded-xl border border-border bg-white p-2.5 text-[11px] leading-relaxed text-text-main shadow-soft">
+        <span className="pointer-events-none absolute bottom-full end-0 z-50 mb-1.5 w-52 rounded-xl border border-border bg-white p-2.5 text-[11px] leading-relaxed text-text-main shadow-soft">
           {text}
         </span>
       )}
@@ -143,16 +167,18 @@ function Tip({ text }) {
 // ─── IndicatorBar ─────────────────────────────────────────────────────────────
 
 function IndicatorBar({ ind, val, showWeight = false, noData = false }) {
+  const { t } = useTranslation();
   const v   = Math.min(100, Math.max(0, Number(val) || 0));
   const clr = scoreColor(v);
+  const Icon = ind.Icon;
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-xs">
         <span className="flex items-center gap-1 font-medium text-text-main">
-          <span>{ind.icon}</span>
-          {ind.label}
+          <Icon size={14} aria-hidden="true" />
+          {t(`kpi.indicators.${ind.key}.label`)}
           {showWeight && <span className="text-[10px] text-text-soft">({ind.weight}%)</span>}
-          <Tip text={ind.tip} />
+          <Tip text={t(`kpi.indicators.${ind.key}.tip`)} />
         </span>
         <span className={`font-extrabold ${clr.text}`}>{noData ? '—' : `${fmt(v)}%`}</span>
       </div>
@@ -169,17 +195,18 @@ function IndicatorBar({ ind, val, showWeight = false, noData = false }) {
 // ─── LevelBadge ──────────────────────────────────────────────────────────────
 
 function LevelBadge({ level, noData = false, size = 'sm' }) {
+  const { t } = useTranslation();
   if (noData) {
     return (
       <span className={`rounded-full border border-border bg-background px-2.5 py-0.5 font-bold text-text-soft ${size === 'lg' ? 'text-sm' : 'text-[10px]'}`}>
-        بدون بيانات
+        {t('kpi.noDataBadge')}
       </span>
     );
   }
   const cfg = LEVEL_CFG[level] || LEVEL_CFG.GOOD;
   return (
     <span className={`rounded-full border px-2.5 py-0.5 font-bold ${cfg.bg} ${cfg.border} ${cfg.text} ${size === 'lg' ? 'text-sm' : 'text-[10px]'}`}>
-      {cfg.label}
+      {t(`performanceLevel.${level}`)}
     </span>
   );
 }
@@ -187,25 +214,29 @@ function LevelBadge({ level, noData = false, size = 'sm' }) {
 // ─── TrendSparkline ───────────────────────────────────────────────────────────
 
 function TrendSparkline({ trend }) {
+  const { t } = useTranslation();
   if (!trend?.trend?.length) return null;
   const dir = trend.summary?.direction;
-  const dirLabel = dir === 'improving' ? '▲ تحسن' : dir === 'declining' ? '▼ تراجع' : '← مستقر';
+  const DirIcon = dir === 'improving' ? TrendingUp : dir === 'declining' ? TrendingDown : ArrowRight;
+  const dirLabel = dir === 'improving' ? t('kpi.trend.improving') : dir === 'declining' ? t('kpi.trend.declining') : t('kpi.trend.stable');
   const dirColor = dir === 'improving' ? 'text-accent' : dir === 'declining' ? 'text-danger' : 'text-text-soft';
 
   return (
     <div className="rounded-xl border border-border bg-background p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-xs font-extrabold uppercase tracking-wide text-text-soft">الاتجاه الزمني</h4>
-        <span className={`text-[10px] font-extrabold ${dirColor}`}>{dirLabel}</span>
+        <h4 className="text-xs font-extrabold uppercase tracking-wide text-text-soft">{t('kpi.trend.title')}</h4>
+        <span className={`flex items-center gap-1 text-[10px] font-extrabold ${dirColor}`}>
+          <DirIcon size={12} aria-hidden="true" /> {dirLabel}
+        </span>
       </div>
       <div className="flex items-end gap-1.5 overflow-x-auto py-1">
-        {trend.trend.map((t, i) => {
-          const h   = Math.max(8, Math.round((Number(t.finalScore) / 100) * 60));
-          const val = Number(t.finalScore) || 0;
+        {trend.trend.map((tr, i) => {
+          const h   = Math.max(8, Math.round((Number(tr.finalScore) / 100) * 60));
+          const val = Number(tr.finalScore) || 0;
           const clr = scoreColor(val).bar;
           const isLast = i === trend.trend.length - 1;
           return (
-            <div key={t.periodLabel} className="flex min-w-[40px] flex-col items-center gap-0.5">
+            <div key={tr.periodLabel} className="flex min-w-[40px] flex-col items-center gap-0.5">
               <span className={`text-[9px] font-bold ${scoreColor(val).text}`}>{Math.round(val)}%</span>
               <div className="w-6 overflow-hidden rounded-t-md" style={{ height: 60, display: 'flex', alignItems: 'flex-end' }}>
                 <div
@@ -213,7 +244,7 @@ function TrendSparkline({ trend }) {
                   style={{ height: h }}
                 />
               </div>
-              <span className="text-center text-[9px] text-text-soft leading-tight">{t.periodLabel?.slice(-5)}</span>
+              <span className="text-center text-[9px] text-text-soft leading-tight">{tr.periodLabel?.slice(-5)}</span>
             </div>
           );
         })}
@@ -225,8 +256,11 @@ function TrendSparkline({ trend }) {
 // ─── ElementBreakdownTable ────────────────────────────────────────────────────
 
 function ElementBreakdownTable({ breakdown }) {
-  if (!breakdown?.length) return null;
+  const { t } = useTranslation();
+  // إصلاح ترتيب الـ hooks: تُستدعى قبل أي return مبكر دائماً
   const [open, setOpen] = useState(false);
+
+  if (!breakdown?.length) return null;
 
   // هل لدينا بيانات توقيت؟
   const hasTimingData = breakdown.some(el =>
@@ -239,30 +273,36 @@ function ElementBreakdownTable({ breakdown }) {
         onClick={() => setOpen(v => !v)}
         className="flex w-full items-center justify-between px-5 py-3.5 text-sm font-extrabold text-text-main hover:bg-background transition"
       >
-        <span>📋 تفصيل الأداء حسب نوع العنصر <span className="text-xs font-bold text-text-soft">({breakdown.length} نوع)</span></span>
-        <span className="text-xs text-text-soft">{open ? '▲ إخفاء' : '▼ إظهار'}</span>
+        <span className="flex items-center gap-1.5">
+          <ClipboardList size={16} aria-hidden="true" />
+          {t('kpi.breakdown.title')} <span className="text-xs font-bold text-text-soft">({t('kpi.breakdown.typesCount', { count: breakdown.length })})</span>
+        </span>
+        <span className="flex items-center gap-1 text-xs text-text-soft">
+          {open ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
+          {open ? t('kpi.hide') : t('kpi.show')}
+        </span>
       </button>
       {open && (
         <div className="border-t border-border">
           {/* أسطورة التوقيت */}
           {hasTimingData && (
             <div className="flex flex-wrap gap-3 px-5 py-2.5 text-[10px] bg-background border-b border-border">
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-accent inline-block" /> قبل الموعد المثالي</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary inline-block" /> في الوقت (قبل الأقصى)</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-danger inline-block" /> بعد الموعد الأقصى</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-accent inline-block" /> {t('kpi.breakdown.legendBeforeIdeal')}</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary inline-block" /> {t('kpi.breakdown.legendBeforeMax')}</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-danger inline-block" /> {t('kpi.breakdown.legendAfterMax')}</span>
             </div>
           )}
           <div className="overflow-x-auto">
             <table className="min-w-full text-xs">
               <thead className="bg-background text-text-soft">
                 <tr>
-                  <th className="px-3 py-2.5 text-right font-bold">العنصر</th>
-                  <th className="px-3 py-2.5 text-center font-bold">المطلوب</th>
-                  <th className="px-3 py-2.5 text-center font-bold">قُبل</th>
-                  <th className="px-3 py-2.5 text-center font-bold">أُعيد</th>
-                  <th className="px-3 py-2.5 text-center font-bold">معدل القبول</th>
-                  {hasTimingData && <th className="px-3 py-2.5 text-center font-bold">توزيع التوقيت</th>}
-                  <th className="px-3 py-2.5 text-center font-bold">متوسط التقديم</th>
+                  <th className="px-3 py-2.5 text-start font-bold">{t('kpi.breakdown.colElement')}</th>
+                  <th className="px-3 py-2.5 text-center font-bold">{t('kpi.breakdown.colRequired')}</th>
+                  <th className="px-3 py-2.5 text-center font-bold">{t('kpi.breakdown.colApproved')}</th>
+                  <th className="px-3 py-2.5 text-center font-bold">{t('kpi.breakdown.colReturned')}</th>
+                  <th className="px-3 py-2.5 text-center font-bold">{t('kpi.breakdown.colApprovalRate')}</th>
+                  {hasTimingData && <th className="px-3 py-2.5 text-center font-bold">{t('kpi.breakdown.colTiming')}</th>}
+                  <th className="px-3 py-2.5 text-center font-bold">{t('kpi.breakdown.colAvgSubmission')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -289,18 +329,18 @@ function ElementBreakdownTable({ breakdown }) {
                           {timedTotal > 0 ? (
                             <div className="flex items-center gap-1 text-[10px]">
                               {el.beforeIdeal > 0 && (
-                                <span className="rounded bg-forest-50 text-accent px-1.5 py-0.5 font-bold">
-                                  ✓ {el.beforeIdeal}
+                                <span className="flex items-center gap-0.5 rounded bg-forest-50 text-accent px-1.5 py-0.5 font-bold">
+                                  <Check size={11} aria-hidden="true" /> {el.beforeIdeal}
                                 </span>
                               )}
                               {el.beforeMax > 0 && (
-                                <span className="rounded bg-primary-light text-primary px-1.5 py-0.5 font-bold">
-                                  ⏱ {el.beforeMax}
+                                <span className="flex items-center gap-0.5 rounded bg-primary-light text-primary px-1.5 py-0.5 font-bold">
+                                  <Clock size={11} aria-hidden="true" /> {el.beforeMax}
                                 </span>
                               )}
                               {el.afterMax > 0 && (
-                                <span className="rounded bg-burgundy/10 text-danger px-1.5 py-0.5 font-bold">
-                                  ⚠ {el.afterMax}
+                                <span className="flex items-center gap-0.5 rounded bg-burgundy/10 text-danger px-1.5 py-0.5 font-bold">
+                                  <AlertTriangle size={11} aria-hidden="true" /> {el.afterMax}
                                 </span>
                               )}
                             </div>
@@ -308,7 +348,7 @@ function ElementBreakdownTable({ breakdown }) {
                         </td>
                       )}
                       <td className="px-3 py-2 text-center text-text-soft">
-                        {fmtDur(el.avgSubmissionHours)}
+                        {fmtDur(t, el.avgSubmissionHours)}
                       </td>
                     </tr>
                   );
@@ -325,6 +365,7 @@ function ElementBreakdownTable({ breakdown }) {
 // ─── EmployeeCard ─────────────────────────────────────────────────────────────
 
 function EmployeeCard({ snap, selected, onSelect }) {
+  const { t } = useTranslation();
   const score  = Number(snap.finalScoreDisplay ?? snap.finalScore ?? 0);
   const level  = snap.performanceLevel || 'GOOD';
   const lcfg   = LEVEL_CFG[level] || LEVEL_CFG.GOOD;
@@ -367,10 +408,11 @@ function EmployeeCard({ snap, selected, onSelect }) {
           <div className="flex-1 min-w-0 space-y-1.5">
             {IND_CFG.slice(0, 3).map(ind => {
               const v = Math.min(100, Math.max(0, Number(snap[ind.key]) || 0));
+              const Icon = ind.Icon;
               return (
                 <div key={ind.key}>
                   <div className="mb-0.5 flex items-center justify-between text-[10px]">
-                    <span className="text-text-soft">{ind.icon} {ind.label}</span>
+                    <span className="flex items-center gap-1 text-text-soft"><Icon size={12} aria-hidden="true" /> {t(`kpi.indicators.${ind.key}.label`)}</span>
                     <span className={`font-bold ${scoreColor(v).text}`}>{noData ? '—' : `${Math.round(v)}%`}</span>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-forest-50">
@@ -388,15 +430,16 @@ function EmployeeCard({ snap, selected, onSelect }) {
         {/* الشارات السفلية */}
         <div className="flex items-center justify-between border-t border-border pt-2.5">
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-            {snap.actualCoursesCount ?? 0} دورة
+            {t('kpi.coursesCount', { count: snap.actualCoursesCount ?? 0 })}
           </span>
           {snap.overdueElementsCount > 0 && (
             <span className="rounded-full bg-burgundy/10 px-2 py-0.5 text-[10px] font-bold text-danger">
-              {snap.overdueElementsCount} متأخر
+              {t('kpi.overdueCount', { count: snap.overdueElementsCount })}
             </span>
           )}
-          <span className={`text-[10px] font-bold transition ${selected ? 'text-primary' : 'text-text-soft group-hover:text-primary'}`}>
-            {selected ? '▲ إغلاق' : '▼ التفاصيل'}
+          <span className={`flex items-center gap-1 text-[10px] font-bold transition ${selected ? 'text-primary' : 'text-text-soft group-hover:text-primary'}`}>
+            {selected ? <ChevronUp size={12} aria-hidden="true" /> : <ChevronDown size={12} aria-hidden="true" />}
+            {selected ? t('kpi.collapse') : t('common.details')}
           </span>
         </div>
       </div>
@@ -407,13 +450,13 @@ function EmployeeCard({ snap, selected, onSelect }) {
 // ─── DetailsPanel ─────────────────────────────────────────────────────────────
 
 function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
+  const { t, locale } = useTranslation();
   const [note,         setNote]         = useState('');
   const [savingNote,   setSavingNote]   = useState(false);
   const [trend,        setTrend]        = useState(null);
 
   const score = Number(snap.finalScoreDisplay ?? snap.finalScore ?? 0);
   const level = snap.performanceLevel || 'GOOD';
-  const lcfg  = LEVEL_CFG[level] || LEVEL_CFG.GOOD;
   const name  = `${snap.user?.firstName || ''} ${snap.user?.lastName || ''}`.trim();
 
   useEffect(() => {
@@ -424,25 +467,28 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
   }, [snap?.userId, snap?.periodType]);
 
   const handleNote = async () => {
-    if (!note.trim()) { toast.error('اكتب الملاحظة أولاً'); return; }
+    if (!note.trim()) { toast.error(t('kpi.noteEmpty')); return; }
     setSavingNote(true);
     try {
       await api.post(`/kpis/${snap.userId}/${snap.periodType}/${snap.periodLabel}/notes`, { note: note.trim() });
-      toast.success('تم حفظ الملاحظة ✓');
+      toast.success(t('kpi.noteSaved'));
       setNote('');
       onNoteAdded?.();
     } catch (e) {
-      toast.error(e.response?.data?.message || 'تعذر الحفظ');
+      toast.error(e.response?.data?.message || t('kpi.saveFailed'));
     } finally {
       setSavingNote(false);
     }
   };
 
-  const radarData = IND_CFG.map(ind => ({
-    subject:  ind.label,
-    score:    Math.min(100, Number(snap[ind.key]) || 0),
-    fullMark: 100,
-  }));
+  const radarData = useMemo(
+    () => IND_CFG.map(ind => ({
+      subject:  t(`kpi.indicators.${ind.key}.label`),
+      score:    Math.min(100, Number(snap[ind.key]) || 0),
+      fullMark: 100,
+    })),
+    [snap, t],
+  );
 
   return (
     <div className="overflow-hidden rounded-2xl border border-primary/20 bg-white shadow-soft">
@@ -458,9 +504,10 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
         </div>
         <button
           onClick={onClose}
-          className="rounded-xl border border-border px-3 py-1.5 text-xs text-text-soft hover:bg-background hover:text-primary transition"
+          aria-label={t('common.close')}
+          className="flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-xs text-text-soft hover:bg-background hover:text-primary transition"
         >
-          ✕ إغلاق
+          <X size={14} aria-hidden="true" /> {t('common.close')}
         </button>
       </div>
 
@@ -469,10 +516,10 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
         {/* بطاقات الملخص السريع */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { label: 'الدرجة الكلية',    val: `${fmt(score)}%`,                         color: scoreColor(score).text },
-            { label: 'إتمام العناصر',    val: `${fmt(snap.closureCompletionRate)}%`,     color: 'text-primary' },
-            { label: 'الدورات الفعلية',  val: snap.actualCoursesCount ?? 0,             color: 'text-text-main' },
-            { label: 'عناصر متأخرة',     val: snap.overdueElementsCount ?? 0,           color: (snap.overdueElementsCount > 0) ? 'text-danger' : 'text-accent' },
+            { label: t('kpi.summary.totalScore'),       val: `${fmt(score)}%`,                         color: scoreColor(score).text },
+            { label: t('kpi.summary.elementCompletion'), val: `${fmt(snap.closureCompletionRate)}%`,    color: 'text-primary' },
+            { label: t('kpi.summary.actualCourses'),    val: snap.actualCoursesCount ?? 0,             color: 'text-text-main' },
+            { label: t('kpi.summary.overdueElements'),  val: snap.overdueElementsCount ?? 0,           color: (snap.overdueElementsCount > 0) ? 'text-danger' : 'text-accent' },
           ].map(c => (
             <div key={c.label} className="rounded-xl border border-border bg-background p-3 text-center">
               <p className="mb-0.5 text-[10px] text-text-soft">{c.label}</p>
@@ -484,11 +531,11 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
         {/* الرادار + أشرطة المؤشرات */}
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <div className="rounded-xl border border-border bg-background p-3">
-            <h4 className="mb-2 text-xs font-extrabold uppercase tracking-wide text-text-soft">خريطة المؤشرات</h4>
+            <h4 className="mb-2 text-xs font-extrabold uppercase tracking-wide text-text-soft">{t('kpi.radarTitle')}</h4>
             <RadarKPI data={radarData} />
           </div>
           <div className="rounded-xl border border-border bg-background p-3">
-            <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wide text-text-soft">تفصيل المؤشرات الست</h4>
+            <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wide text-text-soft">{t('kpi.sixIndicatorsDetail')}</h4>
             <div className="space-y-2.5">
               {IND_CFG.map(ind => (
                 <IndicatorBar key={ind.key} ind={ind} val={snap[ind.key]} showWeight />
@@ -503,17 +550,20 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
         {/* الرؤى التلقائية */}
         {snap.insights?.length > 0 && (
           <div>
-            <h4 className="mb-2 text-xs font-extrabold uppercase tracking-wide text-text-soft">رؤى تلقائية</h4>
+            <h4 className="mb-2 text-xs font-extrabold uppercase tracking-wide text-text-soft">{t('kpi.autoInsights')}</h4>
             <div className="space-y-1.5">
-              {snap.insights.map((ins, i) => (
-                <div
-                  key={i}
-                  className={`flex items-start gap-2 rounded-xl border p-2.5 text-xs leading-relaxed ${INSIGHT_BG[ins.type] || INSIGHT_BG.info}`}
-                >
-                  <span className="shrink-0 mt-px">{INSIGHT_ICON[ins.type] || 'ℹ️'}</span>
-                  <span>{ins.text}</span>
-                </div>
-              ))}
+              {snap.insights.map((ins, i) => {
+                const InsIcon = INSIGHT_ICON[ins.type] || Info;
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-2 rounded-xl border p-2.5 text-xs leading-relaxed ${INSIGHT_BG[ins.type] || INSIGHT_BG.info}`}
+                  >
+                    <span className="shrink-0 mt-px"><InsIcon size={14} aria-hidden="true" /></span>
+                    <span>{ins.text}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -526,12 +576,12 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
         {/* الملاحظات السابقة */}
         {snap.notes?.length > 0 && (
           <div className="space-y-2">
-            <h4 className="text-xs font-extrabold uppercase tracking-wide text-text-soft">ملاحظات إدارية سابقة</h4>
+            <h4 className="text-xs font-extrabold uppercase tracking-wide text-text-soft">{t('kpi.previousNotes')}</h4>
             {snap.notes.map((n, i) => (
               <div key={n.id || i} className="rounded-xl border border-primary/10 bg-primary-light/30 px-3.5 py-2.5">
                 <div className="mb-1 flex items-center justify-between">
                   <span className="text-xs font-extrabold text-primary">{n.manager?.firstName} {n.manager?.lastName}</span>
-                  <span className="text-[10px] text-text-soft">{fmtRelative(n.createdAt)}</span>
+                  <span className="text-[10px] text-text-soft">{fmtRelative(t, locale, n.createdAt)}</span>
                 </div>
                 <p className="text-xs text-text-main leading-relaxed">{n.note}</p>
               </div>
@@ -542,12 +592,14 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
         {/* إضافة ملاحظة جديدة — مدير فقط */}
         {isManager && (
           <div className="rounded-xl border border-primary/20 bg-primary-light/20 p-3.5">
-            <h4 className="mb-2 text-xs font-extrabold text-primary">✏️ إضافة ملاحظة إدارية</h4>
+            <h4 className="mb-2 flex items-center gap-1.5 text-xs font-extrabold text-primary">
+              <Pencil size={14} aria-hidden="true" /> {t('kpi.addNote')}
+            </h4>
             <textarea
               value={note}
               onChange={e => setNote(e.target.value)}
               rows={2}
-              placeholder="اكتب ملاحظة للموظف عن أدائه في هذه الفترة..."
+              placeholder={t('kpi.notePlaceholder')}
               className="w-full resize-none rounded-xl border border-border bg-white px-3 py-2 text-xs text-text-main outline-none focus:border-primary transition"
             />
             <div className="mt-2 flex justify-end">
@@ -556,7 +608,7 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
                 disabled={savingNote || !note.trim()}
                 className="flex items-center gap-1.5 rounded-xl bg-primary px-5 py-1.5 text-xs font-bold text-white hover:bg-primary/90 disabled:opacity-50 transition"
               >
-                {savingNote ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> حفظ...</> : 'حفظ الملاحظة'}
+                {savingNote ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> {t('common.saving')}</> : t('kpi.saveNote')}
               </button>
             </div>
           </div>
@@ -569,6 +621,7 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
 // ─── EmployeePersonalView ─────────────────────────────────────────────────────
 
 function EmployeePersonalView({ snap, month, year }) {
+  const { t, locale } = useTranslation();
   const [detail,        setDetail]        = useState(null);
   const [trend,         setTrend]         = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -585,6 +638,20 @@ function EmployeePersonalView({ snap, month, year }) {
       .catch(() => {});
   }, [snap?.userId, snap?.periodType, snap?.periodLabel]);
 
+  const s     = detail || snap || {};
+  const score = Number(s.finalScoreDisplay ?? s.finalScore ?? 0);
+  const level = s.performanceLevel || 'NEEDS_IMPROVEMENT';
+  const noData = !s.isSubjectToEvaluation;
+
+  const radarData = useMemo(
+    () => IND_CFG.map(ind => ({
+      subject:  t(`kpi.indicators.${ind.key}.label`),
+      score:    Math.min(100, Number(s[ind.key]) || 0),
+      fullMark: 100,
+    })),
+    [s, t],
+  );
+
   if (!snap) return null;
 
   if (loadingDetail) {
@@ -592,23 +659,11 @@ function EmployeePersonalView({ snap, month, year }) {
       <div className="flex items-center justify-center rounded-2xl border border-border bg-white py-20 shadow-card">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <span className="text-sm text-text-soft">جاري تحميل مؤشراتك...</span>
+          <span className="text-sm text-text-soft">{t('kpi.loadingYourKpis')}</span>
         </div>
       </div>
     );
   }
-
-  const s     = detail || snap;
-  const score = Number(s.finalScoreDisplay ?? s.finalScore ?? 0);
-  const level = s.performanceLevel || 'NEEDS_IMPROVEMENT';
-  const lcfg  = LEVEL_CFG[level] || LEVEL_CFG.NEEDS_IMPROVEMENT;
-  const noData = !s.isSubjectToEvaluation;
-
-  const radarData = IND_CFG.map(ind => ({
-    subject:  ind.label,
-    score:    Math.min(100, Number(s[ind.key]) || 0),
-    fullMark: 100,
-  }));
 
   return (
     <div className="space-y-4">
@@ -627,16 +682,16 @@ function EmployeePersonalView({ snap, month, year }) {
                 <LevelBadge level={level} noData={noData} size="lg" />
               </div>
               <p className="mb-3 text-xs text-text-soft">
-                {s.user?.operationalProject?.name || 'بدون مشروع'} · {AR_MONTHS[month - 1]} {year}
+                {s.user?.operationalProject?.name || t('kpi.noProject')} · {monthName(locale, month, year)} {year}
               </p>
               {!noData && (
                 <p className="text-sm leading-relaxed text-text-main max-w-lg">
-                  {ENCOURAGE[level]}
+                  {t(`kpi.encourage.${level}`)}
                 </p>
               )}
               {noData && (
                 <p className="text-sm text-warning">
-                  لا توجد دورات في نطاق هذه الفترة — لا تُحسَب مؤشرات لهذا الشهر.
+                  {t('kpi.noCoursesInPeriod')}
                 </p>
               )}
             </div>
@@ -646,10 +701,10 @@ function EmployeePersonalView({ snap, month, year }) {
           {!noData && (
             <div className="mt-4 flex flex-wrap gap-3">
               {[
-                { label: 'الدرجة الكلية',   val: `${fmt(score)}%`,                        color: scoreColor(score).text },
-                { label: 'إتمام الإقفال',   val: `${fmt(s.closureCompletionRate)}%`,      color: 'text-primary' },
-                { label: 'الدورات',          val: `${s.actualCoursesCount ?? 0}`,           color: 'text-text-main' },
-                { label: 'عناصر متأخرة',    val: `${s.overdueElementsCount ?? 0}`,         color: s.overdueElementsCount > 0 ? 'text-danger' : 'text-accent' },
+                { label: t('kpi.summary.totalScore'),       val: `${fmt(score)}%`,                        color: scoreColor(score).text },
+                { label: t('kpi.summary.closureCompletion'), val: `${fmt(s.closureCompletionRate)}%`,     color: 'text-primary' },
+                { label: t('kpi.summary.courses'),          val: `${s.actualCoursesCount ?? 0}`,          color: 'text-text-main' },
+                { label: t('kpi.summary.overdueElements'),  val: `${s.overdueElementsCount ?? 0}`,        color: s.overdueElementsCount > 0 ? 'text-danger' : 'text-accent' },
               ].map(c => (
                 <div key={c.label} className="rounded-xl border border-border bg-white/80 px-4 py-2 text-center min-w-[80px]">
                   <p className="text-[10px] text-text-soft">{c.label}</p>
@@ -664,7 +719,7 @@ function EmployeePersonalView({ snap, month, year }) {
         {!noData && (
           <div className="border-t border-border px-5 py-5">
             <h3 className="mb-4 text-xs font-extrabold uppercase tracking-wide text-text-soft">
-              تفصيل المؤشرات الست — نتيجتك هذا الشهر
+              {t('kpi.sixIndicatorsThisMonth')}
             </h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {IND_CFG.map(ind => (
@@ -679,24 +734,27 @@ function EmployeePersonalView({ snap, month, year }) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {!noData && (
           <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
-            <h4 className="mb-2 text-xs font-extrabold uppercase tracking-wide text-text-soft">خريطة المؤشرات</h4>
+            <h4 className="mb-2 text-xs font-extrabold uppercase tracking-wide text-text-soft">{t('kpi.radarTitle')}</h4>
             <RadarKPI data={radarData} />
           </div>
         )}
 
         {s.insights?.length > 0 && (
           <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
-            <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wide text-text-soft">التوجيهات والملاحظات</h4>
+            <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wide text-text-soft">{t('kpi.guidanceAndNotes')}</h4>
             <div className="space-y-2">
-              {s.insights.map((ins, i) => (
-                <div
-                  key={i}
-                  className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-xs leading-relaxed ${INSIGHT_BG[ins.type] || INSIGHT_BG.info}`}
-                >
-                  <span className="shrink-0 mt-px">{INSIGHT_ICON[ins.type] || 'ℹ️'}</span>
-                  <span>{ins.text}</span>
-                </div>
-              ))}
+              {s.insights.map((ins, i) => {
+                const InsIcon = INSIGHT_ICON[ins.type] || Info;
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-xs leading-relaxed ${INSIGHT_BG[ins.type] || INSIGHT_BG.info}`}
+                  >
+                    <span className="shrink-0 mt-px"><InsIcon size={14} aria-hidden="true" /></span>
+                    <span>{ins.text}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -717,14 +775,14 @@ function EmployeePersonalView({ snap, month, year }) {
       {/* ملاحظات الإدارة */}
       {s.notes?.length > 0 && (
         <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
-          <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wide text-text-soft">ملاحظات الإدارة</h4>
+          <h4 className="mb-3 text-xs font-extrabold uppercase tracking-wide text-text-soft">{t('kpi.managementNotes')}</h4>
           <div className="space-y-2">
             {s.notes.map((n, i) => (
               <div key={n.id || i} className="rounded-xl border border-primary/10 bg-primary-light/30 px-3.5 py-2.5">
                 <div className="mb-1 flex items-center justify-between">
                   <span className="text-xs font-extrabold text-primary">{n.manager?.firstName} {n.manager?.lastName}</span>
                   <span className="text-[10px] text-text-soft">
-                    {new Date(n.createdAt).toLocaleDateString('ar-SA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {new Date(n.createdAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                 </div>
                 <p className="text-xs leading-relaxed text-text-main">{n.note}</p>
@@ -755,6 +813,7 @@ function StatsPill({ label, value, active, onClick }) {
 // ─── الصفحة الرئيسية ──────────────────────────────────────────────────────────
 
 export default function KpisPage() {
+  const { t, locale } = useTranslation();
   const { activeRole, user } = useAuth();
   const isManager    = activeRole === 'MANAGER';
   const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
@@ -830,15 +889,15 @@ export default function KpisPage() {
     try {
       if (periodMode === 'yearly') {
         await api.post('/kpis/calculate-yearly', { year });
-        toast.success('✓ تم احتساب المؤشرات السنوية بنجاح');
+        toast.success(t('kpi.calcYearlySuccess'));
         load();
         return;
       }
       await api.post('/kpis/calculate', { periodType: 'MONTHLY', year, value: month });
-      toast.success('✓ تم احتساب المؤشرات بنجاح');
+      toast.success(t('kpi.calcSuccess'));
       await load();
     } catch (e) {
-      toast.error(e.response?.data?.message || 'تعذر الاحتساب');
+      toast.error(e.response?.data?.message || t('kpi.calcFailed'));
     } finally {
       setCalculating(false);
     }
@@ -857,7 +916,7 @@ export default function KpisPage() {
       const res = await api.get(`/kpis/${snap.userId}/${snap.periodType}/${snap.periodLabel}`);
       setSelectedSnap(res.data);
     } catch {
-      toast.error('تعذر تحميل تفاصيل الموظف');
+      toast.error(t('kpi.loadEmployeeFailed'));
       setSelectedId(null);
     } finally {
       setLoadingDet(false);
@@ -923,7 +982,7 @@ export default function KpisPage() {
   // ──────────────────────────────────────────────────────────────────────────
   return (
     <MainLayout>
-      <div className="space-y-5" dir="rtl">
+      <div className="space-y-5">
 
         {/* ══════ رأس الصفحة ══════ */}
         <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
@@ -931,11 +990,11 @@ export default function KpisPage() {
           {/* السطر الرئيسي */}
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
             <div>
-              <h1 className="text-xl font-extrabold text-primary">📊 مؤشرات الأداء</h1>
+              <h1 className="flex items-center gap-2 text-xl font-extrabold text-primary">
+                <BarChart3 size={20} aria-hidden="true" /> {t('kpi.title')}
+              </h1>
               <p className="mt-0.5 text-xs text-text-soft">
-                {isEmployee
-                  ? 'تقييمك الشخصي — 6 مؤشرات مرتبطة بمواعيد إقفال دوراتك'
-                  : 'قياس أداء الفريق بـ 6 مؤشرات ذكية مرتبطة بمواعيد الإقفال'}
+                {isEmployee ? t('kpi.subtitleEmployee') : t('kpi.subtitleTeam')}
               </p>
             </div>
 
@@ -944,7 +1003,7 @@ export default function KpisPage() {
               {['monthly','yearly'].map(m => (
                 <button key={m} onClick={() => { setPeriodMode(m); setSelectedId(null); setSelectedSnap(null); }}
                   className={`px-4 py-2 transition ${periodMode===m ? 'bg-primary text-white' : 'bg-white text-text-soft hover:bg-background'}`}>
-                  {m === 'monthly' ? 'شهري' : 'سنوي'}
+                  {m === 'monthly' ? t('kpi.monthly') : t('kpi.yearly')}
                 </button>
               ))}
             </div>
@@ -953,43 +1012,45 @@ export default function KpisPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={prevMonth}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-text-soft hover:bg-background hover:text-primary transition text-lg"
+                aria-label={t('common.previous')}
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-text-soft hover:bg-background hover:text-primary transition"
               >
-                ›
+                <ChevronRight size={18} aria-hidden="true" />
               </button>
               <div className="min-w-[130px] text-center">
                 {periodMode === 'monthly' ? (
                   <>
-                    <p className="font-extrabold text-primary">{AR_MONTHS[month - 1]} {year}</p>
-                    {isCurrentMonth && <p className="text-[10px] text-accent">● الشهر الحالي</p>}
+                    <p className="font-extrabold text-primary">{monthName(locale, month, year)} {year}</p>
+                    {isCurrentMonth && <p className="text-[10px] text-accent">● {t('kpi.currentMonth')}</p>}
                     {periodLabel < OFFICIAL_START && (
-                      <p className="text-[10px] text-warning">تجريبي</p>
+                      <p className="text-[10px] text-warning">{t('kpi.trial')}</p>
                     )}
                   </>
                 ) : (
                   <>
-                    <p className="font-extrabold text-primary">سنة {year}</p>
-                    <p className="text-[10px] text-text-soft">يناير — ديسمبر</p>
+                    <p className="font-extrabold text-primary">{t('kpi.yearLabel', { year })}</p>
+                    <p className="text-[10px] text-text-soft">{t('kpi.janToDec')}</p>
                   </>
                 )}
               </div>
               <button
                 onClick={nextMonth}
                 disabled={isCurrentMonth && periodMode === 'monthly'}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-text-soft hover:bg-background hover:text-primary disabled:cursor-not-allowed disabled:opacity-30 transition text-lg"
+                aria-label={t('common.next')}
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-text-soft hover:bg-background hover:text-primary disabled:cursor-not-allowed disabled:opacity-30 transition"
               >
-                ‹
+                <ChevronLeft size={18} aria-hidden="true" />
               </button>
             </div>
 
             {/* أزرار الأكشن */}
             <div className="flex flex-wrap items-center gap-2">
               {lastCalc && !isEmployee && (
-                <span className="text-[10px] text-text-soft">آخر احتساب: {fmtRelative(lastCalc)}</span>
+                <span className="text-[10px] text-text-soft">{t('kpi.lastCalc')}: {fmtRelative(t, locale, lastCalc)}</span>
               )}
               {isEmployee && lastCalc && (
-                <span className="rounded-xl border border-accent/20 bg-forest-50 px-3 py-1.5 text-[11px] font-bold text-accent">
-                  ✓ مؤشراتك محدَّثة {fmtRelative(lastCalc)}
+                <span className="flex items-center gap-1 rounded-xl border border-accent/20 bg-forest-50 px-3 py-1.5 text-[11px] font-bold text-accent">
+                  <CheckCircle2 size={13} aria-hidden="true" /> {t('kpi.kpisUpdated', { time: fmtRelative(t, locale, lastCalc) })}
                 </span>
               )}
               {isManager && (
@@ -1001,10 +1062,10 @@ export default function KpisPage() {
                   {calculating ? (
                     <>
                       <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      احتساب...
+                      {t('kpi.calculating')}
                     </>
                   ) : (
-                    '⚙ احتسب المؤشرات'
+                    <><Settings size={15} aria-hidden="true" /> {t('kpi.calculateKpis')}</>
                   )}
                 </button>
               )}
@@ -1017,8 +1078,8 @@ export default function KpisPage() {
               {/* متوسط الفريق */}
               <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-light px-4 py-1.5">
                 <span className="text-base font-extrabold text-primary">{fmt(stats.avg)}%</span>
-                <span className="text-xs text-text-soft">متوسط الفريق</span>
-                <span className="text-[10px] text-text-soft">({stats.total} موظف)</span>
+                <span className="text-xs text-text-soft">{t('kpi.teamAverage')}</span>
+                <span className="text-[10px] text-text-soft">({t('kpi.employeesCount', { count: stats.total })})</span>
               </div>
 
               <div className="h-5 w-px bg-border" />
@@ -1027,7 +1088,7 @@ export default function KpisPage() {
               {LEVEL_ORDER.map(key => stats.counts[key] > 0 && (
                 <StatsPill
                   key={key}
-                  label={LEVEL_CFG[key].label}
+                  label={t(`performanceLevel.${key}`)}
                   value={stats.counts[key]}
                   active={levelFilter === key}
                   onClick={() => setLevelFilter(v => v === key ? null : key)}
@@ -1037,15 +1098,15 @@ export default function KpisPage() {
               {levelFilter && (
                 <button
                   onClick={() => setLevelFilter(null)}
-                  className="rounded-xl border border-border px-2.5 py-1.5 text-[10px] text-text-soft hover:text-danger transition"
+                  className="flex items-center gap-1 rounded-xl border border-border px-2.5 py-1.5 text-[10px] text-text-soft hover:text-danger transition"
                 >
-                  ✕ إلغاء الفلتر
+                  <X size={12} aria-hidden="true" /> {t('kpi.clearFilter')}
                 </button>
               )}
 
               {stats.noData > 0 && (
                 <div className="rounded-xl border border-border bg-background px-2.5 py-1.5 text-xs text-text-soft">
-                  {stats.noData} بدون بيانات
+                  {t('kpi.noDataCount', { count: stats.noData })}
                 </div>
               )}
             </div>
@@ -1057,7 +1118,7 @@ export default function KpisPage() {
           <div className="flex items-center justify-center rounded-2xl border border-border bg-white py-20 shadow-card">
             <div className="flex flex-col items-center gap-3">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-              <span className="text-sm text-text-soft">جاري تحميل مؤشرات {AR_MONTHS[month - 1]}...</span>
+              <span className="text-sm text-text-soft">{t('kpi.loadingMonth', { month: monthName(locale, month, year) })}</span>
             </div>
           </div>
         )}
@@ -1065,24 +1126,24 @@ export default function KpisPage() {
         {/* ══════ حالة فارغة ══════ */}
         {!loading && snapshots.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white px-6 py-16 text-center shadow-card">
-            <div className="mb-4 text-5xl">📊</div>
+            <div className="mb-4 text-primary/40"><BarChart3 size={56} aria-hidden="true" /></div>
             <h3 className="mb-1 text-lg font-extrabold text-text-main">
-              لا توجد بيانات لـ {AR_MONTHS[month - 1]} {year}
+              {t('kpi.emptyTitle', { month: monthName(locale, month, year), year })}
             </h3>
             <p className="mb-5 max-w-md text-sm text-text-soft">
               {isManager
-                ? 'اضغط على "احتسب المؤشرات" لبدء احتساب أداء الفريق لهذه الفترة الزمنية.'
+                ? t('kpi.emptyManager')
                 : isEmployee
-                ? 'لا توجد مؤشرات محتسبة لهذه الفترة. تواصل مع مديرك لطلب الاحتساب.'
-                : 'لم يتم احتساب مؤشرات هذه الفترة بعد. يمكن للمدير بدء الاحتساب.'}
+                ? t('kpi.emptyEmployee')
+                : t('kpi.emptySupervisor')}
             </p>
             {isManager && (
               <button
                 onClick={calculate}
                 disabled={calculating}
-                className="rounded-xl bg-primary px-7 py-3 font-bold text-white hover:bg-primary/90 disabled:opacity-60 transition"
+                className="flex items-center gap-2 rounded-xl bg-primary px-7 py-3 font-bold text-white hover:bg-primary/90 disabled:opacity-60 transition"
               >
-                {calculating ? 'جاري الاحتساب...' : '⚙ احتسب الآن'}
+                {calculating ? t('kpi.calculatingNow') : <><Settings size={16} aria-hidden="true" /> {t('kpi.calculateNow')}</>}
               </button>
             )}
           </div>
@@ -1099,17 +1160,19 @@ export default function KpisPage() {
             <button onClick={() => setShowLeaderboard(v=>!v)}
               className="flex w-full items-center justify-between px-5 py-3.5 hover:bg-background transition">
               <div>
-                <h3 className="font-extrabold text-text-main">🏆 ترتيب المشاريع — {AR_MONTHS[month-1]} {year}</h3>
-                <p className="text-[11px] text-text-soft mt-0.5">مقارنة متوسطات الفرق حسب المشروع</p>
+                <h3 className="flex items-center gap-2 font-extrabold text-text-main">
+                  <Trophy size={18} aria-hidden="true" /> {t('kpi.leaderboard.title', { month: monthName(locale, month, year), year })}
+                </h3>
+                <p className="text-[11px] text-text-soft mt-0.5">{t('kpi.leaderboard.subtitle')}</p>
               </div>
-              <span className="text-xs text-text-soft">{showLeaderboard ? '▲' : '▼'}</span>
+              <span className="text-xs text-text-soft">{showLeaderboard ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}</span>
             </button>
             {showLeaderboard && (
               <div className="border-t border-border">
                 {loadingLB ? (
                   <div className="flex justify-center py-8"><div className="h-6 w-6 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>
                 ) : leaderboard.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-text-soft">لا توجد بيانات لهذه الفترة</p>
+                  <p className="py-8 text-center text-sm text-text-soft">{t('kpi.noPeriodData')}</p>
                 ) : (
                   <div className="divide-y divide-border">
                     {leaderboard.map((proj, idx) => (
@@ -1121,8 +1184,8 @@ export default function KpisPage() {
                         <div className="flex-1 min-w-0">
                           <p className="font-extrabold text-sm text-text-main">{proj.projectName}</p>
                           <p className="text-[11px] text-text-soft">
-                            {proj.employeesCount} موظف مُقيَّم
-                            {proj.topEmployee && ` · الأفضل: ${proj.topEmployee.name}`}
+                            {t('kpi.leaderboard.evaluatedEmployees', { count: proj.employeesCount })}
+                            {proj.topEmployee && ` · ${t('kpi.leaderboard.top', { name: proj.topEmployee.name })}`}
                           </p>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
@@ -1130,7 +1193,7 @@ export default function KpisPage() {
                             <div className="h-full rounded-full bg-primary transition-all"
                               style={{width:`${Math.min(100,proj.avgScore)}%`}} />
                           </div>
-                          <span className="text-sm font-extrabold text-primary w-12 text-left">
+                          <span className="text-sm font-extrabold text-primary w-12 text-end">
                             {Number(proj.avgScore).toFixed(1)}%
                           </span>
                         </div>
@@ -1147,8 +1210,10 @@ export default function KpisPage() {
         {!loading && teamBarData.length > 1 && !isEmployee && (
           <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
             <div className="border-b border-border px-5 py-3">
-              <h3 className="font-extrabold text-text-main">📈 مقارنة أداء الفريق</h3>
-              <p className="text-xs text-text-soft">الدرجة الكلية — أخضر ≥ 80% · أصفر ≥ 60% · أحمر &lt; 60%</p>
+              <h3 className="flex items-center gap-2 font-extrabold text-text-main">
+                <TrendingUp size={18} aria-hidden="true" /> {t('kpi.teamComparison.title')}
+              </h3>
+              <p className="text-xs text-text-soft">{t('kpi.teamComparison.legend')}</p>
             </div>
             <div className="p-4">
               <TeamBarChart data={teamBarData} />
@@ -1161,7 +1226,7 @@ export default function KpisPage() {
           <>
             {levelFilter && (
               <p className="text-xs text-text-soft px-1">
-                عرض {filteredSnaps.length} موظف — مستوى: <strong>{LEVEL_CFG[levelFilter]?.label}</strong>
+                {t('kpi.showingCount', { count: filteredSnaps.length })} — {t('kpi.levelLabel')}: <strong>{t(`performanceLevel.${levelFilter}`)}</strong>
               </p>
             )}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -1175,7 +1240,7 @@ export default function KpisPage() {
                     {isSelected && loadingDet && (
                       <div className="mt-2 flex items-center justify-center gap-2 rounded-2xl border border-border bg-white p-6 sm:hidden">
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                        <span className="text-xs text-text-soft">جاري التحميل...</span>
+                        <span className="text-xs text-text-soft">{t('common.loading')}</span>
                       </div>
                     )}
                     {isSelected && selectedSnap && !loadingDet && (
@@ -1201,7 +1266,7 @@ export default function KpisPage() {
             {loadingDet ? (
               <div className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-12 shadow-card text-text-soft">
                 <div className="h-5 w-5 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
-                <span className="text-sm">جاري تحميل التفاصيل...</span>
+                <span className="text-sm">{t('kpi.loadingDetails')}</span>
               </div>
             ) : selectedSnap ? (
               <DetailsPanel
@@ -1226,6 +1291,7 @@ export default function KpisPage() {
 // ─── تقرير أداء المشرفين ─────────────────────────────────────────────────────
 
 function SupervisorReport({ periodLabel }) {
+  const { t } = useTranslation();
   const [data,    setData]    = useState([]);
   const [show,    setShow]    = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1239,11 +1305,12 @@ function SupervisorReport({ periodLabel }) {
       .finally(() => setLoading(false));
   }, [show, periodLabel]);
 
-  const RESP_COLOR = {
-    'سريع جداً': 'text-accent bg-forest-50 border-forest-200',
-    'مقبول':     'text-primary bg-primary-light border-primary/20',
-    'بطيء':      'text-warning bg-sand/20 border-sand/50',
-    'متأخر':     'text-danger bg-burgundy/10 border-burgundy/30',
+  // مفاتيح الاستجابة (القيم تأتي بالعربية من الـ API) → ألوان + تسمية محلية
+  const RESP_CFG = {
+    'سريع جداً': { color: 'text-accent bg-forest-50 border-forest-200',     key: 'veryFast' },
+    'مقبول':     { color: 'text-primary bg-primary-light border-primary/20', key: 'acceptable' },
+    'بطيء':      { color: 'text-warning bg-sand/20 border-sand/50',          key: 'slow' },
+    'متأخر':     { color: 'text-danger bg-burgundy/10 border-burgundy/30',   key: 'late' },
   };
 
   return (
@@ -1253,13 +1320,16 @@ function SupervisorReport({ periodLabel }) {
         className="flex w-full items-center justify-between px-5 py-3.5 hover:bg-background transition"
       >
         <div className="flex items-center gap-2.5">
-          <span className="text-base">👑</span>
-          <div className="text-right">
-            <h4 className="text-sm font-extrabold text-text-main">تقرير أداء المشرفين</h4>
-            <p className="text-[10px] text-text-soft">سرعة البت + معدل الاعتماد — للمدير فقط</p>
+          <Crown size={18} aria-hidden="true" className="text-primary" />
+          <div className="text-start">
+            <h4 className="text-sm font-extrabold text-text-main">{t('kpi.supervisorReport.title')}</h4>
+            <p className="text-[10px] text-text-soft">{t('kpi.supervisorReport.subtitle')}</p>
           </div>
         </div>
-        <span className="text-xs text-text-soft">{show ? '▲ إخفاء' : '▼ إظهار'}</span>
+        <span className="flex items-center gap-1 text-xs text-text-soft">
+          {show ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
+          {show ? t('kpi.hide') : t('kpi.show')}
+        </span>
       </button>
 
       {show && (
@@ -1267,44 +1337,47 @@ function SupervisorReport({ periodLabel }) {
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-10 text-sm text-text-soft">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              جاري التحميل...
+              {t('common.loading')}
             </div>
           ) : !data.length ? (
-            <div className="py-10 text-center text-sm text-text-soft">لا توجد بيانات بت لهذه الفترة</div>
+            <div className="py-10 text-center text-sm text-text-soft">{t('kpi.supervisorReport.noData')}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-xs">
                 <thead className="bg-background text-text-soft">
                   <tr>
-                    {['المشرف', 'إجمالي البت', 'معتمد', 'مُعاد', 'مرفوض', 'معدل الاعتماد', 'متوسط وقت البت', 'التقييم'].map(h => (
-                      <th key={h} className="px-3 py-2.5 text-right font-bold">{h}</th>
+                    {['supervisor','totalDecisions','approved','returned','rejected','approvalRate','avgDecisionTime','rating'].map(h => (
+                      <th key={h} className="px-3 py-2.5 text-start font-bold">{t(`kpi.supervisorReport.col.${h}`)}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {data.map(s => (
-                    <tr key={s.userId} className="hover:bg-background transition">
-                      <td className="px-3 py-2.5 font-bold text-text-main">{s.name}</td>
-                      <td className="px-3 py-2.5 text-center font-extrabold text-primary">{s.totalDecisions}</td>
-                      <td className="px-3 py-2.5 text-center font-bold text-accent">{s.approved}</td>
-                      <td className="px-3 py-2.5 text-center text-warning">{s.returned}</td>
-                      <td className="px-3 py-2.5 text-center text-danger">{s.rejected}</td>
-                      <td className="px-3 py-2.5">
-                        <div className="mb-0.5 h-1.5 w-full overflow-hidden rounded-full bg-forest-100">
-                          <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${s.approvalRate}%` }} />
-                        </div>
-                        <span className="text-[10px] font-bold">{s.approvalRate}%</span>
-                      </td>
-                      <td className="px-3 py-2.5 font-bold text-text-main">
-                        {s.avgResponseHours != null ? fmtDur(s.avgResponseHours) : '—'}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${RESP_COLOR[s.responsiveness] || 'bg-background text-text-soft border-border'}`}>
-                          {s.responsiveness || '—'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {data.map(s => {
+                    const respCfg = RESP_CFG[s.responsiveness];
+                    return (
+                      <tr key={s.userId} className="hover:bg-background transition">
+                        <td className="px-3 py-2.5 font-bold text-text-main">{s.name}</td>
+                        <td className="px-3 py-2.5 text-center font-extrabold text-primary">{s.totalDecisions}</td>
+                        <td className="px-3 py-2.5 text-center font-bold text-accent">{s.approved}</td>
+                        <td className="px-3 py-2.5 text-center text-warning">{s.returned}</td>
+                        <td className="px-3 py-2.5 text-center text-danger">{s.rejected}</td>
+                        <td className="px-3 py-2.5">
+                          <div className="mb-0.5 h-1.5 w-full overflow-hidden rounded-full bg-forest-100">
+                            <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${s.approvalRate}%` }} />
+                          </div>
+                          <span className="text-[10px] font-bold">{s.approvalRate}%</span>
+                        </td>
+                        <td className="px-3 py-2.5 font-bold text-text-main">
+                          {s.avgResponseHours != null ? fmtDur(t, s.avgResponseHours) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${respCfg?.color || 'bg-background text-text-soft border-border'}`}>
+                            {respCfg ? t(`kpi.responsiveness.${respCfg.key}`) : '—'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1318,6 +1391,7 @@ function SupervisorReport({ periodLabel }) {
 // ─── سجل الإسناد التخطيطي ────────────────────────────────────────────────────
 
 function AssignmentSection({ periodLabel, year, month }) {
+  const { t } = useTranslation();
   const [show,    setShow]    = useState(false);
   const [rows,    setRows]    = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1343,7 +1417,7 @@ function AssignmentSection({ periodLabel, year, month }) {
 
   const save = async (row) => {
     const count = Number(String(row.inp).trim());
-    if (isNaN(count) || count < 0) { toast.error('عدد غير صحيح'); return; }
+    if (isNaN(count) || count < 0) { toast.error(t('kpi.assignment.invalidCount')); return; }
     setSaving(p => ({ ...p, [row.userId]: true }));
     try {
       await api.post('/kpis/assignments', {
@@ -1354,9 +1428,9 @@ function AssignmentSection({ periodLabel, year, month }) {
         assignedCoursesCount: count,
         notes:                row.ni || '',
       });
-      toast.success('حُفظ ✓');
+      toast.success(t('kpi.saved'));
     } catch {
-      toast.error('تعذر الحفظ');
+      toast.error(t('kpi.saveFailed'));
     } finally {
       setSaving(p => ({ ...p, [row.userId]: false }));
     }
@@ -1369,18 +1443,21 @@ function AssignmentSection({ periodLabel, year, month }) {
         className="flex w-full items-center justify-between px-5 py-3.5 hover:bg-background transition"
       >
         <div className="flex items-center gap-2.5">
-          <span className="text-base">📋</span>
-          <div className="text-right">
-            <h4 className="text-sm font-extrabold text-text-main">سجل الإسناد التخطيطي</h4>
-            <p className="text-[10px] text-text-soft">اختياري — لتحديد عدد الدورات المخطط مسبقاً لكل موظف</p>
+          <ClipboardList size={18} aria-hidden="true" className="text-primary" />
+          <div className="text-start">
+            <h4 className="text-sm font-extrabold text-text-main">{t('kpi.assignment.title')}</h4>
+            <p className="text-[10px] text-text-soft">{t('kpi.assignment.subtitle')}</p>
           </div>
         </div>
-        <span className="text-xs text-text-soft">{show ? '▲ إخفاء' : '▼ إظهار'}</span>
+        <span className="flex items-center gap-1 text-xs text-text-soft">
+          {show ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
+          {show ? t('kpi.hide') : t('kpi.show')}
+        </span>
       </button>
 
       {!show && (
-        <div className="border-t border-border bg-sand/10 px-5 py-2 text-[10px] text-warning">
-          💡 هذا السجل مخصص للتخطيط المسبق فقط — KPI يعمل بالكامل بدونه
+        <div className="flex items-center gap-1.5 border-t border-border bg-sand/10 px-5 py-2 text-[10px] text-warning">
+          <Lightbulb size={12} aria-hidden="true" /> {t('kpi.assignment.hint')}
         </div>
       )}
 
@@ -1389,17 +1466,17 @@ function AssignmentSection({ periodLabel, year, month }) {
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-8 text-sm text-text-soft">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              جاري التحميل...
+              {t('common.loading')}
             </div>
           ) : !rows.length ? (
-            <div className="py-8 text-center text-sm text-text-soft">لا توجد بيانات إسناد لهذه الفترة</div>
+            <div className="py-8 text-center text-sm text-text-soft">{t('kpi.assignment.noData')}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-xs">
                 <thead className="bg-background text-text-soft">
                   <tr>
-                    {['الموظف', 'الفعلي', 'المخطط', 'التغطية', 'ملاحظة', ''].map(h => (
-                      <th key={h} className="px-3 py-2.5 text-right font-bold">{h}</th>
+                    {['employee','actual','planned','coverage','note','action'].map(h => (
+                      <th key={h} className="px-3 py-2.5 text-start font-bold">{h === 'action' ? '' : t(`kpi.assignment.col.${h}`)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1430,7 +1507,7 @@ function AssignmentSection({ periodLabel, year, month }) {
                           value={row.ni}
                           onChange={e => upd(row.userId, 'ni', e.target.value)}
                           className="w-36 rounded-lg border border-border px-2 py-1 text-xs outline-none focus:border-primary transition"
-                          placeholder="ملاحظة..."
+                          placeholder={t('kpi.assignment.notePlaceholder')}
                         />
                       </td>
                       <td className="px-3 py-2.5">
@@ -1439,7 +1516,7 @@ function AssignmentSection({ periodLabel, year, month }) {
                           disabled={!!saving[row.userId]}
                           className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 disabled:opacity-50 transition"
                         >
-                          {saving[row.userId] ? '...' : 'حفظ'}
+                          {saving[row.userId] ? '...' : t('common.save')}
                         </button>
                       </td>
                     </tr>

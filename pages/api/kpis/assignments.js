@@ -1,13 +1,13 @@
 // GET/POST /api/kpis/assignments
-const { withManagerOrSupervisor, withMethods } = require('../../../lib/middleware/auth');
-const kpis = require('../../../lib/services/kpis');
+const { withManagerOrSupervisor, withMethods, ok, fail } = require('../../../lib/server/http');
+const kpis = require('../../../lib/modules/kpi/kpi.service');
 
 async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const { periodType, year, value } = req.query;
       if (!periodType || !year) {
-        return res.status(400).json({ message: 'periodType و year مطلوبان' });
+        return res.status(400).json({ code: 'serverErrors.kpis.periodTypeAndYearParamsRequired', message: 'periodType و year مطلوبان' });
       }
       const data = await kpis.getAssignmentRegister(
         periodType,
@@ -19,17 +19,17 @@ async function handler(req, res) {
           supervisedProjectIds: req.scope?.supervisedProjectIds || [],
         },
       );
-      return res.status(200).json(data);
+      return ok(res, data);
     }
 
     if (req.method === 'POST') {
       if (req.activeRole !== 'MANAGER') {
-        return res.status(403).json({ message: 'يتطلب صلاحية المدير للتعديل' });
+        return res.status(403).json({ code: 'serverErrors.kpis.managerRequiredToEdit', message: 'يتطلب صلاحية المدير للتعديل' });
       }
 
       const { userId, periodType, year, value, assignedCoursesCount, notes } = req.body || {};
       if (!userId || !periodType || !year) {
-        return res.status(400).json({ message: 'بيانات الإسناد غير مكتملة' });
+        return res.status(400).json({ code: 'serverErrors.kpis.assignmentDataIncomplete', message: 'بيانات الإسناد غير مكتملة' });
       }
       const saved = await kpis.upsertAssignmentRegister(
         req.user.id,
@@ -40,10 +40,10 @@ async function handler(req, res) {
         Number(assignedCoursesCount),
         notes,
       );
-      return res.status(200).json(saved);
+      return ok(res, saved);
     }
   } catch (err) {
-    return res.status(err.statusCode || 500).json({ message: err.message });
+    return fail(res, err);
   }
 }
 

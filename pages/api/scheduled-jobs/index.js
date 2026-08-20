@@ -1,6 +1,6 @@
 // GET/POST /api/scheduled-jobs
 const { withManager, withMethods } = require('../../../lib/middleware/auth');
-const scheduler = require('../../../lib/services/scheduler');
+const scheduler = require('../../../lib/modules/scheduling/scheduling.service');
 
 async function handler(req, res) {
   try {
@@ -14,7 +14,7 @@ async function handler(req, res) {
       return res.status(201).json(job);
     }
   } catch (err) {
-    return res.status(err.statusCode || 500).json({ message: err.message });
+    return res.status(err.statusCode || 500).json({ code: 'serverErrors.common.serverError', message: err.message });
   }
 }
 

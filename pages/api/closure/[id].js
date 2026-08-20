@@ -1,11 +1,13 @@
-const { withAuth, withMethods } = require('../../../lib/middleware/auth');
-const closureService = require('../../../lib/services/closure');
+const { withMethods, withAuth, withValidation, ok, fail } = require('../../../lib/server/http');
+const svc = require('../../../lib/modules/closure/closure.service');
+const { updateStatusSchema } = require('../../../lib/modules/closure/closure.schema');
 
 async function handler(req, res) {
   try {
-    return res.status(200).json(await closureService.updateStatus(req.query.id, req.body || {}, req.user, req.activeRole));
+    return await withValidation(updateStatusSchema, (r, s) =>
+      svc.updateStatus(r.query.id, r.valid, r.user, r.activeRole).then((x) => ok(s, x)))(req, res);
   } catch (error) {
-    return res.status(error.statusCode || 500).json({ message: error.message });
+    return fail(res, error);
   }
 }
 

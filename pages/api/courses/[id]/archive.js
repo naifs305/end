@@ -1,11 +1,11 @@
-const { withManagerOrSupervisor, withMethods } = require('../../../../lib/middleware/auth');
-const coursesService = require('../../../../lib/services/courses');
+const { withMethods, withManagerOrSupervisor, ok, fail } = require('../../../../lib/server/http');
+const svc = require('../../../../lib/modules/courses/courses.service');
 
 async function handler(req, res) {
   try {
-    return res.status(200).json(await coursesService.archiveCourse(req.query.id, req.user, req.activeRole));
+    return ok(res, await svc.archiveCourse(req.query.id, req.user, req.activeRole));
   } catch (error) {
-    return res.status(error.statusCode || 500).json({ message: error.message });
+    return fail(res, error);
   }
 }
 

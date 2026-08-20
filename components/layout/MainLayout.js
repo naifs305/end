@@ -5,13 +5,34 @@ import Header from './Header';
 import MobileNav from './MobileNav';
 import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
+import { useTranslation } from '../../lib/i18n';
 
 const MESSAGE_CACHE_TTL_MS = 30000;
 
-export default function MainLayout({ children }) {
+export default function MainLayout({ children, breadcrumb }) {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [newMessagePopup, setNewMessagePopup] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  // استرجاع تفضيل طيّ الشريط الجانبي
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem('sidebar-collapsed') === '1');
+    } catch {}
+  }, []);
+
+  const toggleSidebar = () => {
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem('sidebar-collapsed', next ? '1' : '0');
+      } catch {}
+      return next;
+    });
+  };
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const popupStorageKey = useMemo(() => {
@@ -101,38 +122,53 @@ export default function MainLayout({ children }) {
   };
 
   const senderName = newMessagePopup?.sender
-    ? `${newMessagePopup.sender.firstName || ''} ${newMessagePopup.sender.lastName || ''}`.trim() || newMessagePopup.sender.email || 'مستخدم'
-    : 'مستخدم';
+    ? `${newMessagePopup.sender.firstName || ''} ${newMessagePopup.sender.lastName || ''}`.trim() || newMessagePopup.sender.email || t('messages.userFallback')
+    : t('messages.userFallback');
 
   return (
-    <div className="flex min-h-screen w-full overflow-x-hidden bg-background font-cairo">
-      <Sidebar />
+    <div className="relative flex min-h-screen w-full overflow-x-hidden font-cairo">
+      {/* بقع سائلة متحركة خلف كامل التطبيق */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+        <div className="animate-blob absolute -top-24 h-80 w-80 rounded-full bg-primary/15 blur-3xl end-[-4rem]" />
+        <div className="animate-blob absolute top-1/3 h-72 w-72 rounded-full bg-accent/15 blur-3xl start-[-5rem]" style={{ animationDelay: '4s' }} />
+        <div className="animate-blob absolute bottom-[-6rem] left-1/3 h-80 w-80 rounded-full bg-support-blue/10 blur-3xl" style={{ animationDelay: '8s' }} />
+      </div>
+
+      <Sidebar collapsed={collapsed} />
       <MobileNav open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
-        <Header onMenuClick={() => setMobileNavOpen(true)} />
+        <Header
+          onMenuClick={() => setMobileNavOpen(true)}
+          onToggleSidebar={toggleSidebar}
+          scrolled={scrolled}
+          breadcrumb={breadcrumb}
+        />
 
-        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background">
-          <div className="min-h-full w-full max-w-full p-3 sm:p-4 md:p-6">{children}</div>
+        <main
+          className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-transparent"
+          onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
+        >
+          <div key={router.pathname} className="min-h-full w-full max-w-full animate-fade-in p-3 sm:p-4 md:p-6">{children}</div>
         </main>
       </div>
 
       {newMessagePopup && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#2F3437]/40 px-3 py-4 backdrop-blur-sm sm:px-4">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-border bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.18)] sm:p-6">
+        <div className="animate-fade-in fixed inset-0 z-[70] flex items-center justify-center bg-primary-dark/40 px-3 py-4 backdrop-blur-sm sm:px-4">
+          <div className="animate-pop-in w-full max-w-md overflow-hidden rounded-3xl border border-white/50 bg-white/85 p-4 shadow-deep backdrop-blur-xl sm:p-6">
             <div className="mb-4">
-              <h3 className="text-xl font-extrabold text-primary">رسالة جديدة</h3>
+              <h3 className="text-xl font-extrabold text-primary">{t('messages.newMessage')}</h3>
               <p className="mt-2 text-sm leading-7 text-text-soft">
-                لديك رسالة جديدة من: <span className="font-bold text-text-main">{senderName}</span>
+                {t('messages.newMessageFrom')} <span className="font-bold text-text-main">{senderName}</span>
               </p>
             </div>
 
             <div className="mb-5 rounded-2xl border border-border bg-background p-4">
               <div className="mb-2 break-words text-sm font-bold leading-7 text-text-main">
-                {newMessagePopup.subject || 'بدون عنوان'}
+                {newMessagePopup.subject || t('messages.noSubject')}
               </div>
               <div className="line-clamp-4 break-words text-sm leading-8 text-text-soft">
-                {newMessagePopup.body || 'لا يوجد محتوى'}
+                {newMessagePopup.body || t('messages.noContent')}
               </div>
             </div>
 
@@ -141,14 +177,14 @@ export default function MainLayout({ children }) {
                 onClick={rememberPopupMessage}
                 className="w-full rounded-2xl border border-border bg-white px-5 py-3 font-bold text-text-main transition hover:bg-background sm:w-auto"
               >
-                لاحقًا
+                {t('messages.later')}
               </button>
 
               <button
                 onClick={openMessagePage}
                 className="w-full rounded-2xl bg-primary px-5 py-3 font-bold text-white transition hover:bg-primary-dark sm:w-auto"
               >
-                عرض الرسالة
+                {t('messages.viewMessage')}
               </button>
             </div>
           </div>
