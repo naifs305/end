@@ -41,6 +41,8 @@ async function handler(req, res) {
       results: withEmail.map((entry) => ({
         username: entry.username,
         email: entry.email,
+        firstName: entry.firstName,
+        lastName: entry.lastName,
         displayName: entry.displayName,
         mobile: entry.mobile,
         extension: entry.extension,

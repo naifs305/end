@@ -2,8 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
 import api from '../../lib/axios';
 import Link from 'next/link';
-import { Search, Pencil } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Search, Pencil, UserPlus } from 'lucide-react';
 import { useTranslation } from '../../lib/i18n';
+
+const ROLE_OPTIONS = ['EMPLOYEE', 'PROJECT_SUPERVISOR', 'MANAGER', 'QUALITY_VIEWER'];
 
 // أنماط الأدوار فقط — التسميات من الترجمة عبر roles.*
 const ROLE_CLS = {
@@ -19,12 +22,97 @@ export default function UserManagement() {
   const [loading, setLoading]   = useState(true);
   const [filters, setFilters]   = useState({ search: '', role: '', status: '' });
 
-  useEffect(() => {
+  // إضافة موظف عبر البحث في Active Directory
+  const [projects, setProjects] = useState([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const [adQuery, setAdQuery] = useState('');
+  const [adResults, setAdResults] = useState([]);
+  const [adLoading, setAdLoading] = useState(false);
+  const [adSearched, setAdSearched] = useState(false);
+  const [picked, setPicked] = useState(null);
+  const [newFirstName, setNewFirstName] = useState('');
+  const [newLastName, setNewLastName] = useState('');
+  const [newMobile, setNewMobile] = useState('');
+  const [newExtension, setNewExtension] = useState('');
+  const [newProjectId, setNewProjectId] = useState('');
+  const [newRoles, setNewRoles] = useState(['EMPLOYEE']);
+  const [saving, setSaving] = useState(false);
+
+  function loadUsers() {
     setLoading(true);
-    api.get('/users').then((res) => { const d = res.data; setUsers(Array.isArray(d) ? d : d?.data || []); })
+    return api.get('/users').then((res) => { const d = res.data; setUsers(Array.isArray(d) ? d : d?.data || []); })
       .catch(() => setUsers([]))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => { loadUsers(); }, []);
+
+  useEffect(() => {
+    api.get('/projects').then((res) => setProjects(res.data || [])).catch(() => setProjects([]));
   }, []);
+
+  // بحث AD مع تأخير بسيط حتى لا نستعلم مع كل حرف
+  useEffect(() => {
+    const q = adQuery.trim();
+    if (!addOpen || q.length < 2) { setAdResults([]); setAdSearched(false); return; }
+    setAdLoading(true);
+    const timer = setTimeout(() => {
+      api.get(`/admin/ad-search?q=${encodeURIComponent(q)}`)
+        .then((res) => { setAdResults(res.data?.results || []); })
+        .catch((err) => {
+          setAdResults([]);
+          toast.error(err.response?.data?.message || t('admin.users.directorySearchFailed'));
+        })
+        .finally(() => { setAdSearched(true); setAdLoading(false); });
+    }, 400);
+    return () => { clearTimeout(timer); setAdLoading(false); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adQuery, addOpen]);
+
+  function resetAddForm() {
+    setAddOpen(false); setAdQuery(''); setAdResults([]); setAdSearched(false);
+    setPicked(null); setNewFirstName(''); setNewLastName('');
+    setNewMobile(''); setNewExtension(''); setNewProjectId(''); setNewRoles(['EMPLOYEE']);
+  }
+
+  function pickEntry(entry) {
+    setPicked(entry);
+    setNewFirstName(entry.firstName || '');
+    setNewLastName(entry.lastName || '');
+    setNewMobile(entry.mobile || '');
+    setNewExtension(entry.extension || '');
+  }
+
+  function toggleNewRole(role) {
+    setNewRoles((prev) => {
+      const next = prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role];
+      return next.length ? next : prev;
+    });
+  }
+
+  async function addEmployee() {
+    if (!picked || saving) return;
+    if (!newProjectId) { toast.error(t('admin.users.addEmployeeProjectLabel')); return; }
+    setSaving(true);
+    try {
+      await api.post('/users', {
+        email: picked.email,
+        firstName: newFirstName.trim() || picked.username,
+        lastName: newLastName.trim() || picked.username,
+        mobileNumber: newMobile,
+        extensionNumber: newExtension || null,
+        operationalProjectId: newProjectId,
+        roles: newRoles,
+      });
+      resetAddForm();
+      await loadUsers();
+      toast.success(t('admin.users.employeeAdded'));
+    } catch (err) {
+      toast.error(err.response?.data?.message || t('admin.users.addEmployeeFailed'));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
@@ -54,7 +142,7 @@ export default function UserManagement() {
             <h1 className="text-xl font-extrabold text-primary">{t('admin.users.title')}</h1>
             <p className="mt-0.5 text-xs text-text-soft">{t('admin.users.subtitle')}</p>
           </div>
-          <div className="flex flex-wrap gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             {[
               [t('admin.users.statTotal'),       stats.total,       'text-primary'],
               [t('admin.users.statActive'),      stats.active,      'text-accent'],
@@ -67,8 +155,133 @@ export default function UserManagement() {
                 <div className="text-text-soft">{l}</div>
               </div>
             ))}
+            {!addOpen && (
+              <button
+                type="button"
+                onClick={() => setAddOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition hover:bg-primary-dark"
+              >
+                <UserPlus size={14} aria-hidden="true" />
+                {t('admin.users.addEmployeeButton')}
+              </button>
+            )}
           </div>
         </div>
+
+        {/* إضافة موظف عبر Active Directory */}
+        {addOpen && (
+          <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
+            <h3 className="text-sm font-extrabold text-text-main">{t('admin.users.addEmployeeHeading')}</h3>
+            <p className="mt-1 text-xs text-text-soft">{t('admin.users.addEmployeeHint')}</p>
+
+            <input
+              className="mt-3 w-full max-w-md rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-primary"
+              placeholder={t('admin.users.directorySearchPlaceholder')}
+              value={adQuery}
+              onChange={(e) => { setAdQuery(e.target.value); setPicked(null); }}
+              autoFocus
+            />
+
+            <div className="mt-3">
+              {adLoading && <p className="text-xs text-text-soft">{t('admin.users.directorySearching')}</p>}
+
+              {!adLoading && adSearched && adResults.length === 0 && (
+                <p className="text-xs text-text-soft">{t('admin.users.directoryNoResults')}</p>
+              )}
+
+              {!adLoading && adResults.length > 0 && (
+                <div className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-xl border border-border bg-background p-2">
+                  {adResults.map((entry) => (
+                    <label
+                      key={entry.username}
+                      className={`flex items-center gap-2 rounded-lg px-3 py-2 ${entry.alreadyAdded ? 'cursor-not-allowed opacity-55' : 'cursor-pointer'} ${picked?.username === entry.username ? 'bg-primary-light' : 'hover:bg-white'}`}
+                    >
+                      <input
+                        type="radio"
+                        name="ad-pick"
+                        disabled={entry.alreadyAdded}
+                        checked={picked?.username === entry.username}
+                        onChange={() => pickEntry(entry)}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold text-text-main">{entry.displayName || entry.username}</span>
+                        <span className="block text-xs text-text-soft">{entry.email}</span>
+                      </span>
+                      {entry.alreadyAdded && (
+                        <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-bold text-text-soft">
+                          {t('admin.users.directoryAlreadyAdded')}
+                        </span>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {picked && (
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-text-main">{t('admin.users.firstName')}</label>
+                  <input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)}
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-primary" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-text-main">{t('admin.users.lastName')}</label>
+                  <input value={newLastName} onChange={(e) => setNewLastName(e.target.value)}
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-primary" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-text-main">{t('admin.users.addEmployeeMobileLabel')}</label>
+                  <input value={newMobile} onChange={(e) => setNewMobile(e.target.value)}
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-primary" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-text-main">{t('admin.users.addEmployeeExtensionLabel')}</label>
+                  <input value={newExtension} onChange={(e) => setNewExtension(e.target.value)}
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-primary" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-xs font-bold text-text-main">{t('admin.users.addEmployeeProjectLabel')}</label>
+                  <select value={newProjectId} onChange={(e) => setNewProjectId(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary">
+                    <option value="" disabled>{t('admin.users.selectProject')}</option>
+                    {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="mb-1.5 block text-xs font-bold text-text-main">{t('admin.users.addEmployeeRolesLabel')}</label>
+                  <div className="flex flex-wrap gap-2">
+                    {ROLE_OPTIONS.map((role) => {
+                      const checked = newRoles.includes(role);
+                      return (
+                        <label key={role} className="flex cursor-pointer select-none items-center gap-1.5">
+                          <input type="checkbox" checked={checked} onChange={() => toggleNewRole(role)} className="h-3.5 w-3.5 rounded" />
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${checked ? ROLE_CLS[role] : 'bg-background text-text-soft border border-border'}`}>
+                            {t(`roles.${role}`)}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {picked && (
+                <button type="button" onClick={addEmployee} disabled={saving}
+                  className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-70">
+                  {saving ? t('admin.users.addEmployeeSaving') : t('admin.users.addEmployeeSubmit')}
+                </button>
+              )}
+              <button type="button" onClick={resetAddForm} disabled={saving}
+                className="rounded-xl border border-border px-4 py-2 text-xs font-bold text-text-soft transition hover:bg-background">
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* فلاتر */}
         <div className="flex flex-wrap gap-2 rounded-2xl border border-border bg-white px-4 py-3 shadow-card">
@@ -116,6 +329,11 @@ export default function UserManagement() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-extrabold text-text-main">{u.firstName} {u.lastName}</span>
+                      {u.isDirectoryAccount && (
+                        <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-bold text-text-soft" title={t('admin.users.directoryAccountTooltip')}>
+                          {t('admin.users.directoryBadge')}
+                        </span>
+                      )}
                       {(u.roles || []).map(r => (
                         <span key={r} className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${ROLE_CLS[r] || 'bg-background text-text-soft border border-border'}`}>
                           {t(`roles.${r}`)}

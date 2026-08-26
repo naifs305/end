@@ -86,7 +86,8 @@ model OperationalProject {
 model User {
   id                   String   @id @default(uuid())
   email                String   @unique
-  passwordHash         String
+  // فارغ لحسابات مصادَقة عبر Active Directory حصراً (بلا كلمة مرور محلية)
+  passwordHash         String?
   firstName            String
   lastName             String
   mobileNumber         String
