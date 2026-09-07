@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
-import Link from 'next/link';
 import Image from 'next/image';
 import Head from 'next/head';
 import toast from 'react-hot-toast';
-import { Mail, Lock, Eye, EyeOff, LogIn, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
 import { useTranslation } from '../lib/i18n';
 import LanguageSwitcher from '../components/layout/LanguageSwitcher';
 
@@ -164,7 +163,7 @@ export default function Login() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center">
                     <label className="flex items-center gap-2 text-sm text-text-main">
                       <input
                         id="remember-me"
@@ -176,9 +175,6 @@ export default function Login() {
                       />
                       {t('auth.rememberMe')}
                     </label>
-                    <Link href="/forgot-password" className="text-sm text-text-soft transition hover:text-primary">
-                      {t('auth.forgotPassword')}
-                    </Link>
                   </div>
 
                   <button
@@ -195,16 +191,6 @@ export default function Login() {
                       </>
                     )}
                   </button>
-
-                  <div className="text-center">
-                    <Link
-                      href="/register"
-                      className="inline-flex items-center gap-1.5 text-sm font-bold text-primary transition hover:text-primary-dark"
-                    >
-                      <ArrowLeft size={16} aria-hidden="true" />
-                      {t('auth.noAccount')}
-                    </Link>
-                  </div>
                 </form>
               </div>
             </div>
