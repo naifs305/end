@@ -186,7 +186,8 @@
       "updateFailed": "تعذر تحديث الدورة",
       "loadFailed": "تعذر تحميل بيانات الدورة",
       "loadProjectsFailed": "تعذر تحميل المشاريع",
-      "dateError": "تاريخ النهاية يجب أن يكون بعد تاريخ البداية"
+      "dateError": "تاريخ النهاية يجب أن يكون بعد تاريخ البداية",
+      "cityPlaceholder": "مثال: الرياض"
     }
   },
   "courseDetail": {

@@ -186,7 +186,8 @@
       "updateFailed": "Failed to update the course",
       "loadFailed": "Failed to load course data",
       "loadProjectsFailed": "Failed to load projects",
-      "dateError": "End date must be after the start date"
+      "dateError": "End date must be after the start date",
+      "cityPlaceholder": "e.g. Riyadh"
     }
   },
   "courseDetail": {

@@ -108,7 +108,6 @@ export default function CreateCoursePage() {
   const { user, loading } = useAuth();
   const { t } = useTranslation();
   const { options: locationOptions } = useOptions('LOCATION_TYPE');
-  const { options: cityOptions } = useOptions('CITY');
 
   const [form, setForm] = useState(EMPTY);
   const [projects, setProjects] = useState([]);
@@ -234,14 +233,8 @@ export default function CreateCoursePage() {
                 </select>
               </Field>
               <Field label={t('course.form.city')} required>
-                <select value={form.city} onChange={(e) => set('city', e.target.value)} required className={inputCls}>
-                  <option value="">{t('course.form.selectCity')}</option>
-                  {cityOptions.map((o) => (
-                    <option key={o.value} value={o.label}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                <input value={form.city} onChange={(e) => set('city', e.target.value)} required
+                  placeholder={t('course.form.cityPlaceholder')} className={inputCls} />
               </Field>
               <Field label={t('course.form.project')} required>
                 <select value={form.operationalProjectId} onChange={(e) => set('operationalProjectId', e.target.value)} required className={inputCls}>
