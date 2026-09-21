@@ -622,7 +622,12 @@
       "removeFailed": "Could not remove",
       "deleteConfirm": "Delete project \"{name}\"?\nIt must not contain any employees or courses.",
       "deleted": "Project deleted",
-      "deleteFailed": "Could not delete"
+      "deleteFailed": "Could not delete",
+      "selectCoordinator": "Select a coordinator to add",
+      "addCoordinator": "Add",
+      "addCoordinatorHint": "Adding a coordinator here moves them from their current project to this one.",
+      "coordinatorAssigned": "Coordinator assigned to the project",
+      "coordinatorAssignFailed": "Could not assign the coordinator"
     },
     "closureElements": {
       "title": "Submission Elements",

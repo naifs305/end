@@ -622,7 +622,12 @@
       "removeFailed": "تعذر الإزالة",
       "deleteConfirm": "حذف مشروع \"{name}\"؟\nيجب ألا يحتوي على موظفين أو دورات.",
       "deleted": "تم حذف المشروع",
-      "deleteFailed": "تعذر الحذف"
+      "deleteFailed": "تعذر الحذف",
+      "selectCoordinator": "اختر منسقاً لإضافته",
+      "addCoordinator": "إضافة",
+      "addCoordinatorHint": "إضافة منسق هنا تنقله من مشروعه الحالي إلى هذا المشروع.",
+      "coordinatorAssigned": "تم إسناد المنسق للمشروع",
+      "coordinatorAssignFailed": "تعذّر إسناد المنسق"
     },
     "closureElements": {
       "title": "عناصر التقديم",

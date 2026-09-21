@@ -34,6 +34,9 @@ export default function ProjectsPage() {
   const [expandedProject,  setExpandedProject]  = useState(null);
   const [confirmState,     setConfirmState]     = useState(null);
   const [busy,             setBusy]             = useState(false);
+  // إسناد المنسقين: اختيار منفصل لكل مشروع { [projectId]: userId }
+  const [coordPick,        setCoordPick]        = useState({});
+  const [coordBusy,        setCoordBusy]        = useState(null);
 
   useEffect(() => {
     if (!authLoading && (!user || !canManageProjects(activeRole))) router.replace('/');
@@ -80,6 +83,23 @@ export default function ProjectsPage() {
       toast.success(t('admin.projects.supervisorRemoved'));
       load();
     } catch (e) { toast.error(e.response?.data?.message || t('admin.projects.removeFailed')); }
+  };
+
+  // إسناد منسق لمشروع — ينقله من مشروعه الحالي إلى هذا المشروع
+  const assignCoordinator = async (projectId) => {
+    const userId = coordPick[projectId];
+    if (!userId) return toast.error(t('admin.projects.selectCoordinator'));
+    setCoordBusy(projectId);
+    try {
+      await api.put(`/users/${userId}`, { operationalProjectId: projectId });
+      setCoordPick((p) => ({ ...p, [projectId]: '' }));
+      toast.success(t('admin.projects.coordinatorAssigned'));
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.message || t('admin.projects.coordinatorAssignFailed'));
+    } finally {
+      setCoordBusy(null);
+    }
   };
 
   const confirmDeleteProject = async () => {
@@ -248,6 +268,34 @@ export default function ProjectsPage() {
                           <h4 className="mb-2 text-xs font-extrabold uppercase text-text-soft">
                             {t('admin.projects.coordinatorsHeading', { count: members.length })}
                           </h4>
+                          {/* إسناد منسق جديد لهذا المشروع */}
+                          <div className="mb-2 flex gap-1.5">
+                            <select
+                              value={coordPick[project.id] || ''}
+                              onChange={(e) => setCoordPick((p) => ({ ...p, [project.id]: e.target.value }))}
+                              className="min-w-0 flex-1 rounded-lg border border-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
+                            >
+                              <option value="">{t('admin.projects.selectCoordinator')}</option>
+                              {eligibleUsers
+                                .filter((u) => u.operationalProjectId !== project.id)
+                                .map((u) => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.firstName} {u.lastName}
+                                    {u.operationalProject?.name ? ` — ${u.operationalProject.name}` : ''}
+                                  </option>
+                                ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => assignCoordinator(project.id)}
+                              disabled={coordBusy === project.id || !coordPick[project.id]}
+                              className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {coordBusy === project.id ? t('common.saving') : t('admin.projects.addCoordinator')}
+                            </button>
+                          </div>
+                          <p className="mb-2 text-[10px] leading-5 text-text-soft">{t('admin.projects.addCoordinatorHint')}</p>
+
                           {members.length === 0 ? (
                             <p className="text-xs text-text-soft">{t('admin.projects.noCoordinators')}</p>
                           ) : (
