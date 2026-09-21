@@ -1063,13 +1063,14 @@ function StatsPill({ label, value, active, onClick }) {
 // ─── MultiPeriodPicker ────────────────────────────────────────────────────────
 
 function MultiPeriodPicker({ selectedMonths, onChange }) {
+  const { locale } = useTranslation();
   const now  = new Date();
   // عرض آخر 18 شهر
   const available = [];
   for (let i = 0; i < 18; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    available.push({ label, name: `${AR_MONTHS[d.getMonth()]} ${d.getFullYear()}` });
+    available.push({ label, name: `${monthName(locale, d.getMonth() + 1, d.getFullYear())} ${d.getFullYear()}` });
   }
 
   const toggle = (label) => {
@@ -1124,7 +1125,7 @@ function MultiPeriodPicker({ selectedMonths, onChange }) {
         <p className="mt-2 text-[10px] text-text-soft">
           {selectedMonths.length} شهر محدد: {selectedMonths.map(m => {
             const d = new Date(m + '-01');
-            return `${AR_MONTHS[d.getMonth()]}`;
+            return monthName(locale, d.getMonth() + 1, d.getFullYear());
           }).join(' · ')}
         </p>
       )}
@@ -1135,6 +1136,7 @@ function MultiPeriodPicker({ selectedMonths, onChange }) {
 // ─── MultiPeriodResults — عرض نتائج الفترة المخصصة ──────────────────────────
 
 function MultiPeriodResults({ months, isManager }) {
+  const { locale } = useTranslation();
   const [data,    setData]    = useState([]);
   const [loading, setLoading] = useState(false);
   const [nameFilter,    setNameFilter]    = useState('');
@@ -1323,7 +1325,7 @@ function MultiPeriodResults({ months, isManager }) {
                               <span className="font-bold text-text-soft">تفصيل الشهور:</span>
                               {snap.monthDetail?.map(md => {
                                 const d = new Date(md.periodLabel + '-01');
-                                const mName = `${AR_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+                                const mName = `${monthName(locale, d.getMonth() + 1, d.getFullYear())} ${d.getFullYear()}`;
                                 return (
                                   <span
                                     key={md.periodLabel}
@@ -1977,7 +1979,7 @@ function SupervisorReport({ periodLabel }) {
                         {s.avgResponseHours != null ? fmtDur(t, s.avgResponseHours) : '—'}
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${RESP_COLOR[s.responsiveness] || 'bg-background text-text-soft border-border'}`}>
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${RESP_CFG[s.responsiveness]?.color || 'bg-background text-text-soft border-border'}`}>
                           {s.responsiveness || '—'}
                         </span>
                       </td>

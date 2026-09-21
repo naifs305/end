@@ -43,6 +43,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const [extReason, setExtReason] = useState('');
   const [savingExt, setSavingExt] = useState(false);
   const isFinancialElement = ['advance_req', 'settlement'].includes(element?.element?.key);
+  const isMedicalInsurance = element?.element?.key === 'medical_insurance';
   const isOpeningReport = element?.element?.key === 'opening_report';
   const isClosingReport = element?.element?.key === 'closing_report';
   const isCourseReport = isOpeningReport || isClosingReport;
