@@ -4,7 +4,8 @@ import MainLayout from '../../components/layout/MainLayout';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
 import useAuth from '../../context/AuthContext';
-import { ArrowLeft, User, Search, Star, BarChart3, KeyRound, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowLeft, User, Search, Star, BarChart3, KeyRound, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
+import ConfirmModal from '../../components/operational/ConfirmModal';
 import { useTranslation } from '../../lib/i18n';
 
 // تكوين الأدوار — الأيقونات هنا، التسميات من roles.* والأوصاف من admin.users.*
@@ -18,10 +19,13 @@ const ROLE_CFG = [
 export default function EditUser() {
   const router = useRouter();
   const { id }  = router.query;
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, activeRole } = useAuth();
+  const isManager = activeRole === 'MANAGER';
   const { t } = useTranslation();
 
   const [user,     setUser]     = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting,      setDeleting]      = useState(false);
   const [projects, setProjects] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState(false);
@@ -40,6 +44,20 @@ export default function EditUser() {
       .catch(() => toast.error(t('admin.users.loadFailed')))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // حذف الحساب — يتحول تلقائياً إلى تعطيل إن كان للموظف دورات مرتبطة
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const res = await api.delete(`/users/${id}`);
+      toast.success(res.data?.message || t('admin.users.deleted'));
+      router.replace('/users');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || t('common.error'));
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -223,7 +241,32 @@ export default function EditUser() {
           )}
         </div>
 
+        {/* حذف الحساب — للمدير فقط، ولا يظهر لحساب المستخدم نفسه */}
+        {isManager && currentUser?.id !== id && (
+          <div className="rounded-2xl border border-burgundy/20 bg-burgundy/5 p-5">
+            <h2 className="mb-1 inline-flex items-center gap-1.5 font-extrabold text-danger">
+              <Trash2 size={16} aria-hidden="true" /> {t('admin.users.deleteAccount')}
+            </h2>
+            <p className="mb-3 text-xs leading-6 text-text-soft">{t('admin.users.deleteAccountHint')}</p>
+            <button type="button" onClick={() => setConfirmDelete(true)} disabled={deleting}
+              className="rounded-xl border border-burgundy/30 bg-white px-4 py-2.5 text-sm font-bold text-danger transition hover:bg-burgundy/10 disabled:opacity-50">
+              {deleting ? t('common.saving') : t('admin.users.deleteAccount')}
+            </button>
+          </div>
+        )}
+
       </div>
+
+      <ConfirmModal
+        open={confirmDelete}
+        title={t('admin.users.deleteAccount')}
+        message={t('admin.users.deleteConfirm', { name: `${user.firstName || ''} ${user.lastName || ''}`.trim() })}
+        confirmLabel={t('common.delete')}
+        tone="danger"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </MainLayout>
   );
 }

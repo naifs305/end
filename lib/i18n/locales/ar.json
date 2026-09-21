@@ -584,7 +584,11 @@
       "addEmployeeFailed": "فشلت إضافة الموظف",
       "employeeAdded": "تمت إضافة الموظف",
       "directoryBadge": "AD",
-      "directoryAccountTooltip": "حساب مرتبط بـ Active Directory — لا كلمة مرور محلية"
+      "directoryAccountTooltip": "حساب مرتبط بـ Active Directory — لا كلمة مرور محلية",
+      "deleteAccount": "حذف الحساب",
+      "deleteAccountHint": "إن كان للموظف دورات مسجّلة باسمه فسيُعطَّل حسابه بدل حذفه، حفاظاً على سجل الدورات ومؤشرات الأداء. وإن لم تكن له دورات يُحذف نهائياً.",
+      "deleteConfirm": "سيُحذف حساب {name} نهائياً إن لم تكن له دورات. هل تريد المتابعة؟",
+      "deleted": "تم تنفيذ الطلب"
     },
     "projects": {
       "title": "المشاريع التشغيلية",

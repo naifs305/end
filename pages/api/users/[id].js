@@ -10,6 +10,9 @@ async function handler(req, res) {
     if (req.method === 'GET') {
       return ok(res, await identity.getUser(id, actor));
     }
+    if (req.method === 'DELETE') {
+      return ok(res, await identity.deleteUser(id, actor));
+    }
     return await withValidation(userUpdateSchema, (r, s) =>
       identity.updateUser(id, r.valid, actor).then((u) => ok(s, u)))(req, res);
   } catch (e) {
@@ -17,5 +20,5 @@ async function handler(req, res) {
   }
 }
 
-module.exports = withMethods(['GET', 'PUT'], withAuth(handler));
+module.exports = withMethods(['GET', 'PUT', 'DELETE'], withAuth(handler));
 module.exports.default = module.exports;

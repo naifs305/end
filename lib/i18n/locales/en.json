@@ -584,7 +584,11 @@
       "addEmployeeFailed": "Failed to add employee",
       "employeeAdded": "Employee added",
       "directoryBadge": "AD",
-      "directoryAccountTooltip": "Account linked to Active Directory — no local password"
+      "directoryAccountTooltip": "Account linked to Active Directory — no local password",
+      "deleteAccount": "Delete account",
+      "deleteAccountHint": "If the employee owns any courses the account is deactivated instead of deleted, to preserve the course record and KPIs. With no courses it is permanently deleted.",
+      "deleteConfirm": "The account of {name} will be permanently deleted if they own no courses. Continue?",
+      "deleted": "Done"
     },
     "projects": {
       "title": "Operational Projects",
