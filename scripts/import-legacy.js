@@ -29,7 +29,6 @@ const DRY = process.argv.includes('--dry');
 // نفس ترتيب التصدير — المستقل قبل المرتبط
 const ORDER = [
   ['operationalProject',       'المشاريع التشغيلية'],
-  ['closureElement',           'عناصر الإقفال (التعريف)'],
   ['course',                   'الدورات'],
   ['courseSupport',            'الفريق المساند'],
   ['courseClosureTracking',    'متابعة إقفال الدورات'],
@@ -115,7 +114,7 @@ async function buildUserIdMap() {
 const USER_REFS = [
   'userId', 'authorId', 'createdById', 'primaryEmployeeId', 'executedById',
   'decidedById', 'overriddenById', 'extensionGrantedById', 'senderId',
-  'recipientId', 'supervisorId', 'assignedById',
+  'recipientId', 'readById', 'supervisorId', 'assignedById',
 ];
 
 function remapUserIds(row, map) {
@@ -124,6 +123,32 @@ function remapUserIds(row, map) {
     if (out[f] && map.has(out[f])) out[f] = map.get(out[f]);
   }
   return out;
+}
+
+// خريطة عناصر الإقفال: المعرّف القديم → معرّف القاعدة — المطابقة بالمفتاح key
+// العناصر تُنشأ مسبقاً من seed.js بمعرّفات مختلفة، والمفتاح key فريد
+async function buildElementIdMap(userMap) {
+  const rows = read('closureElement') || [];
+  const map = new Map();
+  for (const raw of rows) {
+    const e = remapUserIds(revive(raw), userMap);
+    let found = await prisma.closureElement.findUnique({
+      where: { key: e.key }, select: { id: true },
+    });
+    if (!found && !DRY) {
+      const { id, ...rest } = e;   // معرّف جديد تفادياً لتضارب المفتاح
+      found = await prisma.closureElement.create({ data: rest, select: { id: true } });
+    }
+    if (found) map.set(e.id, found.id);
+  }
+  return map;
+}
+
+function remapElementId(row, map) {
+  if (row.elementId && map.has(row.elementId)) {
+    return { ...row, elementId: map.get(row.elementId) };
+  }
+  return row;
 }
 
 (async () => {
@@ -137,6 +162,8 @@ function remapUserIds(row, map) {
 
   await importUsers();
   const userMap = await buildUserIdMap();
+  const elemMap = await buildElementIdMap(userMap);
+  console.log('  عناصر الإقفال: طوبقت ' + elemMap.size + ' عنصراً بالمفتاح');
   console.log('');
 
   for (const [model, label] of ORDER) {
@@ -146,14 +173,18 @@ function remapUserIds(row, map) {
 
     let ok = 0, failed = 0;
     for (const raw of rows) {
-      const data = remapUserIds(revive(raw), userMap);
+      const data = remapElementId(remapUserIds(revive(raw), userMap), elemMap);
       if (DRY) { ok++; continue; }
       try {
         await prisma[model].upsert({ where: { id: data.id }, update: data, create: data });
         ok++;
       } catch (e) {
         failed++;
-        if (failed <= 3) console.log('      خطأ في سجل: ' + e.message.split('\n')[0].slice(0, 120));
+        if (failed <= 3) {
+          const msg = e.message.split('\n').map(function (l) { return l.trim(); })
+            .filter(Boolean).pop() || e.message;
+          console.log('      خطأ في سجل: ' + msg.slice(0, 160));
+        }
       }
     }
     console.log(String(ok).padStart(7) + '  ' + label + (failed ? '   (فشل ' + failed + ')' : ''));
