@@ -23,7 +23,7 @@ if (!process.env.DATABASE_URL) require('dotenv').config({ path: path.join(__dirn
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-const IN = path.join('C:', 'nif', 'الملفات المساعدة', 'نقل البيانات');
+const IN = process.env.LEGACY_DIR || path.join('C:', 'nif', 'الملفات المساعدة', 'نقل البيانات');
 const DRY = process.argv.includes('--dry');
 
 // نفس ترتيب التصدير — المستقل قبل المرتبط
