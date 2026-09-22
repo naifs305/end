@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: end-db
+    environment:
+      POSTGRES_USER: nauss
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: end_db
+    ports:
+      - "127.0.0.1:5437:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nauss -d end_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    logging:
+      options: { max-size: "20m", max-file: "5" }
+
+  web:
+    build: .
+    image: training/end:latest
+    container_name: end-web
+    env_file: .env                  # يتضمن LDAP_* و NODE_EXTRA_CA_CERTS
+    ports:
+      - "127.0.0.1:8084:3010"      # الفرق الوحيد عن التأمين: 8084
+    volumes:
+      - /opt/certs/nauss-ad-ca.pem:/certs/nauss-ad-ca.pem:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      options: { max-size: "20m", max-file: "5" }
+
+volumes:
+  dbdata:
