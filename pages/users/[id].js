@@ -230,7 +230,7 @@ export default function EditUser() {
           </button>
           {showPw && (
             <div className="mt-3 space-y-2">
-              <input type="password" value={newPass} onChange={e=>setNewPass(e.target.value)}
+              <input type="password" autoComplete="off" value={newPass} onChange={e=>setNewPass(e.target.value)}
                 placeholder={t('admin.users.newPasswordPlaceholder')}
                 className="w-full rounded-xl border border-border px-4 py-3 text-sm outline-none focus:border-primary" />
               <button type="button" onClick={handleResetPassword} disabled={savingPw||!newPass.trim()}

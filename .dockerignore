@@ -4,3 +4,6 @@ node_modules
 .env
 *.md
 npm-debug.log
+
+# تقارير الفحص الأمني (سرية)
+*Vulnerability Scan*.pdf

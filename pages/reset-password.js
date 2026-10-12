@@ -80,7 +80,7 @@ export default function ResetPasswordPage() {
                   <div className="relative">
                     <Lock size={18} aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-text-soft start-3.5" />
                     <input
-                      type={showPw ? 'text' : 'password'}
+                      type={showPw ? 'text' : 'password'} autoComplete="off"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder={t('resetPassword.minPlaceholder')}
@@ -102,7 +102,7 @@ export default function ResetPasswordPage() {
                   <div className="relative">
                     <Lock size={18} aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-text-soft start-3.5" />
                     <input
-                      type={showConfirm ? 'text' : 'password'}
+                      type={showConfirm ? 'text' : 'password'} autoComplete="off"
                       value={confirm}
                       onChange={(e) => setConfirm(e.target.value)}
                       placeholder={t('resetPassword.confirmPlaceholder')}

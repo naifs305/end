@@ -331,7 +331,7 @@ export default function Profile() {
                 <div>
                   <label className={labelClass}>{t('profile.currentPassword')}</label>
                   <input
-                    type="password"
+                    type="password" autoComplete="off"
                     name="currentPassword"
                     value={pwForm.currentPassword}
                     onChange={handlePasswordChange}
@@ -342,7 +342,7 @@ export default function Profile() {
                 <div>
                   <label className={labelClass}>{t('profile.newPassword')}</label>
                   <input
-                    type="password"
+                    type="password" autoComplete="off"
                     name="newPassword"
                     value={pwForm.newPassword}
                     onChange={handlePasswordChange}
@@ -353,7 +353,7 @@ export default function Profile() {
                 <div>
                   <label className={labelClass}>{t('profile.confirmNewPassword')}</label>
                   <input
-                    type="password"
+                    type="password" autoComplete="off"
                     name="confirmPassword"
                     value={pwForm.confirmPassword}
                     onChange={handlePasswordChange}

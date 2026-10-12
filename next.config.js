@@ -15,15 +15,6 @@ const nextConfig = {
       { protocol: 'https', hostname: 'nauss.edu.sa' },
     ],
   },
-  // كتم تحذير webpack الحميد القادم من react-datepicker
-  // (يستخدم require ديناميكياً لتحميل لغات date-fns — لا يؤثر على التشغيل)
-  webpack: (config) => {
-    config.ignoreWarnings = [
-      ...(config.ignoreWarnings || []),
-      { module: /node_modules\/react-datepicker/ },
-    ];
-    return config;
-  },
   async headers() {
     // سياسة أمان المحتوى (CSP) — دفاع متعدّد الطبقات.
     // ملاحظة: نسمح بـ 'unsafe-inline'/'unsafe-eval' للسكربتات لأن نكست (موجّه الصفحات)
@@ -50,6 +41,8 @@ const nextConfig = {
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Content-Security-Policy', value: csp },
+          // HSTS: إجبار المتصفح على HTTPS (Qualys 150135)
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
         ],
       },
     ];
