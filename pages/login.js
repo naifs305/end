@@ -105,7 +105,7 @@ export default function Login() {
                   <p className="mt-2 text-sm text-text-soft">{t('auth.loginSubtitle')}</p>
                 </div>
 
-                <form className="space-y-5" onSubmit={handleSubmit}>
+                <form className="space-y-5" onSubmit={handleSubmit} autoComplete="off">
                   {/* البريد الإلكتروني */}
                   <div>
                     <label htmlFor="email" className="mb-2 block text-sm font-semibold text-text-main">
@@ -145,7 +145,7 @@ export default function Login() {
                       <input
                         id="password"
                         name="password"
-                        type={showPassword ? 'text' : 'password'}
+                        type={showPassword ? 'text' : 'password'} autoComplete="off"
                         required
                         className="w-full rounded-2xl border border-border bg-white py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 ps-11 pe-11"
                         placeholder={t('auth.passwordPlaceholder')}

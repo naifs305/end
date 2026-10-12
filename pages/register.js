@@ -229,7 +229,7 @@ export default function Register() {
                       <div className="relative">
                         <Lock size={18} aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-text-soft start-3.5" />
                         <input
-                          type={showPassword ? 'text' : 'password'}
+                          type={showPassword ? 'text' : 'password'} autoComplete="off"
                           name="password"
                           required
                           value={form.password}
@@ -252,7 +252,7 @@ export default function Register() {
                       <div className="relative">
                         <Lock size={18} aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-text-soft start-3.5" />
                         <input
-                          type={showConfirm ? 'text' : 'password'}
+                          type={showConfirm ? 'text' : 'password'} autoComplete="off"
                           name="confirmPassword"
                           required
                           value={form.confirmPassword}
