@@ -42,5 +42,10 @@ prisma/migrations/dev/
 # بيانات النقل غير المضغوطة — يُرفع الأرشيف المضغوط وحده
 الملفات المساعدة/نقل البيانات/
 
+.env
+backups/
+*.dump
+.docker-compose.prev.yml
+
 # تقارير الفحص الأمني (سرية)
 *Vulnerability Scan*.pdf

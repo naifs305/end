@@ -1,0 +1,54 @@
+# =============================================================
+#  training/end — CI/CD
+#  Server : 172.16.8.17 (TrainingAppSrvr1-Prim)  —  Runner tag: training-8-17
+#  MR -> build only  |  default branch -> build -> deploy (manual) -> healthcheck -> auto-rollback
+# =============================================================
+
+stages:
+  - build
+  - deploy
+
+variables:
+  IMAGE_NAME: "training/end"
+  IMAGE_TAG: "$CI_COMMIT_SHORT_SHA"
+  DEPLOY_DIR: "/opt/training/end"
+  SERVICE_NAME: "web"
+  CONTAINER_NAME: "end-web"
+  HEALTH_URL: "http://127.0.0.1:8084/"
+  RUN_MIGRATIONS: "true"
+  DB_CONTAINER: "end-db"
+  DB_USER: "nauss"
+  DB_NAME: "end_db"
+  GIT_DEPTH: "20"
+
+default:
+  tags: [training-8-17]
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+build:
+  stage: build
+  script:
+    - docker build
+        --label "org.opencontainers.image.revision=$CI_COMMIT_SHA"
+        --label "org.opencontainers.image.source=$CI_PROJECT_URL"
+        -t "$IMAGE_NAME:$IMAGE_TAG" .
+    - |
+      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        docker rmi "$IMAGE_NAME:$IMAGE_TAG" || true
+      fi
+
+deploy_production:
+  stage: deploy
+  needs: [build]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  resource_group: end-production
+  environment:
+    name: production
+  script:
+    - bash scripts/deploy.sh

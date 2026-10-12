@@ -21,7 +21,7 @@ services:
 
   web:
     build: .
-    image: training/end:latest
+    image: training/end:${IMAGE_TAG:-latest}
     container_name: end-web
     env_file: .env                  # يتضمن LDAP_* و NODE_EXTRA_CA_CERTS
     ports:
