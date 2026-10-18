@@ -71,17 +71,32 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password, rememberMe) => {
-    const res = await api.post('/auth/login', { email, password });
+  const startSession = (data, rememberMe) => {
     const storage = rememberMe ? localStorage : sessionStorage;
 
-    storage.setItem('token', res.data.access_token);
+    storage.setItem('token', data.access_token);
 
-    const defaultRole = getDefaultRole(res.data.user.roles);
-    setUser(res.data.user);
+    const defaultRole = getDefaultRole(data.user.roles);
+    setUser(data.user);
     setActiveRole(defaultRole);
-    persistUserSession(res.data.user, defaultRole, rememberMe);
+    persistUserSession(data.user, defaultRole, rememberMe);
+  };
 
+  // عند تفعيل التحقق الثنائي يُرجع الخادم { mfaRequired, mfaToken } بلا جلسة
+  const login = async (email, password, rememberMe) => {
+    const res = await api.post('/auth/login', { email, password });
+    if (!res.data.mfaRequired) startSession(res.data, rememberMe);
+    return res.data;
+  };
+
+  const verifyOtp = async (mfaToken, code, rememberMe) => {
+    const res = await api.post('/auth/verify-otp', { mfaToken, code });
+    startSession(res.data, rememberMe);
+    return res.data;
+  };
+
+  const resendOtp = async (mfaToken) => {
+    const res = await api.post('/auth/resend-otp', { mfaToken });
     return res.data;
   };
 
@@ -123,6 +138,8 @@ export const AuthProvider = ({ children }) => {
         user,
         activeRole,
         login,
+        verifyOtp,
+        resendOtp,
         register,
         logout,
         switchRole,

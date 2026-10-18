@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import Image from 'next/image';
 import Head from 'next/head';
 import toast from 'react-hot-toast';
-import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, ArrowRight, RotateCw } from 'lucide-react';
 import { useTranslation } from '../lib/i18n';
 import LanguageSwitcher from '../components/layout/LanguageSwitcher';
 
@@ -14,7 +14,12 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  // التحقق الثنائي: تحدٍّ قائم بعد اجتياز كلمة المرور
+  const [mfa, setMfa] = useState(null);
+  const [otp, setOtp] = useState('');
+  const [resendIn, setResendIn] = useState(0);
+  const [resending, setResending] = useState(false);
+  const { login, verifyOtp, resendOtp } = useAuth();
   const router = useRouter();
   const { t, locale } = useTranslation();
 
@@ -30,7 +35,13 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password, remember);
+      const data = await login(email, password, remember);
+      if (data.mfaRequired) {
+        setPassword('');
+        startChallenge(data);
+        toast.success(t('auth.otpSent', { email: data.email }));
+        return;
+      }
       router.push('/');
     } catch (err) {
       const msg = err.response?.data?.message || t('auth.invalidCredentials');
@@ -39,6 +50,122 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (resendIn <= 0) return undefined;
+    const timer = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
+
+  function startChallenge(data) {
+    setMfa(data);
+    setOtp('');
+    setResendIn(data.resendCooldownSeconds || 60);
+  }
+
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      await verifyOtp(mfa.mfaToken, otp, remember);
+      router.push('/');
+    } catch (err) {
+      toast.error(err.response?.data?.message || t('auth.otpInvalid'));
+      if (err.response?.data?.code === 'serverErrors.auth.mfaSessionInvalid') setMfa(null);
+      else setOtp('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      const data = await resendOtp(mfa.mfaToken);
+      startChallenge(data);
+      toast.success(t('auth.otpSent', { email: data.email }));
+    } catch (err) {
+      toast.error(err.response?.data?.message || t('auth.otpResendFailed'));
+      if (err.response?.data?.code === 'serverErrors.auth.mfaSessionInvalid') setMfa(null);
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const otpForm = mfa && (
+    <>
+      <div className="mb-8 text-start">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <ShieldCheck size={24} aria-hidden="true" />
+        </div>
+        <h3 className="text-3xl font-extrabold text-text-main">{t('auth.otpTitle')}</h3>
+        <p className="mt-2 text-sm text-text-soft">
+          {t('auth.otpSubtitle', { minutes: mfa.expiresInMinutes })}{' '}
+          <span dir="ltr" className="font-semibold text-text-main">{mfa.email}</span>
+        </p>
+      </div>
+
+      <form className="space-y-5" onSubmit={handleVerify} autoComplete="off">
+        <div>
+          <label htmlFor="otp" className="mb-2 block text-sm font-semibold text-text-main">
+            {t('auth.otpLabel')}
+          </label>
+          <input
+            id="otp"
+            name="otp"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]{6}"
+            maxLength={6}
+            required
+            autoFocus
+            dir="ltr"
+            className="w-full rounded-2xl border border-border bg-white py-3 text-center font-mono text-2xl tracking-[0.5em] text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+            placeholder="000000"
+            value={otp}
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading || otp.length !== 6}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {loading ? (
+            t('auth.otpVerifying')
+          ) : (
+            <>
+              <ShieldCheck size={18} aria-hidden="true" />
+              {t('auth.otpVerify')}
+            </>
+          )}
+        </button>
+
+        <div className="flex items-center justify-between text-sm">
+          <button
+            type="button"
+            onClick={() => setMfa(null)}
+            className="inline-flex items-center gap-1.5 font-semibold text-text-soft transition hover:text-primary"
+          >
+            <ArrowRight size={16} aria-hidden="true" className={locale === 'en' ? 'rotate-180' : ''} />
+            {t('auth.otpBack')}
+          </button>
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={resending || resendIn > 0}
+            className="inline-flex items-center gap-1.5 font-semibold text-primary transition hover:text-primary-dark disabled:cursor-not-allowed disabled:text-text-soft"
+          >
+            <RotateCw size={16} aria-hidden="true" />
+            {resendIn > 0 ? t('auth.otpResendIn', { seconds: resendIn }) : t('auth.otpResend')}
+          </button>
+        </div>
+      </form>
+    </>
+  );
 
   return (
     <>
@@ -100,6 +227,8 @@ export default function Login() {
                   <p className="mt-2 text-sm text-text-soft">{t('common.university')}</p>
                 </div>
 
+                {otpForm || (
+                <>
                 <div className="mb-8 text-start">
                   <h3 className="text-3xl font-extrabold text-text-main">{t('auth.loginTitle')}</h3>
                   <p className="mt-2 text-sm text-text-soft">{t('auth.loginSubtitle')}</p>
@@ -192,6 +321,8 @@ export default function Login() {
                     )}
                   </button>
                 </form>
+                </>
+                )}
               </div>
             </div>
           </div>

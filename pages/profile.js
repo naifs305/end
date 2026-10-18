@@ -5,10 +5,11 @@ import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
 import { isAcceptableImageFile, normalizeImageFile } from '../lib/clientImage';
-import { Upload, Trash2, Save, KeyRound, Mail, MailCheck, User } from 'lucide-react';
+import { Upload, Trash2, Save, KeyRound, Mail, MailCheck, User, ShieldCheck } from 'lucide-react';
 import { useTranslation } from '../lib/i18n';
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB
+const MFA_DEFAULT_FROM = 'bisaa@nauss.edu.sa';
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -40,8 +41,41 @@ export default function Profile() {
   const [testSending, setTestSending] = useState(false);
   const isManager = (user?.roles || []).includes('MANAGER');
 
+  // التحقق الثنائي عبر البريد — إعدادات النظام (للمدير فقط)
+  const [mfaEnabled, setMfaEnabled] = useState(true);
+  const [mfaFrom, setMfaFrom] = useState('');
+  const [mfaSaving, setMfaSaving] = useState(false);
+
   const profileInputRef = useRef(null);
   const signatureInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!isManager) return;
+    api.get('/settings')
+      .then((res) => {
+        const s = res.data || {};
+        setMfaEnabled(String(s['auth.mfa.enabled'] ?? 'true').toLowerCase() !== 'false');
+        setMfaFrom(s['auth.mfa.from'] || MFA_DEFAULT_FROM);
+      })
+      .catch(() => setMfaFrom(MFA_DEFAULT_FROM));
+  }, [isManager]);
+
+  const handleSaveMfa = async () => {
+    const from = mfaFrom.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from)) return toast.error(t('profile.mfaFromInvalid'));
+    setMfaSaving(true);
+    try {
+      await api.put('/settings', [
+        { key: 'auth.mfa.enabled', value: mfaEnabled ? 'true' : 'false', category: 'auth', label: 'تفعيل التحقق الثنائي عبر البريد' },
+        { key: 'auth.mfa.from', value: from, category: 'auth', label: 'بريد مُرسِل رموز التحقق' },
+      ]);
+      toast.success(t('profile.mfaSaved'));
+    } catch (err) {
+      toast.error(err.response?.data?.message || t('profile.mfaSaveFailed'));
+    } finally {
+      setMfaSaving(false);
+    }
+  };
 
   useEffect(() => {
     api.get('/profile')
@@ -416,6 +450,52 @@ export default function Profile() {
                     )}
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* التحقق الثنائي عبر البريد — للمدير فقط */}
+            {isManager && (
+              <div className="space-y-4 rounded-3xl border border-border bg-white p-5 sm:p-6">
+                <h2 className="flex items-center gap-2 text-lg font-extrabold text-text-main">
+                  <ShieldCheck size={20} aria-hidden="true" className="text-primary" /> {t('profile.mfaTitle')}
+                </h2>
+                <p className="text-sm text-text-soft">{t('profile.mfaDescription')}</p>
+
+                <label className="flex items-center gap-3 text-sm font-semibold text-text-main">
+                  <input
+                    type="checkbox"
+                    checked={mfaEnabled}
+                    onChange={(e) => setMfaEnabled(e.target.checked)}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  />
+                  {t('profile.mfaEnabled')}
+                </label>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex-1">
+                    <label className={labelClass}>{t('profile.mfaFrom')}</label>
+                    <div className="relative">
+                      <Mail size={18} aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-text-soft start-3.5" />
+                      <input
+                        type="email"
+                        value={mfaFrom}
+                        onChange={(e) => setMfaFrom(e.target.value)}
+                        placeholder={MFA_DEFAULT_FROM}
+                        dir="ltr"
+                        className="w-full rounded-2xl border border-border bg-white py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 ps-11 pe-4 text-start"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSaveMfa}
+                    disabled={mfaSaving}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
+                  >
+                    <Save size={16} aria-hidden="true" /> {mfaSaving ? t('common.saving') : t('profile.mfaSave')}
+                  </button>
+                </div>
+                <p className="text-xs text-text-soft">{t('profile.mfaFromHint')}</p>
               </div>
             )}
           </>
