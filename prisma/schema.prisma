@@ -105,6 +105,10 @@ model User {
   resetToken           String?
   resetTokenExpiry     DateTime?
   tokenVersion         Int      @default(0)
+  // التحقق الثنائي عبر البريد — رمز OTP مُجزّأ + انتهاء + محاولات خاطئة
+  otpHash              String?
+  otpExpiry            DateTime?
+  otpAttempts          Int      @default(0)
 
   primaryCourses       Course[]                @relation("PrimaryResponsible")
   supportingCourses    CourseSupport[]         @relation("SupportingMember")

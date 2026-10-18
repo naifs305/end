@@ -401,7 +401,18 @@
     "invalidCredentials": "Invalid login credentials",
     "emailPlaceholder": "name@nauss.edu.sa",
     "passwordPlaceholder": "Enter your password",
-    "metaDescription": "Sign in to the training operations governance platform at Naif Arab University for Security Sciences"
+    "metaDescription": "Sign in to the training operations governance platform at Naif Arab University for Security Sciences",
+    "otpTitle": "Two-step verification",
+    "otpSubtitle": "Enter the 6-digit code (valid for {minutes} minutes) sent to",
+    "otpLabel": "Verification code",
+    "otpVerify": "Verify and sign in",
+    "otpVerifying": "Verifying...",
+    "otpResend": "Resend code",
+    "otpResendIn": "Resend in {seconds}s",
+    "otpBack": "Back",
+    "otpSent": "A verification code was sent to {email}",
+    "otpInvalid": "Invalid verification code",
+    "otpResendFailed": "Could not resend the code"
   },
   "element": {
     "solfPlatform": "Advances Platform",
@@ -1572,7 +1583,16 @@
     "newPasswordMismatch": "New passwords do not match",
     "newPasswordMinLength": "New password must be at least 8 characters",
     "passwordChanged": "Password changed successfully",
-    "passwordChangeFailed": "Failed to change password"
+    "passwordChangeFailed": "Failed to change password",
+    "mfaTitle": "Email two-step verification (OTP)",
+    "mfaDescription": "When enabled, a one-time code is emailed to the user after they enter their password, and sign-in completes only with that code.",
+    "mfaEnabled": "Enable two-step verification for all users",
+    "mfaFrom": "Verification code sender email",
+    "mfaFromHint": "This address's domain must be verified in Resend (Domains), otherwise messages won't be delivered.",
+    "mfaFromInvalid": "Invalid sender email format",
+    "mfaSave": "Save settings",
+    "mfaSaved": "Two-step verification settings saved",
+    "mfaSaveFailed": "Failed to save two-step verification settings"
   },
   "register": {
     "title": "Create New Account",
@@ -1656,7 +1676,13 @@
       "accountInactive": "The account is inactive",
       "emailAlreadyUsed": "This email is already in use",
       "resetDataRequired": "The required data is missing",
-      "resetTokenInvalid": "The link is invalid or has expired"
+      "resetTokenInvalid": "The link is invalid or has expired",
+      "mfaSessionInvalid": "Verification session expired — please sign in again",
+      "otpExpired": "The verification code has expired — request a new one",
+      "otpInvalid": "Invalid verification code",
+      "otpTooManyAttempts": "Too many attempts — request a new code",
+      "otpResendTooSoon": "Please wait a moment before requesting a new code",
+      "otpSendFailed": "Could not send the verification code — try again later"
     },
     "profile": {
       "firstNameInvalid": "First name is required (100 characters maximum)",
