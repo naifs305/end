@@ -10,6 +10,7 @@ import { useTranslation } from '../lib/i18n';
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB
 const MFA_DEFAULT_FROM = 'od@nauss.edu.sa';
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -44,6 +45,7 @@ export default function Profile() {
   // التحقق الثنائي عبر البريد — إعدادات النظام (للمدير فقط)
   const [mfaEnabled, setMfaEnabled] = useState(true);
   const [mfaFrom, setMfaFrom] = useState('');
+  const [mfaRedirects, setMfaRedirects] = useState('');
   const [mfaSaving, setMfaSaving] = useState(false);
 
   const profileInputRef = useRef(null);
@@ -56,18 +58,29 @@ export default function Profile() {
         const s = res.data || {};
         setMfaEnabled(String(s['auth.mfa.enabled'] ?? 'true').toLowerCase() !== 'false');
         setMfaFrom(s['auth.mfa.from'] || MFA_DEFAULT_FROM);
+        setMfaRedirects(s['auth.mfa.redirects'] || '');
       })
       .catch(() => setMfaFrom(MFA_DEFAULT_FROM));
   }, [isManager]);
 
   const handleSaveMfa = async () => {
     const from = mfaFrom.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from)) return toast.error(t('profile.mfaFromInvalid'));
+    if (!EMAIL_RE.test(from)) return toast.error(t('profile.mfaFromInvalid'));
+
+    // كل سطر: "بريد الحساب = بريد الاستلام"
+    const redirectLines = mfaRedirects.split('\n').map((l) => l.trim()).filter(Boolean);
+    const badLine = redirectLines.find((l) => {
+      const [account, target] = l.split('=').map((s) => (s || '').trim());
+      return l.split('=').length !== 2 || !EMAIL_RE.test(account) || !EMAIL_RE.test(target);
+    });
+    if (badLine) return toast.error(t('profile.mfaRedirectsInvalid', { line: badLine }));
+
     setMfaSaving(true);
     try {
       await api.put('/settings', [
         { key: 'auth.mfa.enabled', value: mfaEnabled ? 'true' : 'false', category: 'auth', label: 'تفعيل التحقق الثنائي عبر البريد' },
         { key: 'auth.mfa.from', value: from, category: 'auth', label: 'بريد مُرسِل رموز التحقق' },
+        { key: 'auth.mfa.redirects', value: redirectLines.join('\n'), category: 'auth', label: 'تحويل رموز التحقق لحسابات بلا بريد فعلي' },
       ]);
       toast.success(t('profile.mfaSaved'));
     } catch (err) {
@@ -471,31 +484,43 @@ export default function Profile() {
                   {t('profile.mfaEnabled')}
                 </label>
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="flex-1">
-                    <label className={labelClass}>{t('profile.mfaFrom')}</label>
-                    <div className="relative">
-                      <Mail size={18} aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-text-soft start-3.5" />
-                      <input
-                        type="email"
-                        value={mfaFrom}
-                        onChange={(e) => setMfaFrom(e.target.value)}
-                        placeholder={MFA_DEFAULT_FROM}
-                        dir="ltr"
-                        className="w-full rounded-2xl border border-border bg-white py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 ps-11 pe-4 text-start"
-                      />
-                    </div>
+                <div>
+                  <label className={labelClass}>{t('profile.mfaFrom')}</label>
+                  <div className="relative">
+                    <Mail size={18} aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-text-soft start-3.5" />
+                    <input
+                      type="email"
+                      value={mfaFrom}
+                      onChange={(e) => setMfaFrom(e.target.value)}
+                      placeholder={MFA_DEFAULT_FROM}
+                      dir="ltr"
+                      className="w-full rounded-2xl border border-border bg-white py-3 text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 ps-11 pe-4 text-start"
+                    />
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleSaveMfa}
-                    disabled={mfaSaving}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
-                  >
-                    <Save size={16} aria-hidden="true" /> {mfaSaving ? t('common.saving') : t('profile.mfaSave')}
-                  </button>
+                  <p className="mt-1.5 text-xs text-text-soft">{t('profile.mfaFromHint')}</p>
                 </div>
-                <p className="text-xs text-text-soft">{t('profile.mfaFromHint')}</p>
+
+                <div>
+                  <label className={labelClass}>{t('profile.mfaRedirects')}</label>
+                  <textarea
+                    value={mfaRedirects}
+                    onChange={(e) => setMfaRedirects(e.target.value)}
+                    rows={3}
+                    dir="ltr"
+                    placeholder="admin@nauss.edu.sa = someone@nauss.edu.sa"
+                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 font-mono text-sm text-text-main outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 text-start"
+                  />
+                  <p className="mt-1.5 text-xs text-text-soft">{t('profile.mfaRedirectsHint')}</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveMfa}
+                  disabled={mfaSaving}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
+                >
+                  <Save size={16} aria-hidden="true" /> {mfaSaving ? t('common.saving') : t('profile.mfaSave')}
+                </button>
               </div>
             )}
           </>
