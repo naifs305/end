@@ -1588,7 +1588,7 @@
     "mfaDescription": "When enabled, a one-time code is emailed to the user after they enter their password, and sign-in completes only with that code.",
     "mfaEnabled": "Enable two-step verification for all users",
     "mfaFrom": "Verification code sender email",
-    "mfaFromHint": "This address's domain must be verified in Resend (Domains), otherwise messages won't be delivered.",
+    "mfaFromHint": "The Microsoft 365 app must be allowed to send as this mailbox (Mail.Send), otherwise messages won't be delivered.",
     "mfaFromInvalid": "Invalid sender email format",
     "mfaSave": "Save settings",
     "mfaSaved": "Two-step verification settings saved",
