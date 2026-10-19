@@ -9,7 +9,7 @@ import { Upload, Trash2, Save, KeyRound, Mail, MailCheck, User, ShieldCheck } fr
 import { useTranslation } from '../lib/i18n';
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB
-const MFA_DEFAULT_FROM = 'bisaa@nauss.edu.sa';
+const MFA_DEFAULT_FROM = 'od@nauss.edu.sa';
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
