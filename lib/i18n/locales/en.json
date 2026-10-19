@@ -1592,7 +1592,10 @@
     "mfaFromInvalid": "Invalid sender email format",
     "mfaSave": "Save settings",
     "mfaSaved": "Two-step verification settings saved",
-    "mfaSaveFailed": "Failed to save two-step verification settings"
+    "mfaSaveFailed": "Failed to save two-step verification settings",
+    "mfaRedirects": "Code delivery redirects (for accounts without a real mailbox)",
+    "mfaRedirectsHint": "One line per account: account email = email that receives the code. For example, the system admin account has no real mailbox, so its code goes to a real one and two-step verification still applies.",
+    "mfaRedirectsInvalid": "Invalid redirect line: {line}"
   },
   "register": {
     "title": "Create New Account",
