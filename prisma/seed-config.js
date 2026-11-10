@@ -83,7 +83,7 @@ const SETTINGS = [
   { key: 'report.email.cc', value: process.env.REPORT_EMAIL_CC || 'NALSHAHRANI@NAUSS.EDU.SA', category: 'email', label: 'نسخة إلى (CC)' },
   { key: 'email.from', value: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev', category: 'email', label: 'البريد المُرسِل' },
   { key: 'kpi.officialStart', value: process.env.OFFICIAL_KPI_START || '2026-06', category: 'kpi', label: 'بداية احتساب الأداء (YYYY-MM)' },
-  { key: 'solf.url', value: process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-nif.vercel.app', category: 'integration', label: 'رابط منصة السلف' },
+  { key: 'solf.url', value: process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-training.nauss.edu.sa', category: 'integration', label: 'رابط منصة السلف' },
 ];
 
 async function main() {

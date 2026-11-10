@@ -48,7 +48,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const isClosingReport = element?.element?.key === 'closing_report';
   const isCourseReport = isOpeningReport || isClosingReport;
   const [showReportForm, setShowReportForm] = useState(false);
-  const solfUrl = getSetting('solf.url', process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-nif.vercel.app');
+  const solfUrl = getSetting('solf.url', process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-training.nauss.edu.sa');
 
   // ── نموذج التأمين الطبي ──
   const [showInsuranceForm, setShowInsuranceForm] = useState(false);
