@@ -84,6 +84,11 @@ const SETTINGS = [
   { key: 'email.from', value: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev', category: 'email', label: 'البريد المُرسِل' },
   { key: 'kpi.officialStart', value: process.env.OFFICIAL_KPI_START || '2026-06', category: 'kpi', label: 'بداية احتساب الأداء (YYYY-MM)' },
   { key: 'solf.url', value: process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-nif.vercel.app', category: 'integration', label: 'رابط منصة السلف' },
+  // ── بلاغات العوائق ──
+  { key: 'blockers.quarterQuota', value: process.env.BLOCKER_QUARTER_QUOTA || '3', category: 'blockers', label: 'رصيد المنسق من بلاغات العوائق في الفصل' },
+  { key: 'blockers.partyDirectory', value: '', category: 'blockers', label: 'عناوين الجهات المنتظَرة (سطر لكل جهة: الاسم = البريد)' },
+  // ── الإدخال المتأخر للدورة ──
+  { key: 'course.entryLeadHours', value: process.env.COURSE_ENTRY_LEAD_HOURS || '72', category: 'courses', label: 'المهلة المطلوبة لإدخال الدورة قبل بدايتها (ساعة)' },
 ];
 
 async function main() {
