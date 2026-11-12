@@ -22,6 +22,7 @@ import { useTranslation } from '../../lib/i18n';
 import { useSettings } from '../../lib/hooks/useSettings';
 import CourseReportForm from './CourseReportForm';
 import ReasonModal from './ReasonModal';
+import BlockerPanel from './BlockerPanel';
 
 // ======================================================================
 // مكون صف عنصر الإقفال
@@ -351,6 +352,9 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               </button>
             )}
           </div>
+
+          {/* بلاغ العائق — يُرفع والمنسق منتظر، لا بعد فوات الموعد */}
+          <BlockerPanel element={element} canAct={canExecute} onUpdate={onUpdate} />
 
           {showDelayReason && (
             <div className="w-full rounded-xl border border-sand/40 bg-sand/10 p-2">

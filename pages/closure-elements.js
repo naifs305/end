@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { Plus } from 'lucide-react';
 import MainLayout from '../components/layout/MainLayout';
 import ConfirmModal from '../components/operational/ConfirmModal';
+import ElementSuspensions from '../components/operational/ElementSuspensions';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
 import { useTranslation } from '../lib/i18n';
@@ -211,6 +212,12 @@ export default function ClosureElementsPage() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* فترات الإيقاف المؤسسي — التعطيل من الكتالوج يسري على الدورات
+          الجديدة وحدها، أما الفترة بتاريخ فتسري على المفتوحة أيضاً */}
+      <div className="mt-4">
+        <ElementSuspensions elements={elements} />
       </div>
 
       <ConfirmModal

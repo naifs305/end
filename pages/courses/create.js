@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import DatePicker from 'react-datepicker';
-import { Calendar, X, ClipboardList, Settings, ArrowLeft, Plus, Star, Check, Sparkles } from 'lucide-react';
+import { Calendar, X, ClipboardList, Settings, ArrowLeft, Plus, Star, Check, Sparkles, AlertTriangle } from 'lucide-react';
 import MainLayout from '../../components/layout/MainLayout';
 import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
@@ -22,6 +22,7 @@ const EMPTY = {
   requiresRevenue: false, materialsIssued: false,
   requiresSupervisorCompensation: false, requiresTrainerCompensation: false,
   requiresPreTest: false, requiresPostTest: false,
+  lateEntryReason: '',
 };
 
 const DateInput = forwardRef(function DateInput({ startDate, endDate, onClick, onClear }, ref) {
@@ -130,10 +131,25 @@ export default function CreateCoursePage() {
   const isCrossProject =
     user && form.operationalProjectId && user.operationalProjectId && form.operationalProjectId !== user.operationalProjectId;
 
+  // ── الإدخال المتأخر ──────────────────────────────────────────────
+  // المنصة لا تمنع إدخال دورة متأخرة أبداً — المنع يعني ضياع الدورة من
+  // السجل كله. لكنها تقيس التأخير وتطلب مبرراً إلزامياً يبتّ فيه المدير.
+  const LEAD_HOURS = 72; // أبكر عنصر: تسجيل المتدربين قبل البداية بـ٧٢ ساعة
+  // لحظة فتح النموذج — ثابتة طوال الجلسة حتى يبقى الحساب مستقرّاً
+  const [openedAt] = useState(() => Date.now());
+  const lateness = useMemo(() => {
+    if (!form.startDate) return { isLate: false, days: 0 };
+    const expectedBy = new Date(form.startDate).getTime() - LEAD_HOURS * 3600000;
+    const hours = (openedAt - expectedBy) / 3600000;
+    return { isLate: hours > 0, days: Math.max(0, Math.round(hours / 24)) };
+  }, [form.startDate, openedAt]);
+
   const canSubmit = useMemo(
     () =>
-      form.name.trim() && form.operationalProjectId && form.locationType && form.city.trim() && form.startDate && form.endDate && form.numTrainees && Number(form.numTrainees) > 0,
-    [form]
+      form.name.trim() && form.operationalProjectId && form.locationType && form.city.trim()
+      && form.startDate && form.endDate && form.numTrainees && Number(form.numTrainees) > 0
+      && (!lateness.isLate || form.lateEntryReason.trim().length >= 10),
+    [form, lateness.isLate]
   );
 
   const handleSubmit = async (e) => {
@@ -168,6 +184,7 @@ export default function CreateCoursePage() {
         requiresPreTest: form.requiresPreTest,
         requiresPostTest: form.requiresPostTest,
         isCrossProject: isCrossProject || false,
+        ...(lateness.isLate ? { lateEntryReason: form.lateEntryReason.trim() } : {}),
       };
       const res = await api.post('/courses', payload);
       toast.success(t('course.form.createdSuccess'));
@@ -278,6 +295,35 @@ export default function CreateCoursePage() {
                 <input type="number" min="1" value={form.numTrainees} onChange={(e) => set('numTrainees', e.target.value)} required placeholder={t('course.form.numTraineesPlaceholder')} className={inputCls} />
               </Field>
             </div>
+
+            {/* الإدخال المتأخر — الدورة تُضاف في كل حال، والمبرر إلزامي */}
+            {lateness.isLate && (
+              <div className="mt-4 rounded-xl border border-sand/50 bg-sand/10 p-4">
+                <p className="flex items-center gap-2 text-sm font-extrabold text-warning">
+                  <AlertTriangle size={16} aria-hidden="true" />
+                  هذه الدورة تُدخَل متأخرة بـ{lateness.days} يوم
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-text-soft">
+                  الدورة ستُضاف على كل حال — لا نمنع الإدخال أبداً. لكن التأخير
+                  مسجّل، ويُعرض المبرر على المدير: إن قبله فلا تُسجَّل عليك ملاحظة
+                  ولا تُحتسب العناصر التي فات موعدها قبل الإدخال، وإن رفضه تُسجَّل
+                  نقطة على الانضباط.
+                </p>
+                <textarea
+                  value={form.lateEntryReason}
+                  onChange={(e) => set('lateEntryReason', e.target.value)}
+                  rows={3}
+                  maxLength={600}
+                  placeholder="ما سبب تأخر إدخال الدورة؟ اذكر التفصيل — هذا ما سيراه المدير."
+                  className="mt-3 w-full resize-none rounded-lg border border-sand/40 bg-white p-2.5 text-sm text-text-main outline-none focus:border-primary"
+                />
+                <p className="mt-1 text-end text-[11px] text-text-soft">
+                  {form.lateEntryReason.trim().length < 10
+                    ? 'المبرر مطلوب (10 أحرف على الأقل)'
+                    : `${form.lateEntryReason.length}/600`}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl border border-border bg-white p-5 shadow-card">

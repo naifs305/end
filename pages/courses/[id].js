@@ -14,6 +14,10 @@ import {
   Pencil,
   ArrowLeft,
   Undo2,
+  Clock,
+  CalendarClock,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
@@ -85,6 +89,138 @@ function Badge({ label, cls, small }) {
 
 function YesNo({ value }) {
   return value ? <Check size={14} className="text-accent" aria-hidden="true" /> : <Minus size={14} className="text-text-soft/50" aria-hidden="true" />;
+}
+
+// ======================================================================
+// بطاقة الإدخال المتأخر
+// ----------------------------------------------------------------------
+// التأخير قاسته المنصة بنفسها، فلا نقاش فيه. والمعروض للقرار هو
+// المبرر وحده — والدورة مضافة في كل حال.
+// ======================================================================
+function LateEntryCard({ course, isManager, onDecided }) {
+  const [busy, setBusy] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [note, setNote] = useState('');
+
+  const days = Math.max(0, Math.round((course.lateEntryHours || 0) / 24));
+  const status = course.lateEntryStatus;
+
+  async function decide(accept) {
+    if (!accept && note.trim().length < 5) {
+      toast.error('اكتب سبب الرفض');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/courses/${course.id}/late-entry-decision`, { accept, note: note.trim() });
+      toast.success(accept ? 'قُبل المبرر — لا ملاحظة على المنسق' : 'رُفض المبرر — سُجّلت نقطة');
+      setRejectOpen(false);
+      setNote('');
+      onDecided?.();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذّر حفظ القرار');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const tone = status === 'ACCEPTED'
+    ? 'border-accent/30 bg-accent/5'
+    : status === 'REJECTED'
+      ? 'border-burgundy/30 bg-burgundy/5'
+      : 'border-sand/50 bg-sand/10';
+
+  return (
+    <div className={`rounded-2xl border p-4 shadow-card ${tone}`}>
+      <div className="flex items-start gap-3">
+        <CalendarClock size={22} aria-hidden="true" className="shrink-0 text-warning" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-extrabold text-text-main">
+            أُدخلت هذه الدورة متأخرة بـ{days} يوم
+            {status === 'ACCEPTED' && <span className="text-accent"> — قُبل المبرر</span>}
+            {status === 'REJECTED' && <span className="text-danger"> — رُفض المبرر</span>}
+            {status === 'PENDING' && <span className="text-warning"> — بانتظار قرار المدير</span>}
+          </p>
+
+          {course.lateEntryReason && (
+            <p className="mt-1.5 text-xs leading-relaxed text-text-main">
+              <span className="font-bold text-text-soft">مبرر المنسق:</span> {course.lateEntryReason}
+            </p>
+          )}
+
+          {course.lateEntryDecisionNote && (
+            <p className="mt-1 text-xs leading-relaxed text-text-soft">
+              <span className="font-bold">قرار المدير:</span> {course.lateEntryDecisionNote}
+            </p>
+          )}
+
+          {status === 'ACCEPTED' && (
+            <p className="mt-2 text-[11px] text-accent">
+              العناصر التي فات موعدها قبل الإدخال لا تُحتسب في توقيت المنسق.
+            </p>
+          )}
+          {status === 'REJECTED' && (
+            <p className="mt-2 text-[11px] text-danger">
+              المواعيد محتسبة من تواريخ الدورة الأصلية، ونقطة متدرّجة على الانضباط.
+            </p>
+          )}
+
+          {isManager && status === 'PENDING' && (
+            <div className="mt-3">
+              {!rejectOpen ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => decide(true)}
+                    disabled={busy}
+                    className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    <ThumbsUp size={14} aria-hidden="true" /> قبول المبرر
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRejectOpen(true)}
+                    disabled={busy}
+                    className="flex items-center gap-1.5 rounded-xl border border-burgundy/30 bg-white px-3 py-2 text-xs font-bold text-danger transition hover:bg-burgundy/5 disabled:opacity-50"
+                  >
+                    <ThumbsDown size={14} aria-hidden="true" /> رفض وتسجيل نقطة
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={2}
+                    maxLength={600}
+                    placeholder="سبب رفض المبرر — يصل المنسق"
+                    className="w-full resize-none rounded-lg border border-sand/40 bg-white p-2 text-xs text-text-main outline-none focus:border-primary"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => decide(false)}
+                      disabled={busy}
+                      className="rounded-xl bg-danger px-3 py-2 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                    >
+                      تأكيد الرفض
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setRejectOpen(false); setNote(''); }}
+                      className="rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-text-soft"
+                    >
+                      إلغاء
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function CourseDetail() {
@@ -344,6 +480,17 @@ export default function CourseDetail() {
                   <AlertTriangle size={11} aria-hidden="true" /> {t('courseDetail.overdue')}
                 </span>
               )}
+              {/* الموقوف ببلاغ عائق ليس متأخراً — صاحبه أبلغ قبل الموعد */}
+              {isPaused(el) && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-sand/50 bg-sand/20 px-2 py-0.5 text-[10px] font-bold text-warning">
+                  <Clock size={11} aria-hidden="true" /> الساعة متوقفة — بلاغ عائق
+                </span>
+              )}
+              {el.deadlines?.excludedFromTiming && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-bold text-text-soft">
+                  غير محتسب — فات موعده قبل إدخال الدورة
+                </span>
+              )}
               {hasExt && (
                 <span className="inline-flex rounded-full border border-primary/20 bg-primary-light px-2 py-0.5 text-[10px] font-bold text-primary">
                   {t('courseDetail.extensionBadge', { hours: el.extensionHours })}
@@ -471,6 +618,15 @@ export default function CourseDetail() {
   return (
     <MainLayout breadcrumb={[{ label: t('nav.courses'), href: '/courses' }, { label: course.name }]}>
       <div className="space-y-4">
+        {/* الإدخال المتأخر — مسجّل آلياً، وقراره للمدير */}
+        {course.isLateEntry && (
+          <LateEntryCard
+            course={course}
+            isManager={activeRole === 'MANAGER'}
+            onDecided={fetchCourse}
+          />
+        )}
+
         {/* بانر الإنذارات الحرجة */}
         {criticalOverdue.length > 0 && (
           <div className={`rounded-2xl border p-4 shadow-card ${settlementOverdue ? 'border-danger/40 bg-danger/5' : 'border-burgundy/30 bg-burgundy/5'}`}>
