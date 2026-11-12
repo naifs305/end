@@ -74,6 +74,41 @@ enum ChallengeStatus {
   CANCELLED
 }
 
+// =============================================================
+// بلاغات العوائق — سبب التأخر المُعلن مسبقاً
+// -------------------------------------------------------------
+// يرفع المنسق البلاغ وهو منتظر، فتتوقف ساعة العنصر من لحظة
+// الرفع لا من تاريخ يكتبه بيده. والبلاغ المرفوع بعد فوات
+// الموعد لا يؤجّله — وبهذا يُسدّ باب الادّعاء بأثر رجعي.
+// =============================================================
+enum BlockerReason {
+  TRAINER_GRADES       // تأخر تسجيل الدرجات من المدرب
+  TRAINEE_NAMES        // تأخر استلام أسماء المتدربين
+  INSURANCE_SUSPENDED  // إيقاف إصدار التأمين الطبي
+  FINANCE_PENDING      // بانتظار إجراء مالي
+  BENEFICIARY_PENDING  // بانتظار الجهة المستفيدة
+  OTHER
+}
+
+enum BlockerStatus {
+  OPEN       // العائق قائم والساعة متوقفة
+  RESOLVED   // انتهى العائق وعادت الساعة
+  CANCELLED  // سحبه المنسق — لا يُحتسب
+}
+
+enum BlockerCredit {
+  AUTO_APPROVED           // تحت السقف الفصلي — يسري تلقائياً
+  QUOTA_EXCEEDED_PENDING  // تجاوز السقف — بانتظار قرار المدير
+  MANAGER_APPROVED        // اعتمده المدير بعد تجاوز السقف
+  MANAGER_REJECTED        // رفضه المدير — العقوبة قائمة
+}
+
+enum LateEntryStatus {
+  PENDING   // بانتظار نظر المدير
+  ACCEPTED  // مبرر مقبول — لا ملاحظة على المنسق
+  REJECTED  // مبرر مرفوض — تُسجّل نقطة والدورة تبقى
+}
+
 model OperationalProject {
   id          String   @id @default(uuid())
   name        String   @unique
@@ -142,6 +177,12 @@ model User {
   reviewedIdeas        ImprovementIdea[]          @relation("IdeaReviewer")
   ideaSupports         IdeaSupport[]              @relation("IdeaSupportUser")
   pledges              MonthlyPledge[]            @relation("PledgeUser")
+
+  // ----- بلاغات العوائق وفترات الإيقاف والإدخال المتأخر -----
+  raisedBlockers       ElementBlocker[]           @relation("BlockerRaiser")
+  decidedBlockers      ElementBlocker[]           @relation("BlockerDecider")
+  createdSuspensions   ElementSuspension[]        @relation("SuspensionCreator")
+  lateEntryDecisions   Course[]                   @relation("LateEntryDecider")
 }
 
 // =============================================================
@@ -205,6 +246,21 @@ model Course {
   fieldReports                   FieldReport[]
   auditLogs                      AuditLog[]
   messages                       Message[]
+  blockers                       ElementBlocker[]
+
+  // ----- الإدخال المتأخر للدورة -----
+  // المنصة تكتشف التأخير بنفسها (مقارنة لحظة الإدخال بتواريخ الدورة)
+  // فلا يستطيع المنسق الكذب فيه. والمبرر وحده هو ما ينظر فيه المدير.
+  isLateEntry                    Boolean          @default(false)
+  lateEntryHours                 Int?             // مقدار التأخير بالساعات — للتدريج
+  lateEntryReason                String?          // مبرر المنسق (إلزامي عند التأخر)
+  lateEntryStatus                LateEntryStatus?
+  lateEntryDecidedById           String?
+  lateEntryDecidedBy             User?            @relation("LateEntryDecider", fields: [lateEntryDecidedById], references: [id], onDelete: SetNull)
+  lateEntryDecidedAt             DateTime?
+  lateEntryDecisionNote          String?
+  // لحظة إدخال الدورة — مرجع استثناء العناصر التي فات موعدها قبلها
+  entryBaselineAt                DateTime?
 
   createdAt                      DateTime @default(now())
   updatedAt                      DateTime @updatedAt
@@ -214,6 +270,7 @@ model Course {
   @@index([operationalProjectId])
   @@index([primaryEmployeeId])
   @@index([status])
+  @@index([isLateEntry, lateEntryStatus])
 }
 
 // تقارير اختيارية — متعددة لكل دورة, لا تؤثر على KPI سلباً
@@ -277,6 +334,36 @@ model ClosureElement {
   createdAt              DateTime @default(now())
 
   courseClosureTrackings CourseClosureTracking[]
+  suspensions            ElementSuspension[]
+}
+
+// =============================================================
+// فترات إيقاف عنصر إقفال — قرار مؤسسي بتاريخ
+// -------------------------------------------------------------
+// مثال: إيقاف إصدار التأمين الطبي من تاريخ كذا إلى إشعار آخر.
+// كل دورة تبدأ داخل الفترة يسقط عنها العنصر تلقائياً ولا يُحتسب،
+// والدورات المفتوحة حالياً تُحدَّث معها. والمنسق لا يفعل شيئاً —
+// فلا نسيان ولا خطأ ولا تلاعب، والسجل يبيّن سبب السقوط بعد سنوات.
+// =============================================================
+model ElementSuspension {
+  id          String   @id @default(uuid())
+  elementId   String
+  element     ClosureElement @relation(fields: [elementId], references: [id], onDelete: Cascade)
+
+  startsAt    DateTime
+  endsAt      DateTime?  // فارغ = إلى إشعار آخر
+  reason      String
+  isActive    Boolean  @default(true)
+
+  createdById String?
+  createdBy   User?    @relation("SuspensionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trackings   CourseClosureTracking[]
+
+  @@index([elementId, isActive])
+  @@index([startsAt, endsAt])
 }
 
 model CourseClosureTracking {
@@ -310,6 +397,14 @@ model CourseClosureTracking {
   overriddenById       String?
   overriddenBy         User?     @relation("ElementOverrider", fields: [overriddenById], references: [id], onDelete: SetNull)
 
+  // سقوط العنصر بفترة إيقاف مؤسسية (لا بإعفاء يدوي من المدير)
+  // نحتفظ بالمرجع لنعيد العنصر وحده عند انتهاء الإيقاف، بلا أن
+  // نمسّ ما أعفاه المدير بقراره.
+  suspensionId    String?
+  suspension      ElementSuspension? @relation(fields: [suspensionId], references: [id], onDelete: SetNull)
+
+  blockers        ElementBlocker[]
+
   course          Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   element         ClosureElement @relation(fields: [elementId], references: [id])
 
@@ -318,6 +413,57 @@ model CourseClosureTracking {
   @@index([executedById])
   @@index([decidedById])
   @@index([elementId])
+  @@index([suspensionId])
+}
+
+// =============================================================
+// بلاغ عائق على عنصر إقفال
+// -------------------------------------------------------------
+// البلاغ يسري بمجرد رفعه (لا يعتمده أحد) ما دام المنسق تحت
+// سقفه الفصلي — فلا يتوقف الإنصاف على اجتهاد مُراجِع. وهو
+// منشور ومنسوب لجهة بالاسم، فالحارس عليه هو الجهة المتّهمة
+// لا المُراجِع. ومَن تجاوز سقفه وصل إلى مكتب المدير وحده.
+// =============================================================
+model ElementBlocker {
+  id             String        @id @default(uuid())
+  trackingId     String
+  tracking       CourseClosureTracking @relation(fields: [trackingId], references: [id], onDelete: Cascade)
+  // مكرَّر عن قصد: التقارير الأسبوعية والمقارنات تستعلم بالدورة مباشرة
+  courseId       String
+  course         Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  raisedById     String
+  raisedBy       User          @relation("BlockerRaiser", fields: [raisedById], references: [id])
+
+  reason         BlockerReason
+  awaitedParty   String        // الجهة المنتظَرة بالاسم — "المدرب فلان" / "إدارة تطوير الأعمال"
+  details        String
+
+  raisedAt       DateTime      @default(now())
+  resolvedAt     DateTime?
+  status         BlockerStatus @default(OPEN)
+
+  // ── الاحتساب في المؤشرات ──
+  isCredited     Boolean       @default(true)
+  credit         BlockerCredit @default(AUTO_APPROVED)
+  quarterKey     String        // الفصل الذي يُحتسب منه السقف — مثل 2026-Q4
+
+  decidedById    String?
+  decidedBy      User?         @relation("BlockerDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt      DateTime?
+  decisionNote   String?
+
+  // آخر مرة أُدرج فيها في القائمة الأسبوعية المُرسلة للجهة المنتظَرة
+  lastNotifiedAt DateTime?
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([trackingId])
+  @@index([courseId])
+  @@index([raisedById, quarterKey])
+  @@index([status])
+  @@index([reason, status])
 }
 
 model AuditLog {

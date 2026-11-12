@@ -179,22 +179,17 @@ export default function CourseDetail() {
     return Math.round((done / rel.length) * 100);
   }, [sortedElements]);
 
-  const calcDeadline = (el) => {
-    const e = el.element;
-    if (!e?.deadlineRefPoint || e.deadlineMaxHours == null || !course) return null;
-    const ref = e.deadlineRefPoint === 'START' ? new Date(course.startDate) : new Date(course.endDate);
-    return new Date(ref.getTime() + (e.deadlineMaxHours + (el.extensionHours || 0)) * 3600000);
-  };
-  const calcIdealDeadline = (el) => {
-    const e = el.element;
-    if (!e?.deadlineRefPoint || e.deadlineIdealHours == null || !course) return null;
-    const ref = e.deadlineRefPoint === 'START' ? new Date(course.startDate) : new Date(course.endDate);
-    return new Date(ref.getTime() + e.deadlineIdealHours * 3600000);
-  };
+  // المواعيد تأتي محسوبة من الخادم (lib/shared/deadlines) ولا تُحسب هنا.
+  // كانت الشاشة تحسبها بنفسها فتتجاهل أيام العمل وبلاغات العوائق،
+  // فيرى المنسق موعداً ويُحاسَب على آخر.
+  const calcDeadline = (el) => (el.deadlines?.maxDeadline ? new Date(el.deadlines.maxDeadline) : null);
+  const calcIdealDeadline = (el) => (el.deadlines?.idealDeadline ? new Date(el.deadlines.idealDeadline) : null);
+  const isPaused = (el) => !!el.deadlines?.hasOpenBlocker;
   const isOverdue = (el) => {
     if (['APPROVED', 'NOT_APPLICABLE', 'PENDING_APPROVAL'].includes(el.status)) return false;
-    const dl = calcDeadline(el);
-    return dl && new Date() > dl;
+    // الموقوف ببلاغ عائق قائم ليس متأخراً — صاحبه أبلغ قبل الموعد
+    if (isPaused(el)) return false;
+    return !!el.deadlines?.isOverdue;
   };
   const supervisorWaitHours = (el) => {
     if (el.status !== 'PENDING_APPROVAL' || !el.executionAt) return null;
