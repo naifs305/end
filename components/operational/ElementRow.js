@@ -30,15 +30,19 @@ import BlockerPanel from './BlockerPanel';
 // رئيسي واحد في البطاقة (الفعل المطلوب الآن)، وما سواه ثانوي أو خفيف.
 // والأحمر للرفض وحده، فيبقى له وقعه.
 // ======================================================================
-const BTN_BASE =
-  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50';
+// تصميم «حلقة الوقت»: الأزرار في ذيل البطاقة. الفعل الرئيسي حبّة ممتلئة
+// تتقدّم السطر، وما سواه روابط هادئة بلا إطار تتبعه.
+const BTN_PILL =
+  'order-first inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-5 py-2.5 text-[13px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50';
+const BTN_LINK =
+  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-[13px] font-bold transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50';
 
 const BTN = {
-  primary:   `${BTN_BASE} bg-primary text-white shadow-sm hover:bg-primary-dark`,
-  approve:   `${BTN_BASE} bg-accent text-white shadow-sm hover:brightness-95`,
-  secondary: `${BTN_BASE} border border-border bg-white text-text-main hover:border-primary/50 hover:text-primary`,
-  warn:      `${BTN_BASE} border border-sand/60 bg-white text-warning hover:bg-sand/10`,
-  danger:    `${BTN_BASE} border border-burgundy/30 bg-white text-danger hover:bg-burgundy/5`,
+  primary:   `${BTN_PILL} bg-primary shadow-[0_8px_18px_-10px_rgba(46,96,102,0.85)] hover:bg-primary-dark`,
+  approve:   `${BTN_PILL} bg-primary shadow-[0_8px_18px_-10px_rgba(46,96,102,0.85)] hover:bg-primary-dark`,
+  secondary: `${BTN_LINK} text-text-soft hover:text-primary`,
+  warn:      `${BTN_LINK} text-warning`,
+  danger:    `${BTN_LINK} text-danger`,
   ghost:     'inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-bold text-text-soft transition hover:text-primary disabled:opacity-50',
 };
 
@@ -304,7 +308,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   // العرض
   // ======================================================================
   return (
-    <div className="flex w-full max-w-full flex-wrap items-center justify-end gap-2">
+    <div className="flex w-full max-w-full flex-wrap items-center gap-x-1 gap-y-2">
       {/* زر منصة السلف */}
       {canExecute && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
         <button
@@ -350,9 +354,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold shadow-sm transition disabled:opacity-50 ${
-                  isFinancialElement ? 'border border-sand/50 bg-white text-warning hover:bg-sand/10' : 'bg-primary text-white hover:bg-primary-dark'
-                }`}
+                className={isFinancialElement ? `order-first ${BTN.warn} border border-sand/60 bg-white` : BTN.primary}
               >
                 {loading ? (
                   <><Spinner /> {t('element.uploading')}</>
@@ -374,7 +376,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           </div>
 
           {/* بلاغ العائق — يُرفع والمنسق منتظر، لا بعد فوات الموعد */}
-          <div className="order-last w-full">
+          <div className="contents">
             <BlockerPanel element={element} canAct={canExecute} onUpdate={onUpdate} />
           </div>
 

@@ -122,11 +122,13 @@ export default function BlockerPanel({ element, canAct, onUpdate }) {
 
   const selectedReason = REASONS.find((r) => r.value === reason) || REASONS[0];
 
+  // الجذر «شفاف» في التخطيط: زر الرفع يجلس في سطر أزرار ذيل البطاقة،
+  // وما سواه (البلاغ القائم، والنموذج) يأخذ سطراً كاملاً تحته.
   return (
-    <div className="w-full">
+    <div className="contents">
       {/* ── بلاغ قائم ── */}
       {openBlocker && (
-        <div className="rounded-xl border border-sand/50 bg-sand/10 p-3">
+        <div className="order-last w-full rounded-xl border border-sand/50 bg-sand/10 p-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-xs font-extrabold text-warning">
@@ -171,14 +173,14 @@ export default function BlockerPanel({ element, canAct, onUpdate }) {
 
       {/* ── بلاغات سابقة أثّرت في الموعد ── */}
       {!openBlocker && creditedPast.length > 0 && dl.maxPauseHours > 0 && (
-        <p className="flex items-center gap-1.5 text-[11px] text-text-soft">
+        <p className="order-last flex w-full items-center gap-1.5 text-[11px] text-text-soft">
           <Clock3 size={12} aria-hidden="true" />
           أُجّل الموعد {Math.round(dl.maxPauseHours / 24)} يوم بسبب {creditedPast.length} بلاغ عائق سابق
         </p>
       )}
 
       {pendingDecision && !openBlocker && (
-        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-warning">
+        <p className="order-last flex w-full items-center gap-1.5 text-[11px] text-warning">
           <AlertTriangle size={12} aria-hidden="true" />
           بلاغ بانتظار قرار المدير — تجاوز رصيدك الفصلي
         </p>
@@ -189,15 +191,15 @@ export default function BlockerPanel({ element, canAct, onUpdate }) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="mt-1 flex items-center gap-1.5 text-xs text-text-soft underline transition hover:text-warning"
+          className="ms-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-[13px] font-bold text-text-soft transition hover:bg-white hover:text-warning"
         >
-          <OctagonPause size={13} aria-hidden="true" /> أبلغ عن عائق يمنعني
+          <OctagonPause size={15} aria-hidden="true" /> أبلغ عن عائق
         </button>
       )}
 
       {/* ── نموذج البلاغ ── */}
       {canRaise && open && (
-        <div className="mt-2 space-y-3 rounded-xl border border-sand/50 bg-sand/5 p-3">
+        <div className="order-last w-full space-y-3 rounded-xl border border-sand/50 bg-white p-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-extrabold text-text-main">بلاغ عائق</p>
             <button type="button" onClick={() => setOpen(false)} aria-label="إغلاق" className="text-text-soft hover:text-danger">
