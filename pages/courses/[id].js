@@ -445,25 +445,34 @@ export default function CourseDetail() {
     const CritIcon = CRITICAL_ICON[el.element?.key];
     const isRedAlert = isCritical && overdue && !['APPROVED', 'PENDING_APPROVAL'].includes(el.status);
     const isSettlement = el.element?.key === 'settlement';
-    const palette =
-      el.status === 'APPROVED'
-        ? { bg: 'linear-gradient(135deg,#F0F8F4 0%,#FFFFFF 60%)', border: '#5D8A70', glow: 'rgba(93,138,112,0.16)' }
-        : el.status === 'PENDING_APPROVAL'
-        ? { bg: 'linear-gradient(135deg,#EEF5F2 0%,#FFFFFF 62%)', border: '#253C32', glow: 'rgba(37,60,50,0.14)' }
-        : overdue || isRedAlert
-        ? { bg: 'linear-gradient(135deg,#FFF5EF 0%,#FFFFFF 62%)', border: '#633646', glow: 'rgba(99,54,70,0.14)' }
-        : { bg: 'linear-gradient(135deg,#FBF8F2 0%,#FFFFFF 62%)', border: '#C3B39F', glow: 'rgba(195,179,159,0.18)' };
+    // لون حافة البطاقة وحده يحمل الحالة — فلا تتنافس التدرجات خلف النص
+    const accent =
+      el.status === 'APPROVED' ? '#5D8A70'
+      : el.status === 'PENDING_APPROVAL' ? '#253C32'
+      : isRedAlert || overdue ? '#633646'
+      : el.status === 'NOT_APPLICABLE' ? '#D7DBDA'
+      : '#C3B39F';
 
     const waitDuration = waitH != null ? (waitH < 24 ? t('courseDetail.hours', { n: waitH }) : t('courseDetail.days', { n: Math.floor(waitH / 24) })) : '';
+
+    const Chip = ({ children, tone }) => (
+      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${tone}`}>
+        {children}
+      </span>
+    );
+
+    const showDeadlines = deadline && !['APPROVED', 'NOT_APPLICABLE'].includes(el.status);
 
     return (
       <div
         key={el.id}
-        className={`min-h-[128px] overflow-visible rounded-2xl border transition hover:-translate-y-0.5 ${isRedAlert ? 'border-danger shadow-[0_0_0_2px_rgba(99,54,70,0.15)]' : 'border-border'}`}
-        style={{ borderInlineStart: `5px solid ${isRedAlert ? '#633646' : palette.border}`, background: palette.bg, boxShadow: `0 10px 24px ${palette.glow}` }}
+        className={`overflow-visible rounded-2xl border bg-white shadow-[0_2px_10px_rgba(17,32,43,0.05)] transition hover:shadow-[0_8px_22px_rgba(17,32,43,0.09)] ${
+          isRedAlert ? 'border-danger/40' : 'border-border'
+        }`}
+        style={{ borderInlineStart: `4px solid ${accent}` }}
       >
         {isRedAlert && (
-          <div className={`flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold text-white ${isSettlement ? 'bg-danger' : 'bg-burgundy/80'}`}>
+          <div className={`flex items-center gap-2 rounded-t-2xl px-4 py-1.5 text-[11px] font-bold text-white ${isSettlement ? 'bg-danger' : 'bg-burgundy/80'}`}>
             <AlertTriangle size={14} aria-hidden="true" className="animate-pulse" />
             <span>{t('courseDetail.alertBanner', { level: isSettlement ? t('courseDetail.alertCritical') : t('courseDetail.alertUrgent'), label: criticalLabel(el.element?.key) })}</span>
             {isSettlement && <span className="ms-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px]">{t('courseDetail.needsImmediate')}</span>}
@@ -471,58 +480,65 @@ export default function CourseDetail() {
         )}
 
         {isCritical && !isRedAlert && !['APPROVED', 'NOT_APPLICABLE'].includes(el.status) && (
-          <div className={`flex items-center gap-1.5 px-4 py-1.5 text-[10px] font-bold ${isSettlement ? 'border-b border-burgundy/15 bg-burgundy/8 text-danger' : 'border-b border-sand/20 bg-sand/10 text-warning'}`}>
+          <div className={`flex items-center gap-1.5 px-4 py-1.5 text-[10px] font-bold ${isSettlement ? 'border-b border-burgundy/15 bg-burgundy/5 text-danger' : 'border-b border-sand/20 bg-sand/10 text-warning'}`}>
             {CritIcon && <CritIcon size={12} aria-hidden="true" />}
             <span>{t('courseDetail.criticalElement')} — {criticalLabel(el.element?.key)}</span>
           </div>
         )}
 
-        <div className="space-y-2.5 p-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div className="p-4">
+          {/* ── رأس البطاقة: الاسم ومواعيده، والحالة في الطرف ── */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
               <h4 className="text-[15px] font-extrabold leading-snug text-text-main">{el.element.name}</h4>
-              <Badge label={elStatusLabel(el.status)} cls={meta.cls} small />
-              {overdue && !isRedAlert && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-burgundy/20 bg-burgundy/10 px-2 py-0.5 text-[10px] font-bold text-danger">
-                  <AlertTriangle size={11} aria-hidden="true" /> {t('courseDetail.overdue')}
-                </span>
-              )}
-              {/* الموقوف ببلاغ عائق ليس متأخراً — صاحبه أبلغ قبل الموعد */}
-              {isPaused(el) && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-sand/50 bg-sand/20 px-2 py-0.5 text-[10px] font-bold text-warning">
-                  <Clock size={11} aria-hidden="true" /> الساعة متوقفة — بلاغ عائق
-                </span>
-              )}
-              {el.deadlines?.excludedFromTiming && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-bold text-text-soft">
-                  غير محتسب — فات موعده قبل إدخال الدورة
-                </span>
-              )}
-              {hasExt && (
-                <span className="inline-flex rounded-full border border-primary/20 bg-primary-light px-2 py-0.5 text-[10px] font-bold text-primary">
-                  {t('courseDetail.extensionBadge', { hours: el.extensionHours })}
-                </span>
-              )}
+
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-text-soft">
+                {showDeadlines && idealDl && (
+                  <span>{t('courseDetail.ideal')} <span className="font-bold text-accent">{fmt(idealDl)}</span></span>
+                )}
+                {showDeadlines && (
+                  <>
+                    {idealDl && <span className="text-border">•</span>}
+                    <span>
+                      {t('courseDetail.max')}{' '}
+                      <span className={`font-bold ${overdue ? 'text-danger' : 'text-text-main'}`}>{fmt(deadline)}</span>
+                      {el.element?.isDeadlineWorkingDays ? ` ${t('courseDetail.workingDays')}` : ''}
+                    </span>
+                  </>
+                )}
+
+                {overdue && !isRedAlert && (
+                  <Chip tone="border-burgundy/20 bg-burgundy/10 text-danger">
+                    <AlertTriangle size={11} aria-hidden="true" /> {t('courseDetail.overdue')}
+                  </Chip>
+                )}
+                {/* الموقوف ببلاغ عائق ليس متأخراً — صاحبه أبلغ قبل الموعد */}
+                {isPaused(el) && (
+                  <Chip tone="border-sand/50 bg-sand/20 text-warning">
+                    <Clock size={11} aria-hidden="true" /> الساعة متوقفة
+                  </Chip>
+                )}
+                {el.deadlines?.excludedFromTiming && (
+                  <Chip tone="border-border bg-background text-text-soft">غير محتسب</Chip>
+                )}
+                {hasExt && (
+                  <Chip tone="border-primary/20 bg-primary-light text-primary">
+                    {t('courseDetail.extensionBadge', { hours: el.extensionHours })}
+                  </Chip>
+                )}
+              </div>
             </div>
-            <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1.5 sm:w-[360px] sm:max-w-[62%]">
-              <ElementRow element={{ ...el, course }} activeRole={activeRole} isOverdue={overdue} onUpdate={fetchCourse} />
-              {renderAction(el)}
-            </div>
+
+            <Badge label={elStatusLabel(el.status)} cls={meta.cls} small />
           </div>
 
-          {deadline && !['APPROVED', 'NOT_APPLICABLE'].includes(el.status) && (
-            <div className="flex flex-wrap gap-2 rounded-xl border border-white/70 bg-white/70 px-2.5 py-1.5 text-[11px]">
-              {idealDl && (
-                <span className="text-text-soft">
-                  {t('courseDetail.ideal')}: <span className="font-bold text-accent">{fmt(idealDl)}</span>
-                </span>
-              )}
-              <span className={`font-bold ${overdue ? 'text-danger' : 'text-text-main'}`}>
-                {t('courseDetail.max')}: {fmt(deadline)}
-                {el.element?.isDeadlineWorkingDays ? ` ${t('courseDetail.workingDays')}` : ''}
-              </span>
-            </div>
-          )}
+          {/* ── الأزرار: سطر واحد بعرض البطاقة، واللوحات تحته ── */}
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border/70 pt-3">
+            <ElementRow element={{ ...el, course }} activeRole={activeRole} isOverdue={overdue} onUpdate={fetchCourse} />
+            {renderAction(el)}
+          </div>
+
+          <div className="space-y-2.5 empty:mt-0 [&:not(:empty)]:mt-3">
 
           {waitH !== null && (
             <div className={`flex w-fit items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11px] ${waitH > 48 ? 'border border-sand/40 bg-sand/20 text-warning' : 'border border-border bg-background text-text-soft'}`}>
@@ -593,6 +609,7 @@ export default function CourseDetail() {
               {el.decisionAt && <p className="mt-1 text-text-soft">{fmtFull(el.decisionAt)}</p>}
             </div>
           )}
+          </div>
         </div>
       </div>
     );

@@ -27,6 +27,24 @@ import ReasonModal from './ReasonModal';
 import BlockerPanel from './BlockerPanel';
 
 // ======================================================================
+// مقياس الأزرار — مظهر واحد لكل رتبة، فلا تتنافس الألوان داخل البطاقة
+// ----------------------------------------------------------------------
+// رئيسي واحد في البطاقة (الفعل المطلوب الآن)، وما سواه ثانوي أو خفيف.
+// والأحمر للرفض وحده، فيبقى له وقعه.
+// ======================================================================
+const BTN_BASE =
+  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50';
+
+const BTN = {
+  primary:   `${BTN_BASE} bg-primary text-white shadow-sm hover:bg-primary-dark`,
+  approve:   `${BTN_BASE} bg-accent text-white shadow-sm hover:brightness-95`,
+  secondary: `${BTN_BASE} border border-border bg-white text-text-main hover:border-primary/50 hover:text-primary`,
+  warn:      `${BTN_BASE} border border-sand/60 bg-white text-warning hover:bg-sand/10`,
+  danger:    `${BTN_BASE} border border-burgundy/30 bg-white text-danger hover:bg-burgundy/5`,
+  ghost:     'inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-bold text-text-soft transition hover:text-primary disabled:opacity-50',
+};
+
+// ======================================================================
 // مكون صف عنصر الإقفال
 // ======================================================================
 export default function ElementRow({ element, activeRole, isOverdue = false, onUpdate }) {
@@ -303,26 +321,26 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   // العرض
   // ======================================================================
   return (
-    <div className="flex w-full max-w-full flex-col items-end gap-2">
+    <div className="flex w-full max-w-full flex-wrap items-center justify-end gap-2">
       {/* زر منصة السلف */}
       {canExecute && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
         <button
           type="button"
           onClick={openSolfForCourse}
-          className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-xl border border-primary/30 bg-white px-3 py-2 text-xs font-bold text-primary shadow-sm hover:bg-primary-light"
+          className={BTN.secondary}
         >
           <ExternalLink size={14} aria-hidden="true" /> {t('element.solfPlatform')}
         </button>
       )}
 
       {canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status) && (
-        <div className="flex w-full flex-col items-end gap-2">
-          <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="contents">
+          <div className="contents">
             {isMedicalInsurance ? (
               <button
                 onClick={() => setShowInsuranceForm((v) => !v)}
                 disabled={loading}
-                className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-primary-dark disabled:opacity-50"
+                className={BTN.primary}
               >
                 <HeartPulse size={14} aria-hidden="true" />
                 {element.status === 'RETURNED' ? t('element.resubmit') : t('element.submitInsurance')}
@@ -331,7 +349,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               <button
                 onClick={() => setShowInterpreterForm(true)}
                 disabled={loading}
-                className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-primary-dark disabled:opacity-50"
+                className={BTN.primary}
               >
                 <Languages size={14} aria-hidden="true" />
                 {element.status === 'RETURNED' ? t('element.resubmit') : t('element.submit')}
@@ -340,7 +358,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               <button
                 onClick={() => setShowReportForm(true)}
                 disabled={loading}
-                className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-primary-dark disabled:opacity-50"
+                className={BTN.primary}
               >
                 <FileText size={14} aria-hidden="true" />
                 {element.status === 'RETURNED' ? t('element.resubmit') : element.formData ? t('element.completeDraft') : t('element.submit')}
@@ -366,17 +384,19 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             )}
 
             {isOverdue && (
-              <button type="button" onClick={() => setShowDelayReason((v) => !v)} className="text-xs text-text-soft underline hover:text-primary">
+              <button type="button" onClick={() => setShowDelayReason((v) => !v)} className={BTN.ghost}>
                 {showDelayReason ? t('element.hideDelayReason') : `+ ${t('element.addDelayReason')}`}
               </button>
             )}
           </div>
 
           {/* بلاغ العائق — يُرفع والمنسق منتظر، لا بعد فوات الموعد */}
-          <BlockerPanel element={element} canAct={canExecute} onUpdate={onUpdate} />
+          <div className="order-last w-full">
+            <BlockerPanel element={element} canAct={canExecute} onUpdate={onUpdate} />
+          </div>
 
           {showDelayReason && (
-            <div className="w-full rounded-xl border border-sand/40 bg-sand/10 p-2">
+            <div className="order-last w-full rounded-xl border border-sand/40 bg-sand/10 p-2">
               <textarea
                 value={delayReason}
                 onChange={(e) => setDelayReason(e.target.value)}
@@ -391,7 +411,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
 
           {/* ── نموذج التأمين الطبي ── */}
           {isMedicalInsurance && showInsuranceForm && (
-            <div className="w-full space-y-3 rounded-xl border border-primary/20 bg-primary-light p-4">
+            <div className="order-last w-full space-y-3 rounded-xl border border-primary/20 bg-primary-light p-4">
               <p className="flex items-center gap-2 text-sm font-extrabold text-primary">
                 <HeartPulse size={16} aria-hidden="true" /> {t('element.insurance.title')}
               </p>
@@ -484,7 +504,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           type="button"
           onClick={handleVolunteerReport}
           disabled={volunteering}
-          className="whitespace-nowrap rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent shadow-sm hover:bg-accent hover:text-white disabled:opacity-50"
+          className={BTN.secondary}
           title={t('element.volunteerReportHint')}
         >
           {volunteering ? '...' : t('element.volunteerReport')}
@@ -492,18 +512,18 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       )}
 
       {canExecute && element.status === 'PENDING_APPROVAL' && (
-        <div className="flex flex-wrap gap-2">
+        <div className="contents">
           <button
             onClick={handleWithdraw}
             disabled={loading || reminding}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-xs font-bold text-warning transition hover:bg-sand/20 disabled:opacity-50"
+            className={BTN.warn}
           >
             <Undo2 size={14} aria-hidden="true" /> {t('element.withdraw')}
           </button>
           <button
             onClick={handleRemind}
             disabled={loading || reminding}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-primary bg-white px-3 py-2 text-xs font-bold text-primary hover:bg-primary-light disabled:opacity-50"
+            className={BTN.secondary}
           >
             {reminding ? (<><Spinner /> {t('element.sending')}</>) : (<><Bell size={14} aria-hidden="true" /> {t('element.remindSupervisor')}</>)}
           </button>
@@ -516,7 +536,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           type="button"
           onClick={() => setShowManualClose(true)}
           disabled={loading}
-          className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent shadow-sm hover:bg-accent hover:text-white disabled:opacity-50"
+          className={BTN.secondary}
         >
           <CheckCircle2 size={14} aria-hidden="true" /> {t('element.manualClose')}
         </button>
@@ -535,7 +555,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
 
       {/* عرض بيانات التأمين للمعتمد */}
       {isApprover && isMedicalInsurance && element.status === 'PENDING_APPROVAL' && element.formData && (
-        <div className="mb-1 w-full space-y-1.5 rounded-xl border border-primary/20 bg-primary-light px-4 py-3">
+        <div className="order-last mb-1 w-full space-y-1.5 rounded-xl border border-primary/20 bg-primary-light px-4 py-3">
           <p className="inline-flex items-center gap-1.5 text-xs font-extrabold text-primary">
             <HeartPulse size={14} aria-hidden="true" /> {t('element.insurance.submittedTitle')}
           </p>
@@ -569,12 +589,12 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       )}
 
       {isApprover && element.status === 'PENDING_APPROVAL' && (
-        <div className="flex w-full flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
+        <div className="contents">
+          <div className="contents">
             <button
               onClick={handleApprove}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+              className={BTN.approve}
             >
               <Check size={14} aria-hidden="true" /> {t('element.approve')}
             </button>
@@ -582,7 +602,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               type="button"
               onClick={() => { setShowReturnForm((v) => !v); setShowRejectForm(false); }}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-warning px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+              className={BTN.warn}
             >
               <CornerUpLeft size={14} aria-hidden="true" /> {t('element.returnToEmployee')}
             </button>
@@ -590,14 +610,14 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               type="button"
               onClick={() => { setShowRejectForm((v) => !v); setShowReturnForm(false); }}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-danger px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+              className={BTN.danger}
             >
               <X size={14} aria-hidden="true" /> {t('element.reject')}
             </button>
           </div>
 
           {showReturnForm && (
-            <div className="rounded-xl border border-sand/40 bg-sand/10 p-2">
+            <div className="order-last w-full rounded-xl border border-sand/40 bg-sand/10 p-2">
               <p className="mb-1 text-xs font-bold text-warning">{t('element.returnReasonLabel')}</p>
               <textarea
                 value={returnReason}
@@ -619,7 +639,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           )}
 
           {showRejectForm && (
-            <div className="rounded-xl border border-burgundy/20 bg-burgundy/5 p-2">
+            <div className="order-last w-full rounded-xl border border-burgundy/20 bg-burgundy/5 p-2">
               <p className="mb-1 text-xs font-bold text-danger">{t('element.rejectReasonLabel')}</p>
               <textarea
                 value={rejectReason}
@@ -644,17 +664,17 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
 
       {/* تمديد الموعد — مدير فقط */}
       {isManager && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
-        <div className="flex flex-col gap-2">
+        <div className="contents">
           <button
             type="button"
             onClick={() => setShowExtendForm((v) => !v)}
-            className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-xl border border-primary/40 bg-primary-light/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-light"
+            className={BTN.secondary}
           >
             {showExtendForm ? t('common.close') : (<><Clock size={14} aria-hidden="true" /> {t('element.grantExtension')}</>)}
           </button>
 
           {showExtendForm && (
-            <div className="rounded-xl border border-primary/20 bg-primary-light/30 p-3">
+            <div className="order-last w-full rounded-xl border border-primary/20 bg-primary-light/30 p-3">
               <p className="mb-2 text-xs font-bold text-primary">{t('element.grantExtensionTitle')}</p>
               <div className="flex flex-wrap gap-2">
                 <div>
