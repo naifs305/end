@@ -20,29 +20,39 @@ ALTER TABLE "Course"
   ADD COLUMN IF NOT EXISTS "interpreterContractType" TEXT;
 
 -- ── (٢) جدول بيانات المترجم ─────────────────────────────────
-CREATE TABLE IF NOT EXISTS "CourseInterpreter" (
-    -- معرّفات الدورة والمستخدم من نوع UUID في قاعدة البيانات،
-    -- فما يشير إليها UUID كذلك
-    "id" UUID NOT NULL,
-    "courseId" UUID NOT NULL,
-    "fullName" TEXT NOT NULL,
-    "nationalId" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
-    "mobile" TEXT NOT NULL,
-    "address" TEXT NOT NULL,
-    "nationality" TEXT,
-    "amount" DOUBLE PRECISION,
-    "bankName" TEXT,
-    "bankBranch" TEXT,
-    "bankCountry" TEXT,
-    "iban" TEXT,
-    "notes" TEXT,
-    "createdById" UUID,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "CourseInterpreter_pkey" PRIMARY KEY ("id")
-);
+-- معرّفات الدورة والمستخدم UUID في قاعدة فيرسل ونصّية في قاعدة
+-- خادم الجامعة، والربط يشترط تطابق النوعين — فيأخذ كل عمود يشير
+-- إليها نوعه من جدوله وقت التطبيق.
+DO $$
+DECLARE
+  t_user   text := (SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+                     WHERE attrelid = '"User"'::regclass AND attname = 'id');
+  t_course text := (SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+                     WHERE attrelid = '"Course"'::regclass AND attname = 'id');
+BEGIN
+  EXECUTE format($sql$
+    CREATE TABLE IF NOT EXISTS "CourseInterpreter" (
+      "id" %1$s NOT NULL,
+      "courseId" %2$s NOT NULL,
+      "fullName" TEXT NOT NULL,
+      "nationalId" TEXT NOT NULL,
+      "email" TEXT NOT NULL,
+      "mobile" TEXT NOT NULL,
+      "address" TEXT NOT NULL,
+      "nationality" TEXT,
+      "amount" DOUBLE PRECISION,
+      "bankName" TEXT,
+      "bankBranch" TEXT,
+      "bankCountry" TEXT,
+      "iban" TEXT,
+      "notes" TEXT,
+      "createdById" %1$s,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "CourseInterpreter_pkey" PRIMARY KEY ("id")
+    )
+  $sql$, t_user, t_course);
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS "CourseInterpreter_courseId_key"
   ON "CourseInterpreter"("courseId");

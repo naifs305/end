@@ -5,10 +5,12 @@
 -- ولا يغيّر قيمة قائمة. كل ما يضيفه اختياري أو له قيمة افتراضية،
 -- فالنظام الحالي يعمل كما هو قبل أن يُفعّل أحد الميزات الجديدة.
 --
--- ملاحظة على الأنواع: جداول المنصة الأساسية (المستخدم، الدورة،
--- عنصر الإقفال، سجل المتابعة) معرّفاتها من نوع UUID في قاعدة
--- البيانات، فكل عمود يشير إليها هنا UUID كذلك — وإلا رفضت قاعدة
--- البيانات الربط لاختلاف النوعين.
+-- ملاحظة على الأنواع: معرّفات الجداول الأساسية (المستخدم، الدورة،
+-- عنصر الإقفال، سجل المتابعة) ليست بنوع واحد في كل القواعد: فهي
+-- UUID في قاعدة نسخة فيرسل، ونصّية (TEXT) في قاعدة خادم الجامعة
+-- لأنها أُنشئت من المخطط مباشرة. والربط بين جدولين يشترط تطابق
+-- النوعين، فكل عمود يشير إليها هنا يأخذ نوعه من الجدول الذي يشير
+-- إليه وقت التطبيق — فيصح الملف على القاعدتين معاً.
 -- =============================================================
 
 -- ── الأنواع (Enums) ─────────────────────────────────────────
@@ -34,18 +36,29 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ── فترات إيقاف عنصر الإقفال ────────────────────────────────
-CREATE TABLE IF NOT EXISTS "ElementSuspension" (
-  "id"          UUID NOT NULL,
-  "elementId"   UUID NOT NULL,
-  "startsAt"    TIMESTAMP(3) NOT NULL,
-  "endsAt"      TIMESTAMP(3),
-  "reason"      TEXT NOT NULL,
-  "isActive"    BOOLEAN NOT NULL DEFAULT true,
-  "createdById" UUID,
-  "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "ElementSuspension_pkey" PRIMARY KEY ("id")
-);
+DO $$
+DECLARE
+  -- نوع المعرّف كما هو في هذه القاعدة بعينها
+  t_user    text := (SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+                      WHERE attrelid = '"User"'::regclass AND attname = 'id');
+  t_element text := (SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+                      WHERE attrelid = '"ClosureElement"'::regclass AND attname = 'id');
+BEGIN
+  EXECUTE format($sql$
+    CREATE TABLE IF NOT EXISTS "ElementSuspension" (
+      "id"          %1$s NOT NULL,
+      "elementId"   %2$s NOT NULL,
+      "startsAt"    TIMESTAMP(3) NOT NULL,
+      "endsAt"      TIMESTAMP(3),
+      "reason"      TEXT NOT NULL,
+      "isActive"    BOOLEAN NOT NULL DEFAULT true,
+      "createdById" %1$s,
+      "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ElementSuspension_pkey" PRIMARY KEY ("id")
+    )
+  $sql$, t_user, t_element);
+END $$;
 
 CREATE INDEX IF NOT EXISTS "ElementSuspension_elementId_isActive_idx"
   ON "ElementSuspension"("elementId", "isActive");
@@ -79,8 +92,11 @@ END $$;
 -- ── مرجع فترة الإيقاف على سجل متابعة العنصر ─────────────────
 -- نُعلّم به ما أسقطته الفترة وحدها، لنعيده عند انتهائها بلا أن
 -- نمسّ ما أعفاه المدير بقراره.
-ALTER TABLE "CourseClosureTracking"
-  ADD COLUMN IF NOT EXISTS "suspensionId" UUID;
+DO $$ BEGIN
+  EXECUTE format('ALTER TABLE "CourseClosureTracking" ADD COLUMN IF NOT EXISTS "suspensionId" %s',
+    (SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+      WHERE attrelid = '"ElementSuspension"'::regclass AND attname = 'id'));
+END $$;
 
 CREATE INDEX IF NOT EXISTS "CourseClosureTracking_suspensionId_idx"
   ON "CourseClosureTracking"("suspensionId");
@@ -98,28 +114,40 @@ DO $$ BEGIN
 END $$;
 
 -- ── بلاغات العوائق ──────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS "ElementBlocker" (
-  "id"             UUID NOT NULL,
-  "trackingId"     UUID NOT NULL,
-  "courseId"       UUID NOT NULL,
-  "raisedById"     UUID NOT NULL,
-  "reason"         "BlockerReason" NOT NULL,
-  "awaitedParty"   TEXT NOT NULL,
-  "details"        TEXT NOT NULL,
-  "raisedAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "resolvedAt"     TIMESTAMP(3),
-  "status"         "BlockerStatus" NOT NULL DEFAULT 'OPEN',
-  "isCredited"     BOOLEAN NOT NULL DEFAULT true,
-  "credit"         "BlockerCredit" NOT NULL DEFAULT 'AUTO_APPROVED',
-  "quarterKey"     TEXT NOT NULL,
-  "decidedById"    UUID,
-  "decidedAt"      TIMESTAMP(3),
-  "decisionNote"   TEXT,
-  "lastNotifiedAt" TIMESTAMP(3),
-  "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "ElementBlocker_pkey" PRIMARY KEY ("id")
-);
+DO $$
+DECLARE
+  t_user     text := (SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+                       WHERE attrelid = '"User"'::regclass AND attname = 'id');
+  t_course   text := (SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+                       WHERE attrelid = '"Course"'::regclass AND attname = 'id');
+  t_tracking text := (SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+                       WHERE attrelid = '"CourseClosureTracking"'::regclass AND attname = 'id');
+BEGIN
+  EXECUTE format($sql$
+    CREATE TABLE IF NOT EXISTS "ElementBlocker" (
+      "id"             %1$s NOT NULL,
+      "trackingId"     %3$s NOT NULL,
+      "courseId"       %2$s NOT NULL,
+      "raisedById"     %1$s NOT NULL,
+      "reason"         "BlockerReason" NOT NULL,
+      "awaitedParty"   TEXT NOT NULL,
+      "details"        TEXT NOT NULL,
+      "raisedAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "resolvedAt"     TIMESTAMP(3),
+      "status"         "BlockerStatus" NOT NULL DEFAULT 'OPEN',
+      "isCredited"     BOOLEAN NOT NULL DEFAULT true,
+      "credit"         "BlockerCredit" NOT NULL DEFAULT 'AUTO_APPROVED',
+      "quarterKey"     TEXT NOT NULL,
+      "decidedById"    %1$s,
+      "decidedAt"      TIMESTAMP(3),
+      "decisionNote"   TEXT,
+      "lastNotifiedAt" TIMESTAMP(3),
+      "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ElementBlocker_pkey" PRIMARY KEY ("id")
+    )
+  $sql$, t_user, t_course, t_tracking);
+END $$;
 
 CREATE INDEX IF NOT EXISTS "ElementBlocker_trackingId_idx" ON "ElementBlocker"("trackingId");
 CREATE INDEX IF NOT EXISTS "ElementBlocker_courseId_idx"   ON "ElementBlocker"("courseId");
@@ -182,7 +210,11 @@ ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "isLateEntry"           BOOLEAN NO
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryHours"        INTEGER;
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryReason"       TEXT;
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryStatus"       "LateEntryStatus";
-ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryDecidedById"  UUID;
+DO $$ BEGIN
+  EXECUTE format('ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryDecidedById" %s',
+    (SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+      WHERE attrelid = '"User"'::regclass AND attname = 'id'));
+END $$;
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryDecidedAt"    TIMESTAMP(3);
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryDecisionNote" TEXT;
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "entryBaselineAt"       TIMESTAMP(3);
@@ -216,8 +248,9 @@ ON CONFLICT ("key") DO NOTHING;
 -- الجهات في الإعداد أعلاه — فلا يُرسل بريد قبل أن تُراجعه الإدارة.
 INSERT INTO "ScheduledJob" ("id", "name", "type", "status", "intervalHours", "payload", "nextRunAt", "createdAt", "updatedAt")
 SELECT
-  -- معرّف ثابت: لا يعتمد على امتداد توليد المعرّفات في الخادم
-  'a7f3c1d2-9b64-4e08-8c15-5e0b10c4e7a1'::UUID,
+  -- معرّف ثابت: لا يعتمد على امتداد توليد المعرّفات في الخادم،
+  -- وبلا تحديد نوع فيأخذ نوع العمود أياً كان
+  'a7f3c1d2-9b64-4e08-8c15-5e0b10c4e7a1',
   'القائمة الأسبوعية للجهات المتأخرة',
   'CUSTOM',
   'PAUSED',
