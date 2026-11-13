@@ -776,7 +776,9 @@
         "ELEMENT_EXTENSION_GRANTED": "Deadline extended",
         "KPI_SNAPSHOTS_CALCULATED": "KPIs calculated",
         "KPI_NOTE_ADDED": "Performance note",
-        "ASSIGNMENT_REGISTER_UPDATED": "Assignment register updated"
+        "ASSIGNMENT_REGISTER_UPDATED": "Assignment register updated",
+        "USER_PROJECT_CHANGED": "Coordinator moved between projects",
+        "KPI_SNAPSHOT_PROJECTS_BACKFILLED": "Past-month projects restored"
       }
     }
   },

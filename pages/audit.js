@@ -39,6 +39,8 @@ const ACTION_META = {
   KPI_SNAPSHOTS_CALCULATED:   { Icon: BarChart3,     cls: 'bg-forest-50 text-primary border-primary/10' },
   KPI_NOTE_ADDED:             { Icon: StickyNote,    cls: 'bg-forest-50 text-accent border-accent/20' },
   ASSIGNMENT_REGISTER_UPDATED:{ Icon: ClipboardList, cls: 'bg-background text-text-soft border-border' },
+  USER_PROJECT_CHANGED:       { Icon: RefreshCw,     cls: 'bg-forest-50 text-primary border-primary/10' },
+  KPI_SNAPSHOT_PROJECTS_BACKFILLED: { Icon: BarChart3, cls: 'bg-background text-text-soft border-border' },
 };
 
 

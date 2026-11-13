@@ -32,7 +32,11 @@ async function handler(req, res) {
     prisma.course.count({ where: { ...courseWhere, endDate: { lt: new Date() }, status: { notIn: ['CLOSED','ARCHIVED'] } } }),
     prisma.employeeKpiSnapshot.findMany({
       where: { periodType: 'MONTHLY', periodLabel },
-      include: { user: { select: { id:true, firstName:true, lastName:true, operationalProject:{ select:{ name:true } } } } },
+      include: {
+        user: { select: { id:true, firstName:true, lastName:true, operationalProject:{ select:{ name:true } } } },
+        // مشروع اللقطة — أداء الشهر يُنسب لمشروعه لا لانتماء المنسق اليوم
+        operationalProject: { select: { name: true } },
+      },
       orderBy: { finalScore: 'desc' },
     }),
     prisma.courseClosureTracking.findMany({
@@ -68,14 +72,14 @@ async function handler(req, res) {
 
   const top3 = activeSnaps.slice(0, 3).map(s => ({
     name:  `${s.user?.firstName} ${s.user?.lastName}`,
-    project: s.user?.operationalProject?.name || '-',
+    project: (s.operationalProject?.name || s.user?.operationalProject?.name || '-'),
     score: Number(s.finalScore || 0).toFixed(1),
     level: s.performanceLevelLabel || s.performanceLevel,
   }));
 
   const needsAttention = activeSnaps.filter(s => Number(s.finalScore) < 60).map(s => ({
     name:  `${s.user?.firstName} ${s.user?.lastName}`,
-    project: s.user?.operationalProject?.name || '-',
+    project: (s.operationalProject?.name || s.user?.operationalProject?.name || '-'),
     score: Number(s.finalScore || 0).toFixed(1),
   }));
 

@@ -13,6 +13,7 @@ async function handler(req, res) {
       'COURSE_REASSIGNED', 'ELEMENT_SUBMITTED', 'ELEMENT_APPROVED', 'ELEMENT_REJECTED',
       'ELEMENT_RETURNED', 'KPI_SNAPSHOTS_CALCULATED', 'KPI_NOTE_ADDED',
       'ASSIGNMENT_REGISTER_UPDATED',
+      'USER_PROJECT_CHANGED', 'KPI_SNAPSHOT_PROJECTS_BACKFILLED',
     ];
     const actionFilter = req.query.action && allowedActions.includes(req.query.action.toUpperCase())
       ? { action: req.query.action.toUpperCase() }

@@ -110,12 +110,14 @@ enum LateEntryStatus {
 }
 
 model OperationalProject {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  createdAt   DateTime @default(now())
-  users       User[]
-  courses     Course[]
-  supervisors ProjectSupervisor[]
+  id           String   @id @default(uuid())
+  name         String   @unique
+  createdAt    DateTime @default(now())
+  users        User[]
+  courses      Course[]
+  supervisors  ProjectSupervisor[]
+  // لقطات الأداء المنسوبة لهذا المشروع لحظة التقاطها (تاريخ ثابت لا يتغيّر بنقل المنسقين)
+  kpiSnapshots EmployeeKpiSnapshot[] @relation("KpiSnapshotProject")
 }
 
 model User {
@@ -628,6 +630,12 @@ model EmployeeKpiSnapshot {
   finalScore                       Float               @default(0)
   performanceLevel                 PerformanceLevel    @default(GOOD)
 
+  // ----- المشروع التشغيلي لحظة التقاط اللقطة -----
+  // يُسجَّل مع اللقطة نفسها، فيبقى أداء الشهر منسوباً للمشروع الذي كان
+  // المنسق يعمل فيه فعلاً، ولا يغيّره أي نقل لاحق بين المشاريع.
+  operationalProjectId             String?
+  operationalProject               OperationalProject? @relation("KpiSnapshotProject", fields: [operationalProjectId], references: [id], onDelete: SetNull)
+
   settingsId                       String?
   settings                         EmployeeKpiSetting? @relation(fields: [settingsId], references: [id], onDelete: SetNull)
 
@@ -640,6 +648,7 @@ model EmployeeKpiSnapshot {
   @@unique([userId, periodType, periodLabel])
   @@index([periodType, periodStart, periodEnd])
   @@index([finalScore])
+  @@index([periodType, periodLabel, operationalProjectId])
 }
 
 model EmployeeKpiNote {

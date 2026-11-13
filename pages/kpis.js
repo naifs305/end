@@ -67,6 +67,15 @@ function fmtRelative(t, locale, v) {
   return new Date(v).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+// اسم المشروع كما سُجّل على لقطة تلك الفترة — لا انتماء المنسق اليوم.
+// فالمنسق الذي نُقل يبقى أداؤه الماضي منسوباً لمشروعه الذي كان فيه.
+function projectOf(snap) {
+  return snap?.projectName
+    || snap?.operationalProject?.name
+    || snap?.user?.operationalProject?.name
+    || null;
+}
+
 function initials(firstName, lastName) {
   return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
 }
@@ -489,7 +498,7 @@ function EmployeeCard({ snap, selected, onSelect }) {
   const lcfg   = LEVEL_CFG[level] || LEVEL_CFG.GOOD;
   const noData = !snap.isSubjectToEvaluation;
   const name   = `${snap.user?.firstName || ''} ${snap.user?.lastName || ''}`.trim();
-  const proj   = snap.user?.operationalProject?.name || '—';
+  const proj   = projectOf(snap) || '—';
   const ini    = initials(snap.user?.firstName, snap.user?.lastName);
 
   return (
@@ -740,7 +749,7 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
           <CircleGauge score={score} size={56} />
           <div className="min-w-0">
             <h3 className="font-extrabold text-text-main">{name}</h3>
-            <p className="text-xs text-text-soft truncate">{snap.user?.operationalProject?.name} — {snap.periodLabel}</p>
+            <p className="text-xs text-text-soft truncate">{projectOf(snap)} — {snap.periodLabel}</p>
           </div>
           <LevelBadge level={level} size="lg" />
         </div>
@@ -924,7 +933,7 @@ function EmployeePersonalView({ snap, month, year }) {
                 <LevelBadge level={level} noData={noData} size="lg" />
               </div>
               <p className="mb-3 text-xs text-text-soft">
-                {s.user?.operationalProject?.name || t('kpi.noProject')} · {monthName(locale, month, year)} {year}
+                {projectOf(s) || t('kpi.noProject')} · {monthName(locale, month, year)} {year}
               </p>
               {!noData && (
                 <p className="text-sm leading-relaxed text-text-main max-w-lg">
@@ -1160,7 +1169,7 @@ function MultiPeriodResults({ months, isManager }) {
     : 0;
 
   const projectList = useMemo(() =>
-    [...new Set(data.map(s => s.user?.operationalProject?.name).filter(Boolean))],
+    [...new Set(data.map(s => projectOf(s)).filter(Boolean))],
     [data]
   );
 
@@ -1173,7 +1182,7 @@ function MultiPeriodResults({ months, isManager }) {
   const filtered = useMemo(() => {
     let snaps = levelFilter ? activeSnaps.filter(x => x.performanceLevel === levelFilter) : [...activeSnaps, ...inactiveSnaps];
     if (nameFilter)    snaps = snaps.filter(s => `${s.user?.firstName} ${s.user?.lastName}`.includes(nameFilter));
-    if (projectFilter) snaps = snaps.filter(s => s.user?.operationalProject?.name === projectFilter);
+    if (projectFilter) snaps = snaps.filter(s => projectOf(s) === projectFilter);
     return snaps;
   }, [activeSnaps, inactiveSnaps, levelFilter, nameFilter, projectFilter]);
 
@@ -1268,7 +1277,7 @@ function MultiPeriodResults({ months, isManager }) {
               <tbody className="divide-y divide-border/50">
                 {filtered.map((snap, idx) => {
                   const name  = `${snap.user?.firstName || ''} ${snap.user?.lastName || ''}`.trim();
-                  const proj  = snap.user?.operationalProject?.name || '—';
+                  const proj  = projectOf(snap) || '—';
                   const ini   = initials(snap.user?.firstName, snap.user?.lastName);
                   const score = Number(snap.finalScore ?? 0);
                   const noData = !snap.isSubjectToEvaluation;
@@ -1521,14 +1530,14 @@ export default function KpisPage() {
   }, [activeSnaps, inactiveSnaps]);
 
   const projectList = useMemo(() =>
-    [...new Set(snapshots.map(s => s.user?.operationalProject?.name).filter(Boolean))],
+    [...new Set(snapshots.map(s => projectOf(s)).filter(Boolean))],
     [snapshots],
   );
 
   const filteredSnaps = useMemo(() => {
     let snaps = levelFilter ? activeSnaps.filter(x => x.performanceLevel === levelFilter) : [...activeSnaps, ...inactiveSnaps];
     if (nameFilter)    snaps = snaps.filter(s => `${s.user?.firstName || ''} ${s.user?.lastName || ''}`.includes(nameFilter));
-    if (projectFilter) snaps = snaps.filter(s => s.user?.operationalProject?.name === projectFilter);
+    if (projectFilter) snaps = snaps.filter(s => projectOf(s) === projectFilter);
     return snaps;
   }, [activeSnaps, inactiveSnaps, levelFilter, nameFilter, projectFilter]);
 

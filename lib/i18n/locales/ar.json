@@ -776,7 +776,9 @@
         "ELEMENT_EXTENSION_GRANTED": "تمديد موعد",
         "KPI_SNAPSHOTS_CALCULATED": "احتساب مؤشرات الأداء",
         "KPI_NOTE_ADDED": "ملاحظة أداء",
-        "ASSIGNMENT_REGISTER_UPDATED": "تحديث سجل الإسناد"
+        "ASSIGNMENT_REGISTER_UPDATED": "تحديث سجل الإسناد",
+        "USER_PROJECT_CHANGED": "نقل منسق بين المشاريع",
+        "KPI_SNAPSHOT_PROJECTS_BACKFILLED": "استرجاع مشاريع الأشهر الماضية"
       }
     }
   },
