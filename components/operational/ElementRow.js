@@ -6,7 +6,6 @@ import {
   RotateCcw,
   Undo2,
   Bell,
-  CheckCircle2,
   Check,
   CornerUpLeft,
   X,
@@ -23,7 +22,6 @@ import { useTranslation } from '../../lib/i18n';
 import { useSettings } from '../../lib/hooks/useSettings';
 import CourseReportForm from './CourseReportForm';
 import InterpreterForm from './InterpreterForm';
-import ReasonModal from './ReasonModal';
 import BlockerPanel from './BlockerPanel';
 
 // ======================================================================
@@ -226,21 +224,6 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       onUpdate();
     } catch (err) {
       toast.error(err.response?.data?.message || t('common.error'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const [showManualClose, setShowManualClose] = useState(false);
-  const doManualClose = async (notes) => {
-    setLoading(true);
-    try {
-      await api.post(`/closure/${element.id}/manual-financial-close`, { notes });
-      toast.success(t('element.toast.manualClosed'));
-      setShowManualClose(false);
-      onUpdate();
-    } catch (err) {
-      toast.error(err.response?.data?.message || t('element.toast.manualCloseFailed'));
     } finally {
       setLoading(false);
     }
@@ -529,29 +512,6 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           </button>
         </div>
       )}
-
-      {/* أزرار المعتمد */}
-      {isApprover && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
-        <button
-          type="button"
-          onClick={() => setShowManualClose(true)}
-          disabled={loading}
-          className={BTN.secondary}
-        >
-          <CheckCircle2 size={14} aria-hidden="true" /> {t('element.manualClose')}
-        </button>
-      )}
-
-      <ReasonModal
-        open={showManualClose}
-        title={t('element.manualClose')}
-        label={t('element.toast.manualClosePrompt')}
-        initialValue={t('element.toast.manualCloseDefault')}
-        tone="primary"
-        loading={loading}
-        onConfirm={doManualClose}
-        onCancel={() => setShowManualClose(false)}
-      />
 
       {/* عرض بيانات التأمين للمعتمد */}
       {isApprover && isMedicalInsurance && element.status === 'PENDING_APPROVAL' && element.formData && (

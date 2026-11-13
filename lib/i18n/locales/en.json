@@ -194,7 +194,8 @@
       "loadFailed": "Failed to load course data",
       "loadProjectsFailed": "Failed to load projects",
       "dateError": "End date must be after the start date",
-      "cityPlaceholder": "e.g. Riyadh"
+      "cityPlaceholder": "e.g. Riyadh",
+      "requiresAdvanceWithSettlementDesc": "The course has a temporary advance — its settlement element opens with it automatically"
     }
   },
   "courseDetail": {

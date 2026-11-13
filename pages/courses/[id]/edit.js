@@ -130,7 +130,6 @@ export default function EditCoursePage() {
           numTrainees: c.numTrainees != null ? String(c.numTrainees) : '',
           operationalProjectId: c.operationalProjectId || c.operationalProject?.id || '',
           requiresAdvance: !!c.requiresAdvance,
-          requiresAdvanceSettlement: !!c.requiresAdvanceSettlement,
           requiresRevenue: !!c.requiresRevenue,
           materialsIssued: !!c.materialsIssued,
           requiresSupervisorCompensation: !!c.requiresSupervisorCompensation,
@@ -179,7 +178,6 @@ export default function EditCoursePage() {
         operationalProjectId: form.operationalProjectId,
         courseType: form.locationType === 'INTERNAL' ? 'internal' : form.locationType === 'REMOTE' ? 'remote' : 'external',
         requiresAdvance: form.requiresAdvance,
-        requiresAdvanceSettlement: form.requiresAdvanceSettlement,
         requiresRevenue: form.requiresRevenue,
         materialsIssued: form.materialsIssued,
         requiresSupervisorCompensation: form.requiresSupervisorCompensation,
@@ -300,8 +298,13 @@ export default function EditCoursePage() {
             </h2>
             <p className="mb-4 text-xs text-text-soft">{t('course.form.opSettingsDescEdit')}</p>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <Toggle label={t('course.form.requiresAdvance')} desc={t('course.form.requiresAdvanceDesc')} checked={form.requiresAdvance} onChange={(v) => set('requiresAdvance', v)} />
-              <Toggle label={t('course.form.requiresAdvanceSettlement')} desc={t('course.form.requiresAdvanceSettlementDesc')} critical checked={form.requiresAdvanceSettlement} onChange={(v) => set('requiresAdvanceSettlement', v)} />
+              {/* التسوية تتبع السلفة حتماً، فلا تُعرض خياراً مستقلاً يُنسى */}
+              <Toggle
+                label={t('course.form.requiresAdvance')}
+                desc={t('course.form.requiresAdvanceWithSettlementDesc')}
+                checked={form.requiresAdvance}
+                onChange={(v) => set('requiresAdvance', v)}
+              />
               <Toggle label={t('course.form.requiresRevenue')} desc={t('course.form.requiresRevenueDesc')} checked={form.requiresRevenue} onChange={(v) => set('requiresRevenue', v)} />
               <Toggle label={t('course.form.materialsIssued')} desc={t('course.form.materialsIssuedDesc')} checked={form.materialsIssued} onChange={(v) => set('materialsIssued', v)} />
               <Toggle label={t('course.form.requiresSupervisorCompensation')} desc={t('course.form.requiresSupervisorCompensationDesc')} critical checked={form.requiresSupervisorCompensation} onChange={(v) => set('requiresSupervisorCompensation', v)} />
