@@ -28,7 +28,12 @@ CREATE TABLE IF NOT EXISTS "CourseInterpreter" (
     "email" TEXT NOT NULL,
     "mobile" TEXT NOT NULL,
     "address" TEXT NOT NULL,
+    "nationality" TEXT,
     "amount" DOUBLE PRECISION,
+    "bankName" TEXT,
+    "bankBranch" TEXT,
+    "bankCountry" TEXT,
+    "iban" TEXT,
     "notes" TEXT,
     "createdById" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -57,6 +62,13 @@ DO $$ BEGIN
       ON DELETE SET NULL ON UPDATE CASCADE;
   END IF;
 END $$;
+
+-- احتياط: لو أُنشئ الجدول بنسخة أقدم من هذا الملف
+ALTER TABLE "CourseInterpreter" ADD COLUMN IF NOT EXISTS "nationality" TEXT;
+ALTER TABLE "CourseInterpreter" ADD COLUMN IF NOT EXISTS "bankName" TEXT;
+ALTER TABLE "CourseInterpreter" ADD COLUMN IF NOT EXISTS "bankBranch" TEXT;
+ALTER TABLE "CourseInterpreter" ADD COLUMN IF NOT EXISTS "bankCountry" TEXT;
+ALTER TABLE "CourseInterpreter" ADD COLUMN IF NOT EXISTS "iban" TEXT;
 
 -- ── (٣) عناصر الإقفال الأربعة ───────────────────────────────
 -- مواعيدها مطابقة لنظائرها: العقد كطلب السلفة (قبل البداية)،
@@ -104,12 +116,15 @@ SELECT gen_random_uuid()::text, c."id", e."id", 'NOT_APPLICABLE'::"ElementStatus
 -- ── (٥) جهة طلب صرف مستحقات المترجم ─────────────────────────
 -- قابلة للتغيير من إعدادات المنصة دون تعديل كود.
 INSERT INTO "AppSetting" ("key", "value", "category", "label", "createdAt", "updatedAt")
-VALUES (
-  'interpreter.transfer.email.to',
-  'AAlfaifi@nauss.edu.sa',
-  'email',
-  'مستلم طلب صرف مستحقات المترجم (تحويل)',
-  CURRENT_TIMESTAMP,
-  CURRENT_TIMESTAMP
-)
+VALUES
+  ('interpreter.transfer.email.to', 'AAlfaifi@nauss.edu.sa', 'email',
+   'مستلم طلب صرف مستحقات المترجم (تحويل)', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  ('interpreter.contract.rep', 'عبد الرزاق عبد العزيز المرجان', 'interpreter',
+   'ممثل الجامعة في عقد الترجمة', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  ('interpreter.contract.repTitle', 'وكيل الجامعة للتدريب', 'interpreter',
+   'صفة ممثل الجامعة في عقد الترجمة', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  ('interpreter.contract.email', 't-aalmargan@nauss.edu.sa', 'interpreter',
+   'البريد الإلكتروني في صدر عقد الترجمة', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  ('interpreter.contract.bufferDays', '2', 'interpreter',
+   'أيام ما قبل الدورة وما بعدها في مدة عقد الترجمة', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("key") DO NOTHING;

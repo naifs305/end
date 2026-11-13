@@ -206,8 +206,15 @@ model CourseInterpreter {
   email       String
   mobile      String
   address     String
+  // الجنسية — تُذكر في صدر العقد
+  nationality String?
   // قيمة المستحق — يحتاجها طلب الصرف ونموذج الاستحقاق
   amount      Float?
+  // الحساب البنكي — جدول الدفع في العقد ونموذج الاستحقاق المالي
+  bankName    String?
+  bankBranch  String?
+  bankCountry String?
+  iban        String?
   notes       String?
 
   createdById String?

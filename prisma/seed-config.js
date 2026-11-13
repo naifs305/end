@@ -91,6 +91,10 @@ const SETTINGS = [
   { key: 'course.entryLeadHours', value: process.env.COURSE_ENTRY_LEAD_HOURS || '72', category: 'courses', label: 'المهلة المطلوبة لإدخال الدورة قبل بدايتها (ساعة)' },
   // ── مترجم الدورة ──
   { key: 'interpreter.transfer.email.to', value: process.env.INTERPRETER_TRANSFER_EMAIL_TO || 'AAlfaifi@nauss.edu.sa', category: 'email', label: 'مستلم طلب صرف مستحقات المترجم (تحويل)' },
+  { key: 'interpreter.contract.rep', value: 'عبد الرزاق عبد العزيز المرجان', category: 'interpreter', label: 'ممثل الجامعة في عقد الترجمة' },
+  { key: 'interpreter.contract.repTitle', value: 'وكيل الجامعة للتدريب', category: 'interpreter', label: 'صفة ممثل الجامعة في عقد الترجمة' },
+  { key: 'interpreter.contract.email', value: 't-aalmargan@nauss.edu.sa', category: 'interpreter', label: 'البريد الإلكتروني في صدر عقد الترجمة' },
+  { key: 'interpreter.contract.bufferDays', value: '2', category: 'interpreter', label: 'أيام ما قبل الدورة وما بعدها في مدة عقد الترجمة' },
 ];
 
 async function main() {

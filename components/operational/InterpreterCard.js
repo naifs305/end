@@ -27,7 +27,8 @@ const TYPE_OUTPUT = {
 };
 
 const EMPTY = {
-  fullName: '', nationalId: '', email: '', mobile: '', address: '', amount: '', notes: '',
+  fullName: '', nationalId: '', nationality: '', email: '', mobile: '', address: '',
+  amount: '', bankName: '', bankBranch: '', bankCountry: '', iban: '', notes: '',
 };
 
 function Field({ label, value, onChange, placeholder, type = 'text', hint, required }) {
@@ -73,10 +74,15 @@ export default function InterpreterCard({ courseId, canEdit, onSaved }) {
         setForm({
           fullName: payload.interpreter.fullName || '',
           nationalId: payload.interpreter.nationalId || '',
+          nationality: payload.interpreter.nationality || '',
           email: payload.interpreter.email || '',
           mobile: payload.interpreter.mobile || '',
           address: payload.interpreter.address || '',
           amount: payload.interpreter.amount != null ? String(payload.interpreter.amount) : '',
+          bankName: payload.interpreter.bankName || '',
+          bankBranch: payload.interpreter.bankBranch || '',
+          bankCountry: payload.interpreter.bankCountry || '',
+          iban: payload.interpreter.iban || '',
           notes: payload.interpreter.notes || '',
         });
       }
@@ -145,14 +151,24 @@ export default function InterpreterCard({ courseId, canEdit, onSaved }) {
             <Field label="رقم الهوية الوطنية" value={form.nationalId} onChange={(v) => set('nationalId', v)} placeholder="عشرة أرقام" required />
             <Field label="البريد الإلكتروني" type="email" value={form.email} onChange={(v) => set('email', v)} placeholder="name@example.com" required />
             <Field label="رقم الجوال" value={form.mobile} onChange={(v) => set('mobile', v)} placeholder="05xxxxxxxx" required />
-            <Field label="العنوان" value={form.address} onChange={(v) => set('address', v)} placeholder="المدينة — الحي" required />
-            <Field
-              label="قيمة المستحق (ريال)"
-              value={form.amount}
-              onChange={(v) => set('amount', v)}
-              placeholder="اختياري"
-              hint="يظهر في طلب الصرف ونموذج الاستحقاق"
-            />
+            <Field label="الجنسية" value={form.nationality} onChange={(v) => set('nationality', v)} placeholder="سعودي" hint="تُذكر في صدر العقد" />
+            <div className="md:col-span-2">
+              <Field label="العنوان" value={form.address} onChange={(v) => set('address', v)} placeholder="المدينة — الحي" required />
+            </div>
+          </div>
+
+          <p className="mb-2 mt-4 text-sm font-extrabold text-text-main">المستحق المالي وبيانات الحساب</p>
+          <p className="mb-3 text-xs text-text-soft">
+            يظهر في العقد ونموذج الاستحقاق وطلب الصرف — وتفقيط المبلغ كتابةً يُكتب تلقائياً من الرقم.
+          </p>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Field label="قيمة المستحق (ريال)" value={form.amount} onChange={(v) => set('amount', v)} placeholder="12000" />
+            <Field label="اسم البنك" value={form.bankName} onChange={(v) => set('bankName', v)} placeholder="مصرف الراجحي" />
+            <Field label="الفرع" value={form.bankBranch} onChange={(v) => set('bankBranch', v)} placeholder="اختياري" />
+            <Field label="الدولة" value={form.bankCountry} onChange={(v) => set('bankCountry', v)} placeholder="اختياري — إن كان الحساب خارج دولة المقر" />
+            <div className="md:col-span-2">
+              <Field label="رقم الحساب الدولي (IBAN)" value={form.iban} onChange={(v) => set('iban', v)} placeholder="SA0000000000000000000000" />
+            </div>
             <div className="md:col-span-2">
               <Field label="ملاحظات" value={form.notes} onChange={(v) => set('notes', v)} placeholder="اختياري" />
             </div>
@@ -188,13 +204,18 @@ export default function InterpreterCard({ courseId, canEdit, onSaved }) {
         <>
           <Row label="الاسم" value={interpreter.fullName} />
           <Row label="رقم الهوية" value={interpreter.nationalId} />
+          {interpreter.nationality && <Row label="الجنسية" value={interpreter.nationality} />}
           <Row label="البريد الإلكتروني" value={interpreter.email} />
           <Row label="رقم الجوال" value={interpreter.mobile} />
           <Row label="العنوان" value={interpreter.address} />
           <Row
             label="قيمة المستحق"
-            value={interpreter.amount != null ? `${Number(interpreter.amount).toLocaleString('ar-SA')} ريال` : null}
+            value={interpreter.amount != null ? `${Number(interpreter.amount).toLocaleString('en-US')} ريال` : null}
           />
+          <Row label="البنك" value={interpreter.bankName} />
+          {interpreter.bankBranch && <Row label="الفرع" value={interpreter.bankBranch} />}
+          {interpreter.bankCountry && <Row label="الدولة" value={interpreter.bankCountry} />}
+          <Row label="رقم الحساب الدولي" value={interpreter.iban} />
           {interpreter.notes && <Row label="ملاحظات" value={interpreter.notes} />}
 
           {canEdit && (

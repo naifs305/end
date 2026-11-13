@@ -1753,6 +1753,19 @@
       "invalidConditionField": "حقل الشرط غير صالح لعنصر مشروط",
       "noDataToUpdate": "لا توجد بيانات لتحديثها"
     },
+    "interpreter": {
+      "nameRequired": "اسم المترجم مطلوب رباعياً كما في الهوية",
+      "nationalIdInvalid": "رقم الهوية الوطنية يتكوّن من عشرة أرقام",
+      "emailInvalid": "البريد الإلكتروني غير صحيح",
+      "mobileInvalid": "رقم الجوال غير صحيح",
+      "addressRequired": "عنوان المترجم مطلوب",
+      "amountInvalid": "قيمة المستحق غير صحيحة",
+      "ibanInvalid": "رقم الحساب الدولي (IBAN) غير صحيح",
+      "notEnabled": "هذه الدورة غير مُفعَّل فيها مترجم",
+      "dataMissing": "أدخل بيانات المترجم أولاً",
+      "dataIncomplete": "بيانات المترجم ناقصة لإصدار هذا المستند",
+      "notInterpreterElement": "هذا العنصر ليس من مستندات المترجم"
+    },
     "fieldReports": {
       "notFound": "التقرير غير موجود",
       "createForbidden": "غير مصرح لك بإنشاء هذا التقرير",

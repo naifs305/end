@@ -10,10 +10,12 @@
 // =============================================================
 const { withMethods, withAuth } = require('../../../../lib/server/http');
 const svc = require('../../../../lib/modules/closure/closure.service');
+const interpreterSvc = require('../../../../lib/modules/courses/interpreter.service');
 const permissions = require('../../../../lib/services/permissions');
 const configService = require('../../../../lib/modules/config/config.service');
 const { buildEmlMessage, sanitizeFilename } = require('../../../../lib/email/eml');
 const {
+  CONTRACT_DEFAULTS,
   renderInterpreterContract,
   renderInterpreterEntitlement,
   renderInterpreterCertificate,
@@ -53,6 +55,15 @@ async function handler(req, res) {
     });
   }
 
+  // مستند مالي بخانة ناقصة لا قيمة له — نقول ما ينقص بدل إخراجه ناقصاً
+  const missing = interpreterSvc.missingForDocument(key, interpreter);
+  if (missing.length) {
+    return res.status(400).json({
+      message: `أكمل بيانات المترجم أولاً: ${missing.join('، ')}`,
+      code: 'serverErrors.interpreter.dataIncomplete',
+    });
+  }
+
   const sections = (element.formData && element.formData.documentSections) || {};
   const canEdit = await permissions.canSubmitElement(req.user, req.activeRole, course);
 
@@ -73,7 +84,20 @@ async function handler(req, res) {
   }
 
   // ── بقية المستندات: صفحة A4 تُعدَّل ثم تُطبع بصيغة PDF ──────
-  const payload = { course, interpreter, sections };
+  // بيانات الطرف الأول من الإعدادات لا من الكود — تتغيّر بلا تعديل برمجي
+  const [rep, repTitle, repEmail, bufferDays] = await Promise.all([
+    configService.getSetting('interpreter.contract.rep', CONTRACT_DEFAULTS.rep),
+    configService.getSetting('interpreter.contract.repTitle', CONTRACT_DEFAULTS.repTitle),
+    configService.getSetting('interpreter.contract.email', CONTRACT_DEFAULTS.email),
+    configService.getSetting('interpreter.contract.bufferDays', String(CONTRACT_DEFAULTS.bufferDays)),
+  ]);
+
+  const payload = {
+    course,
+    interpreter,
+    sections,
+    config: { rep, repTitle, email: repEmail, bufferDays: Number(bufferDays) },
+  };
   const options = { trackingId: id, canEdit };
 
   let html;

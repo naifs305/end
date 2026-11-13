@@ -1753,6 +1753,19 @@
       "invalidConditionField": "Invalid condition field for a conditional element",
       "noDataToUpdate": "There is no data to update"
     },
+    "interpreter": {
+      "nameRequired": "The interpreter's full name is required",
+      "nationalIdInvalid": "The national ID must be ten digits",
+      "emailInvalid": "Invalid email address",
+      "mobileInvalid": "Invalid mobile number",
+      "addressRequired": "The interpreter's address is required",
+      "amountInvalid": "Invalid entitlement amount",
+      "ibanInvalid": "Invalid IBAN",
+      "notEnabled": "This course has no interpreter enabled",
+      "dataMissing": "Enter the interpreter's details first",
+      "dataIncomplete": "The interpreter's details are incomplete for this document",
+      "notInterpreterElement": "This element is not an interpreter document"
+    },
     "fieldReports": {
       "notFound": "Report not found",
       "createForbidden": "You are not authorized to create this report",
