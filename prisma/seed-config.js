@@ -91,6 +91,10 @@ const SETTINGS = [
   { key: 'course.entryLeadHours', value: process.env.COURSE_ENTRY_LEAD_HOURS || '72', category: 'courses', label: 'المهلة المطلوبة لإدخال الدورة قبل بدايتها (ساعة)' },
   // ── مترجم الدورة ──
   { key: 'interpreter.transfer.email.to', value: process.env.INTERPRETER_TRANSFER_EMAIL_TO || 'AAlfaifi@nauss.edu.sa', category: 'email', label: 'مستلم طلب صرف مستحقات المترجم (تحويل)' },
+  { key: 'interpreter.legal.email.to', value: 'Legal@nauss.edu.sa', category: 'email', label: 'مستلم رسالة مراجعة عقد المترجم (الإدارة القانونية)' },
+  { key: 'interpreter.legal.email.cc', value: 'NAlshahrani@nauss.edu.sa', category: 'email', label: 'نسخة رسالة الإدارة القانونية' },
+  { key: 'interpreter.finance.email.to', value: 'finance@nauss.edu.sa', category: 'email', label: 'مستلم طلبات صرف مستحقات المترجم (الإدارة المالية)' },
+  { key: 'interpreter.finance.email.cc', value: 'AAlaraj@nauss.edu.sa, SAlbayoumi@nauss.edu.sa, NAlshahrani@nauss.edu.sa, AAlfaifi@nauss.edu.sa', category: 'email', label: 'نسخة طلبات صرف مستحقات المترجم' },
   { key: 'interpreter.contract.rep', value: 'عبد الرزاق عبد العزيز المرجان', category: 'interpreter', label: 'ممثل الجامعة في عقد الترجمة' },
   { key: 'interpreter.contract.repTitle', value: 'وكيل الجامعة للتدريب', category: 'interpreter', label: 'صفة ممثل الجامعة في عقد الترجمة' },
   { key: 'interpreter.contract.email', value: 't-aalmargan@nauss.edu.sa', category: 'interpreter', label: 'البريد الإلكتروني في صدر عقد الترجمة' },

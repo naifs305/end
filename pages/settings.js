@@ -146,7 +146,7 @@ export default function SettingsPage() {
                               type={field.type === 'number' ? 'number' : 'text'}
                               value={values[field.key] ?? ''}
                               onChange={(e) => set(field.key, e.target.value)}
-                              dir={field.type === 'email' ? 'ltr' : undefined}
+                              dir={['email', 'emails'].includes(field.type) ? 'ltr' : undefined}
                               className={`w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none transition focus:border-primary ${
                                 error ? 'border-danger' : 'border-border'
                               }`}

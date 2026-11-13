@@ -10,7 +10,7 @@
 // وتُقرأ في العقد وطلب الصرف ونموذج الاستحقاق والشهادة.
 // =============================================================
 import { useCallback, useEffect, useState } from 'react';
-import { Languages, Save, FileText, Mail, Send, X, Check, ArrowRight } from 'lucide-react';
+import { Languages, Save, FileText, Mail, Send, X, Check, ArrowRight, PenLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
 
@@ -47,7 +47,7 @@ function Field({ label, value, onChange, placeholder, hint, required, type = 'te
   );
 }
 
-export default function InterpreterForm({ trackingId, courseId, elementKey, onClose, onSuccess }) {
+export default function InterpreterForm({ trackingId, courseId, elementKey, initialFormData, onClose, onSuccess }) {
   const [form, setForm] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -57,7 +57,18 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, onCl
 
   const needsPayment = PAYMENT_KEYS.includes(elementKey);
   const isEmail = elementKey === 'interpreter_transfer';
+  const isContract = elementKey === 'interpreter_contract';
+  const isCertificate = elementKey === 'interpreter_certificate';
   const docLabel = DOC_LABEL[elementKey] || 'المستند';
+
+  // توقيع وكيل الجامعة: العقد لا يكتمل قبله، فلا يُقدَّم العنصر بدونه
+  const savedSignedAt = initialFormData?.agentSignedAt
+    ? String(initialFormData.agentSignedAt).slice(0, 10)
+    : '';
+  const [agentSigned, setAgentSigned] = useState(!!savedSignedAt);
+  const [agentSignedAt, setAgentSignedAt] = useState(savedSignedAt);
+  const [savingSignature, setSavingSignature] = useState(false);
+  const [signatureSaved, setSignatureSaved] = useState(!!savedSignedAt);
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -117,28 +128,30 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, onCl
   };
 
   // المستند يُطلب بهوية الدخول ثم يُعرض — لا يُفتح رابطه مباشرة
-  const openDocument = async () => {
+  // المخرجات تُطلب بهوية الدخول ثم تُعرض أو تُنزَّل — لا تُفتح روابطها
+  const openOutput = async (output = 'document') => {
+    const asEml = output !== 'document' || isEmail;
     try {
-      if (isEmail) {
+      if (asEml) {
         const res = await api.get(`/closure/${trackingId}/interpreter-document`, {
-          responseType: 'blob', headers: { Accept: 'message/rfc822' },
+          params: { output }, responseType: 'blob', headers: { Accept: 'message/rfc822' },
         });
         const disposition = res.headers['content-disposition'] || '';
         const match = disposition.match(/filename="?([^";]+)"?/i);
         const url = window.URL.createObjectURL(res.data);
         const a = document.createElement('a');
         a.href = url;
-        a.download = match?.[1] || 'interpreter-transfer.eml';
+        a.download = match?.[1] || 'interpreter.eml';
         document.body.appendChild(a);
         a.click();
         a.remove();
         window.URL.revokeObjectURL(url);
-        toast.success('نُزِّلت رسالة طلب الصرف');
+        toast.success('نُزِّلت الرسالة — افتحها في برنامج البريد وأرسلها');
         return;
       }
 
       const res = await api.get(`/closure/${trackingId}/interpreter-document`, {
-        responseType: 'text', headers: { Accept: 'text/html' },
+        params: { output }, responseType: 'text', headers: { Accept: 'text/html' },
       });
       const w = window.open('', '_blank');
       if (!w) {
@@ -149,7 +162,34 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, onCl
       w.document.write(res.data);
       w.document.close();
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'تعذّر فتح المستند');
+      const blob = err?.response?.data;
+      if (blob instanceof Blob) {
+        try {
+          const parsed = JSON.parse(await blob.text());
+          toast.error(parsed.message || 'تعذّر إخراج الملف');
+          return;
+        } catch { /* يسقط إلى الرسالة العامة */ }
+      }
+      toast.error(err?.response?.data?.message || 'تعذّر إخراج الملف');
+    }
+  };
+
+  const saveSignature = async () => {
+    if (agentSigned && !agentSignedAt) {
+      toast.error('أدخل تاريخ توقيع الوكيل');
+      return;
+    }
+    setSavingSignature(true);
+    try {
+      await api.post(`/closure/${trackingId}/interpreter-text`, {
+        agentSignedAt: agentSigned ? agentSignedAt : '',
+      });
+      setSignatureSaved(agentSigned);
+      toast.success(agentSigned ? 'سُجّل توقيع الوكيل' : 'أُلغي تسجيل التوقيع');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'تعذّر تسجيل التوقيع');
+    } finally {
+      setSavingSignature(false);
     }
   };
 
@@ -229,6 +269,105 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, onCl
         <div className="mt-3">
           <Field label="ملاحظات" value={form.notes} onChange={(v) => set('notes', v)} placeholder="اختياري" />
         </div>
+
+        {/* ── المخرجات: المستند ورسائله ───────────────────────── */}
+        {saved && (
+          <div className="mt-5 rounded-xl border border-primary/15 bg-primary-light/40 p-4">
+            <p className="mb-1 text-sm font-extrabold text-text-main">المخرجات</p>
+            <p className="mb-3 text-xs text-text-soft">
+              {isContract
+                ? 'المستند يُفتح صفحةً تُعدَّل ثم تُطبع بصيغة PDF. والرسالتان تُفتحان في برنامج البريد جاهزتين بوجهتيهما — أرفق بهما نسخة العقد قبل الإرسال.'
+                : isCertificate
+                ? 'الشهادة تُفتح صفحةً تُطبع بصيغة PDF، ورسالة المالية تُفتح في برنامج البريد — أرفق بها الشهادة قبل الإرسال.'
+                : 'يُفتح المخرج جاهزاً، وتبقى المراجعة والإرسال بيدك.'}
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => openOutput('document')}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white transition hover:bg-primary-dark"
+              >
+                {isEmail
+                  ? <><Mail size={15} aria-hidden="true" /> تنزيل الرسالة</>
+                  : <><FileText size={15} aria-hidden="true" /> فتح {docLabel}</>}
+              </button>
+
+              {isContract && (
+                <button
+                  type="button"
+                  onClick={() => openOutput('legal-eml')}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-white px-4 py-2 text-sm font-bold text-primary transition hover:bg-primary-light"
+                >
+                  <Mail size={15} aria-hidden="true" /> رسالة الإدارة القانونية
+                </button>
+              )}
+
+              {(isContract || isCertificate) && (
+                <button
+                  type="button"
+                  onClick={() => openOutput('finance-eml')}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-white px-4 py-2 text-sm font-bold text-primary transition hover:bg-primary-light"
+                >
+                  <Mail size={15} aria-hidden="true" />
+                  {isContract ? 'رسالة المالية — الدفعة الأولى' : 'رسالة المالية — بقية المستحقات'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── توقيع وكيل الجامعة: شرط اكتمال العقد ───────────── */}
+        {isContract && (
+          <div className={`mt-4 rounded-xl border p-4 ${signatureSaved ? 'border-accent/30 bg-forest-50' : 'border-sand/50 bg-sand/10'}`}>
+            <p className="mb-1 inline-flex items-center gap-2 text-sm font-extrabold text-text-main">
+              <PenLine size={16} aria-hidden="true" className={signatureSaved ? 'text-accent' : 'text-warning'} />
+              توقيع وكيل الجامعة للتدريب
+            </p>
+            <p className="mb-3 text-xs text-text-soft">
+              العقد لا يكتمل بإخراجه، بل بتوقيع الوكيل عليه بعد مراجعة الإدارة القانونية.
+              ولا يُقدَّم هذا العنصر للاعتماد قبل تأكيد التوقيع.
+            </p>
+
+            <label className="mb-3 flex items-center gap-2 text-sm font-bold text-text-main">
+              <input
+                type="checkbox"
+                checked={agentSigned}
+                onChange={(e) => { setAgentSigned(e.target.checked); setSignatureSaved(false); }}
+                className="h-4 w-4 accent-[#016564]"
+              />
+              وقّع وكيل الجامعة للتدريب على العقد
+            </label>
+
+            {agentSigned && (
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-bold text-text-main">تاريخ التوقيع <span className="text-danger">*</span></span>
+                  <input
+                    type="date"
+                    value={agentSignedAt}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => { setAgentSignedAt(e.target.value); setSignatureSaved(false); }}
+                    className="rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={saveSignature}
+                  disabled={savingSignature}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
+                >
+                  <Check size={15} aria-hidden="true" /> {savingSignature ? 'جارٍ التسجيل…' : 'تأكيد التوقيع'}
+                </button>
+                {signatureSaved && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-accent">
+                    <Check size={13} aria-hidden="true" /> مُسجَّل
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background px-5 py-4">
@@ -243,21 +382,12 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, onCl
 
         <button
           type="button"
-          onClick={openDocument}
-          disabled={!saved}
-          title={saved ? '' : 'احفظ البيانات أولاً'}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-50"
-        >
-          {isEmail
-            ? <><Mail size={15} aria-hidden="true" /> تنزيل الرسالة</>
-            : <><FileText size={15} aria-hidden="true" /> فتح {docLabel}</>}
-        </button>
-
-        <button
-          type="button"
           onClick={submitElement}
-          disabled={!saved || submitting}
-          title={saved ? '' : 'احفظ البيانات أولاً'}
+          disabled={!saved || submitting || (isContract && !signatureSaved)}
+          title={
+            !saved ? 'احفظ البيانات أولاً'
+              : (isContract && !signatureSaved) ? 'أكّد توقيع وكيل الجامعة أولاً' : ''
+          }
           className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-50"
         >
           <Send size={15} aria-hidden="true" /> {submitting ? 'جارٍ التقديم…' : 'تقديم للاعتماد'}

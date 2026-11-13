@@ -702,6 +702,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               trackingId={element.id}
               courseId={element.courseId || element.course?.id}
               elementKey={element.element.key}
+              initialFormData={element.formData || null}
               onClose={() => setShowInterpreterForm(false)}
               onSuccess={onUpdate}
             />
