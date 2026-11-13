@@ -4,6 +4,11 @@
 -- آمن لإعادة التشغيل (IF NOT EXISTS في كل خطوة)، ولا يحذف بياناً
 -- ولا يغيّر قيمة قائمة. كل ما يضيفه اختياري أو له قيمة افتراضية،
 -- فالنظام الحالي يعمل كما هو قبل أن يُفعّل أحد الميزات الجديدة.
+--
+-- ملاحظة على الأنواع: جداول المنصة الأساسية (المستخدم، الدورة،
+-- عنصر الإقفال، سجل المتابعة) معرّفاتها من نوع UUID في قاعدة
+-- البيانات، فكل عمود يشير إليها هنا UUID كذلك — وإلا رفضت قاعدة
+-- البيانات الربط لاختلاف النوعين.
 -- =============================================================
 
 -- ── الأنواع (Enums) ─────────────────────────────────────────
@@ -30,13 +35,13 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ── فترات إيقاف عنصر الإقفال ────────────────────────────────
 CREATE TABLE IF NOT EXISTS "ElementSuspension" (
-  "id"          TEXT NOT NULL,
-  "elementId"   TEXT NOT NULL,
+  "id"          UUID NOT NULL,
+  "elementId"   UUID NOT NULL,
   "startsAt"    TIMESTAMP(3) NOT NULL,
   "endsAt"      TIMESTAMP(3),
   "reason"      TEXT NOT NULL,
   "isActive"    BOOLEAN NOT NULL DEFAULT true,
-  "createdById" TEXT,
+  "createdById" UUID,
   "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "ElementSuspension_pkey" PRIMARY KEY ("id")
@@ -75,7 +80,7 @@ END $$;
 -- نُعلّم به ما أسقطته الفترة وحدها، لنعيده عند انتهائها بلا أن
 -- نمسّ ما أعفاه المدير بقراره.
 ALTER TABLE "CourseClosureTracking"
-  ADD COLUMN IF NOT EXISTS "suspensionId" TEXT;
+  ADD COLUMN IF NOT EXISTS "suspensionId" UUID;
 
 CREATE INDEX IF NOT EXISTS "CourseClosureTracking_suspensionId_idx"
   ON "CourseClosureTracking"("suspensionId");
@@ -94,10 +99,10 @@ END $$;
 
 -- ── بلاغات العوائق ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS "ElementBlocker" (
-  "id"             TEXT NOT NULL,
-  "trackingId"     TEXT NOT NULL,
-  "courseId"       TEXT NOT NULL,
-  "raisedById"     TEXT NOT NULL,
+  "id"             UUID NOT NULL,
+  "trackingId"     UUID NOT NULL,
+  "courseId"       UUID NOT NULL,
+  "raisedById"     UUID NOT NULL,
   "reason"         "BlockerReason" NOT NULL,
   "awaitedParty"   TEXT NOT NULL,
   "details"        TEXT NOT NULL,
@@ -107,7 +112,7 @@ CREATE TABLE IF NOT EXISTS "ElementBlocker" (
   "isCredited"     BOOLEAN NOT NULL DEFAULT true,
   "credit"         "BlockerCredit" NOT NULL DEFAULT 'AUTO_APPROVED',
   "quarterKey"     TEXT NOT NULL,
-  "decidedById"    TEXT,
+  "decidedById"    UUID,
   "decidedAt"      TIMESTAMP(3),
   "decisionNote"   TEXT,
   "lastNotifiedAt" TIMESTAMP(3),
@@ -177,7 +182,7 @@ ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "isLateEntry"           BOOLEAN NO
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryHours"        INTEGER;
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryReason"       TEXT;
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryStatus"       "LateEntryStatus";
-ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryDecidedById"  TEXT;
+ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryDecidedById"  UUID;
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryDecidedAt"    TIMESTAMP(3);
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "lateEntryDecisionNote" TEXT;
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "entryBaselineAt"       TIMESTAMP(3);
@@ -212,7 +217,7 @@ ON CONFLICT ("key") DO NOTHING;
 INSERT INTO "ScheduledJob" ("id", "name", "type", "status", "intervalHours", "payload", "nextRunAt", "createdAt", "updatedAt")
 SELECT
   -- معرّف ثابت: لا يعتمد على امتداد توليد المعرّفات في الخادم
-  'a7f3c1d2-9b64-4e08-8c15-5e0b10c4e7a1'::TEXT,
+  'a7f3c1d2-9b64-4e08-8c15-5e0b10c4e7a1'::UUID,
   'القائمة الأسبوعية للجهات المتأخرة',
   'CUSTOM',
   'PAUSED',

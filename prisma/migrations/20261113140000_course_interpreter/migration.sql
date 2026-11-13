@@ -21,8 +21,10 @@ ALTER TABLE "Course"
 
 -- ── (٢) جدول بيانات المترجم ─────────────────────────────────
 CREATE TABLE IF NOT EXISTS "CourseInterpreter" (
-    "id" TEXT NOT NULL,
-    "courseId" TEXT NOT NULL,
+    -- معرّفات الدورة والمستخدم من نوع UUID في قاعدة البيانات،
+    -- فما يشير إليها UUID كذلك
+    "id" UUID NOT NULL,
+    "courseId" UUID NOT NULL,
     "fullName" TEXT NOT NULL,
     "nationalId" TEXT NOT NULL,
     "email" TEXT NOT NULL,
@@ -35,7 +37,7 @@ CREATE TABLE IF NOT EXISTS "CourseInterpreter" (
     "bankCountry" TEXT,
     "iban" TEXT,
     "notes" TEXT,
-    "createdById" TEXT,
+    "createdById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -102,7 +104,7 @@ ON CONFLICT ("key") DO NOTHING;
 -- (تغيير شرط الدورة يُحدّث سجلاً موجوداً ولا يُنشئ سجلاً).
 -- وكلها «غير مطلوبة» لأن حقل المترجم غير مفعّل في دورة قائمة.
 INSERT INTO "CourseClosureTracking" ("id", "courseId", "elementId", "status")
-SELECT gen_random_uuid()::text, c."id", e."id", 'NOT_APPLICABLE'::"ElementStatus"
+SELECT gen_random_uuid(), c."id", e."id", 'NOT_APPLICABLE'::"ElementStatus"
   FROM "Course" c
  CROSS JOIN "ClosureElement" e
  WHERE e."key" IN ('interpreter_contract', 'interpreter_transfer',
