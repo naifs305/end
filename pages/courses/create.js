@@ -22,8 +22,16 @@ const EMPTY = {
   requiresRevenue: false, materialsIssued: false,
   requiresSupervisorCompensation: false, requiresTrainerCompensation: false,
   requiresPreTest: false, requiresPostTest: false,
+  requiresInterpreter: false, interpreterContractType: '',
   lateEntryReason: '',
 };
+
+// أنواع التعاقد مع مترجم الدورة — كلٌّ يفتح عنصر الإقفال الخاص به
+const INTERPRETER_TYPES = [
+  { value: 'CONTRACT', key: 'interpreterTypeContract' },
+  { value: 'TRANSFER', key: 'interpreterTypeTransfer' },
+  { value: 'ADVANCE',  key: 'interpreterTypeAdvance'  },
+];
 
 const DateInput = forwardRef(function DateInput({ startDate, endDate, onClick, onClear }, ref) {
   const { t } = useTranslation();
@@ -148,7 +156,9 @@ export default function CreateCoursePage() {
     () =>
       form.name.trim() && form.operationalProjectId && form.locationType && form.city.trim()
       && form.startDate && form.endDate && form.numTrainees && Number(form.numTrainees) > 0
-      && (!lateness.isLate || form.lateEntryReason.trim().length >= 10),
+      && (!lateness.isLate || form.lateEntryReason.trim().length >= 10)
+      // مترجم بلا نوع تعاقد يعني عنصراً لا يُفتح — فنمنع الحفظ ناقصاً
+      && (!form.requiresInterpreter || !!form.interpreterContractType),
     [form, lateness.isLate]
   );
 
@@ -183,6 +193,8 @@ export default function CreateCoursePage() {
         requiresTrainerCompensation: form.requiresTrainerCompensation,
         requiresPreTest: form.requiresPreTest,
         requiresPostTest: form.requiresPostTest,
+        requiresInterpreter: form.requiresInterpreter,
+        ...(form.requiresInterpreter ? { interpreterContractType: form.interpreterContractType } : {}),
         isCrossProject: isCrossProject || false,
         ...(lateness.isLate ? { lateEntryReason: form.lateEntryReason.trim() } : {}),
       };
@@ -340,7 +352,43 @@ export default function CreateCoursePage() {
               <Toggle label={t('course.form.requiresTrainerCompensation')} desc={t('course.form.requiresTrainerCompensationDesc')} critical checked={form.requiresTrainerCompensation} onChange={(v) => set('requiresTrainerCompensation', v)} />
               <Toggle label={t('course.form.requiresPreTest')} desc={t('course.form.requiresPreTestDesc')} checked={form.requiresPreTest} onChange={(v) => set('requiresPreTest', v)} />
               <Toggle label={t('course.form.requiresPostTest')} desc={t('course.form.requiresPostTestDesc')} checked={form.requiresPostTest} onChange={(v) => set('requiresPostTest', v)} />
+              <Toggle
+                label={t('course.form.requiresInterpreter')}
+                desc={t('course.form.requiresInterpreterDesc')}
+                checked={form.requiresInterpreter}
+                onChange={(v) => {
+                  set('requiresInterpreter', v);
+                  if (!v) set('interpreterContractType', '');
+                }}
+              />
             </div>
+
+            {form.requiresInterpreter && (
+              <div className="mt-4 rounded-xl border border-primary/15 bg-primary-light/40 p-4">
+                <p className="mb-1 text-sm font-extrabold text-text-main">{t('course.form.interpreterContractType')}</p>
+                <p className="mb-3 text-xs text-text-soft">{t('course.form.interpreterContractTypeDesc')}</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {INTERPRETER_TYPES.map((opt) => {
+                    const active = form.interpreterContractType === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => set('interpreterContractType', opt.value)}
+                        aria-pressed={active}
+                        className={`rounded-xl border px-3 py-2.5 text-sm font-bold transition ${
+                          active
+                            ? 'border-primary bg-primary text-white shadow-card'
+                            : 'border-border bg-white text-text-main hover:border-primary/40'
+                        }`}
+                      >
+                        {t(`course.form.${opt.key}`)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="sticky bottom-4 z-10">

@@ -1,0 +1,115 @@
+-- =============================================================
+-- مترجم الدورة — بياناته وعناصر الإقفال الأربعة
+-- -------------------------------------------------------------
+-- عنصر اختياري يحدده المنسق عند إضافة الدورة، ونوع التعاقد يحدد
+-- المطلوب منه:
+--   • بعقد    → عقد مترجم (قبل بداية البرنامج)
+--   • بتحويل  → طلب صرف مستحقات بالبريد (بعد الانتهاء)
+--   • بسلفة   → نموذج استحقاق (بعد الانتهاء)
+-- ومع أي نوع منها: شهادة إنجاز الترجمة بعد انتهاء البرنامج.
+--
+-- آمن لإعادة التشغيل، ولا يحذف بياناً ولا يغيّر قيمة قائمة.
+-- الدورات القائمة لا يتغيّر فيها شيء: العناصر الأربعة تصلها
+-- «غير مطلوبة» لأن حقل المترجم فيها غير مفعّل.
+-- =============================================================
+
+-- ── (١) حقول المترجم على الدورة ─────────────────────────────
+ALTER TABLE "Course"
+  ADD COLUMN IF NOT EXISTS "requiresInterpreter" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Course"
+  ADD COLUMN IF NOT EXISTS "interpreterContractType" TEXT;
+
+-- ── (٢) جدول بيانات المترجم ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS "CourseInterpreter" (
+    "id" TEXT NOT NULL,
+    "courseId" TEXT NOT NULL,
+    "fullName" TEXT NOT NULL,
+    "nationalId" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "mobile" TEXT NOT NULL,
+    "address" TEXT NOT NULL,
+    "amount" DOUBLE PRECISION,
+    "notes" TEXT,
+    "createdById" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "CourseInterpreter_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "CourseInterpreter_courseId_key"
+  ON "CourseInterpreter"("courseId");
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CourseInterpreter_courseId_fkey') THEN
+    ALTER TABLE "CourseInterpreter"
+      ADD CONSTRAINT "CourseInterpreter_courseId_fkey"
+      FOREIGN KEY ("courseId") REFERENCES "Course"("id")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CourseInterpreter_createdById_fkey') THEN
+    ALTER TABLE "CourseInterpreter"
+      ADD CONSTRAINT "CourseInterpreter_createdById_fkey"
+      FOREIGN KEY ("createdById") REFERENCES "User"("id")
+      ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+-- ── (٣) عناصر الإقفال الأربعة ───────────────────────────────
+-- مواعيدها مطابقة لنظائرها: العقد كطلب السلفة (قبل البداية)،
+-- والمستحقات والشهادة كمستحقات المدرب (بعد الانتهاء بأيام عمل).
+-- وللمدير تعديل أي موعد منها من شاشة «عناصر الإقفال».
+INSERT INTO "ClosureElement" (
+  "id", "key", "name", "isFormBased",
+  "deadlineRefPoint", "deadlineIdealHours", "deadlineMaxHours", "isDeadlineWorkingDays",
+  "elementType", "conditionField", "isActive", "isCustom"
+) VALUES
+  ('b1c2d3e4-0001-4a1b-9c2d-3e4f50617281', 'interpreter_contract',
+   'عقد مترجم الدورة', true,
+   'START', -120, -72, true,
+   'CONDITIONAL', 'interpreterContractType=CONTRACT', true, false),
+  ('b1c2d3e4-0002-4a1b-9c2d-3e4f50617282', 'interpreter_transfer',
+   'طلب صرف مستحقات المترجم (تحويل)', true,
+   'END', 72, 120, true,
+   'CONDITIONAL', 'interpreterContractType=TRANSFER', true, false),
+  ('b1c2d3e4-0003-4a1b-9c2d-3e4f50617283', 'interpreter_advance',
+   'نموذج استحقاق مترجم الدورة (سلفة)', true,
+   'END', 72, 120, true,
+   'CONDITIONAL', 'interpreterContractType=ADVANCE', true, false),
+  ('b1c2d3e4-0004-4a1b-9c2d-3e4f50617284', 'interpreter_certificate',
+   'شهادة إنجاز الترجمة', true,
+   'END', 72, 120, true,
+   'CONDITIONAL', 'requiresInterpreter', true, false)
+ON CONFLICT ("key") DO NOTHING;
+
+-- ── (٤) سجلات التتبع للدورات القائمة ────────────────────────
+-- الدورات المفتوحة تحتاج سجلاً لكل عنصر حتى يعمل تفعيله لاحقاً
+-- (تغيير شرط الدورة يُحدّث سجلاً موجوداً ولا يُنشئ سجلاً).
+-- وكلها «غير مطلوبة» لأن حقل المترجم غير مفعّل في دورة قائمة.
+INSERT INTO "CourseClosureTracking" ("id", "courseId", "elementId", "status")
+SELECT gen_random_uuid()::text, c."id", e."id", 'NOT_APPLICABLE'::"ElementStatus"
+  FROM "Course" c
+ CROSS JOIN "ClosureElement" e
+ WHERE e."key" IN ('interpreter_contract', 'interpreter_transfer',
+                   'interpreter_advance', 'interpreter_certificate')
+   AND c."status" NOT IN ('CLOSED', 'ARCHIVED')
+   AND NOT EXISTS (
+     SELECT 1 FROM "CourseClosureTracking" t
+      WHERE t."courseId" = c."id" AND t."elementId" = e."id"
+   );
+
+-- ── (٥) جهة طلب صرف مستحقات المترجم ─────────────────────────
+-- قابلة للتغيير من إعدادات المنصة دون تعديل كود.
+INSERT INTO "AppSetting" ("key", "value", "category", "label", "createdAt", "updatedAt")
+VALUES (
+  'interpreter.transfer.email.to',
+  'AAlfaifi@nauss.edu.sa',
+  'email',
+  'مستلم طلب صرف مستحقات المترجم (تحويل)',
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP
+)
+ON CONFLICT ("key") DO NOTHING;

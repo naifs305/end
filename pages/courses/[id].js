@@ -28,6 +28,7 @@ import toast from 'react-hot-toast';
 import { useTranslation } from '../../lib/i18n';
 import { useOptions } from '../../lib/hooks/useOptions';
 import ReasonModal from '../../components/operational/ReasonModal';
+import InterpreterCard from '../../components/operational/InterpreterCard';
 
 // ── أنماط الحالات (التسميات من الترجمة) ───────────────────────────────
 const STATUS_META = {
@@ -54,7 +55,17 @@ const ELEMENT_ORDER = {
   opening_report: 6, reaction_evaluation: 7, post_test: 8, certificates: 9,
   closing_report: 10, report: 10, supervisor_compensation: 11, trainer_compensation: 12,
   revenues: 13, materials: 14, settlement: 15,
+  // مترجم الدورة: العقد مبكّر مع التجهيز، والمستحقات والشهادة بعد الانتهاء
+  interpreter_contract: 4.5,
+  interpreter_transfer: 12.5,
+  interpreter_advance: 12.6,
+  interpreter_certificate: 12.7,
 };
+
+// عناصر مترجم الدورة — لكلٍّ مستنده، ويُبنى من بيانات المترجم
+const INTERPRETER_KEYS = new Set([
+  'interpreter_contract', 'interpreter_transfer', 'interpreter_advance', 'interpreter_certificate',
+]);
 
 const CRITICAL_ELEMENTS = new Set(['opening_report', 'closing_report', 'settlement']);
 const CRITICAL_ICON = { opening_report: FileText, closing_report: FileCheck, settlement: Coins };
@@ -410,6 +421,17 @@ export default function CourseDetail() {
 
   const isReportKey = (key) => key === 'opening_report' || key === 'closing_report' || key === 'report';
 
+  // مستند المترجم: العنصر نفسه يحدد نوعه، فلا يختار المنسق شيئاً.
+  // ومتاح قبل التقديم وبعده — فالمستند يُصدَّر ليُوقَّع ثم يُقدَّم.
+  const handleInterpreterDocument = (el) => {
+    const isEml = el.element?.key === 'interpreter_transfer';
+    if (isEml) {
+      window.location.href = `/api/closure/${el.id}/interpreter-document`;
+      return;
+    }
+    window.open(`/api/closure/${el.id}/interpreter-document`, '_blank', 'noopener');
+  };
+
   const renderAction = (el) => {
     if (isReportKey(el.element.key) && ['PENDING_APPROVAL', 'APPROVED'].includes(el.status)) {
       return (
@@ -423,6 +445,21 @@ export default function CourseDetail() {
         </div>
       );
     }
+
+    if (INTERPRETER_KEYS.has(el.element?.key) && el.status !== 'NOT_APPLICABLE') {
+      const isEml = el.element.key === 'interpreter_transfer';
+      return (
+        <button
+          onClick={() => handleInterpreterDocument(el)}
+          className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:bg-primary-dark"
+        >
+          {isEml
+            ? <><Mail size={14} aria-hidden="true" /> رسالة طلب الصرف</>
+            : <><Printer size={14} aria-hidden="true" /> فتح المستند</>}
+        </button>
+      );
+    }
+
     return null;
   };
 
@@ -624,6 +661,15 @@ export default function CourseDetail() {
             course={course}
             isManager={activeRole === 'MANAGER'}
             onDecided={fetchCourse}
+          />
+        )}
+
+        {/* بيانات مترجم الدورة — مصدر مستندات المترجم كلها */}
+        {course.requiresInterpreter && (
+          <InterpreterCard
+            courseId={course.id}
+            canEdit={isCoordinator || isManager}
+            onSaved={fetchCourse}
           />
         )}
 

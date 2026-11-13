@@ -174,6 +174,13 @@
       "requiresPreTestDesc": "Administer the pre-test to trainees",
       "requiresPostTest": "Includes a post-test",
       "requiresPostTestDesc": "Administer the post-test to trainees",
+      "requiresInterpreter": "Course has an interpreter",
+      "requiresInterpreterDesc": "Opens the interpreter elements based on the contracting type",
+      "interpreterContractType": "Interpreter contracting type",
+      "interpreterContractTypeDesc": "Each type has its own element and document",
+      "interpreterTypeContract": "Under contract",
+      "interpreterTypeTransfer": "By bank transfer",
+      "interpreterTypeAdvance": "From the advance",
       "readyCreate": "Data complete — ready to create",
       "readySave": "Ready to save",
       "completeRequired": "Complete the required fields",
@@ -778,6 +785,9 @@
         "KPI_NOTE_ADDED": "Performance note",
         "ASSIGNMENT_REGISTER_UPDATED": "Assignment register updated",
         "USER_PROJECT_CHANGED": "Coordinator moved between projects",
+        "INTERPRETER_DATA_ADDED": "Interpreter details added",
+        "INTERPRETER_DATA_UPDATED": "Interpreter details updated",
+        "INTERPRETER_DOCUMENT_TEXT_SAVED": "Interpreter document text saved",
         "KPI_SNAPSHOT_PROJECTS_BACKFILLED": "Past-month projects restored"
       }
     }

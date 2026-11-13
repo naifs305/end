@@ -15,6 +15,7 @@ import {
   BarChart3,
   StickyNote,
   ClipboardList,
+  Languages,
   Pin,
   Search,
   X,
@@ -40,6 +41,9 @@ const ACTION_META = {
   KPI_NOTE_ADDED:             { Icon: StickyNote,    cls: 'bg-forest-50 text-accent border-accent/20' },
   ASSIGNMENT_REGISTER_UPDATED:{ Icon: ClipboardList, cls: 'bg-background text-text-soft border-border' },
   USER_PROJECT_CHANGED:       { Icon: RefreshCw,     cls: 'bg-forest-50 text-primary border-primary/10' },
+  INTERPRETER_DATA_ADDED:     { Icon: Languages,     cls: 'bg-primary-light text-primary border-primary/10' },
+  INTERPRETER_DATA_UPDATED:   { Icon: Languages,     cls: 'bg-primary-light text-primary border-primary/10' },
+  INTERPRETER_DOCUMENT_TEXT_SAVED: { Icon: Languages, cls: 'bg-background text-text-soft border-border' },
   KPI_SNAPSHOT_PROJECTS_BACKFILLED: { Icon: BarChart3, cls: 'bg-background text-text-soft border-border' },
 };
 

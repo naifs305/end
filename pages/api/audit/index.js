@@ -14,6 +14,7 @@ async function handler(req, res) {
       'ELEMENT_RETURNED', 'KPI_SNAPSHOTS_CALCULATED', 'KPI_NOTE_ADDED',
       'ASSIGNMENT_REGISTER_UPDATED',
       'USER_PROJECT_CHANGED', 'KPI_SNAPSHOT_PROJECTS_BACKFILLED',
+      'INTERPRETER_DATA_ADDED', 'INTERPRETER_DATA_UPDATED',
     ];
     const actionFilter = req.query.action && allowedActions.includes(req.query.action.toUpperCase())
       ? { action: req.query.action.toUpperCase() }

@@ -174,6 +174,13 @@
       "requiresPreTestDesc": "تقديم الاختبار القبلي للمتدربين",
       "requiresPostTest": "يشتمل على اختبار بعدي",
       "requiresPostTestDesc": "تقديم الاختبار البعدي للمتدربين",
+      "requiresInterpreter": "الدورة بها مترجم",
+      "requiresInterpreterDesc": "يفتح عناصر المترجم بحسب نوع التعاقد معه",
+      "interpreterContractType": "نوع التعاقد مع المترجم",
+      "interpreterContractTypeDesc": "لكل نوع عنصره ومستنده: العقد قبل البداية، والمستحقات بعد الانتهاء",
+      "interpreterTypeContract": "مترجم بعقد",
+      "interpreterTypeTransfer": "مترجم بتحويل",
+      "interpreterTypeAdvance": "مترجم بسلفة",
       "readyCreate": "البيانات مكتملة — جاهز للإنشاء",
       "readySave": "جاهز للحفظ",
       "completeRequired": "أكمل الحقول المطلوبة",
@@ -778,6 +785,9 @@
         "KPI_NOTE_ADDED": "ملاحظة أداء",
         "ASSIGNMENT_REGISTER_UPDATED": "تحديث سجل الإسناد",
         "USER_PROJECT_CHANGED": "نقل منسق بين المشاريع",
+        "INTERPRETER_DATA_ADDED": "إدخال بيانات مترجم",
+        "INTERPRETER_DATA_UPDATED": "تعديل بيانات مترجم",
+        "INTERPRETER_DOCUMENT_TEXT_SAVED": "حفظ نص مستند مترجم",
         "KPI_SNAPSHOT_PROJECTS_BACKFILLED": "استرجاع مشاريع الأشهر الماضية"
       }
     }

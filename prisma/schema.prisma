@@ -185,6 +185,35 @@ model User {
   decidedBlockers      ElementBlocker[]           @relation("BlockerDecider")
   createdSuspensions   ElementSuspension[]        @relation("SuspensionCreator")
   lateEntryDecisions   Course[]                   @relation("LateEntryDecider")
+  interpreterRecords   CourseInterpreter[]        @relation("InterpreterDataAuthor")
+}
+
+// =============================================================
+// بيانات مترجم الدورة
+// -------------------------------------------------------------
+// تُعبَّأ مرة واحدة لكل دورة، وتخدم مخرجات المترجم الأربعة:
+// العقد، وطلب الصرف بالتحويل، ونموذج الاستحقاق بالسلفة، وشهادة
+// إنجاز الترجمة — فلا يُعاد إدخال الاسم والهوية في كل مستند.
+// بيانات الطرف الأول (الجامعة) ثابتة في قالب المستند لا هنا.
+// =============================================================
+model CourseInterpreter {
+  id          String   @id @default(uuid())
+  courseId    String   @unique
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  fullName    String
+  nationalId  String
+  email       String
+  mobile      String
+  address     String
+  // قيمة المستحق — يحتاجها طلب الصرف ونموذج الاستحقاق
+  amount      Float?
+  notes       String?
+
+  createdById String?
+  createdBy   User?    @relation("InterpreterDataAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // =============================================================
@@ -234,6 +263,12 @@ model Course {
   // الموظف فعّل التقرير بنفسه تطوّعاً (وليس لكونه إجبارياً) — يُستخدم لمنح تقدير في المؤشرات
   openingReportVoluntary         Boolean      @default(false)
   closingReportVoluntary         Boolean      @default(false)
+
+  // ----- مترجم الدورة -----
+  // اختياري: المنسق يحدده عند إضافة الدورة. ونوع التعاقد يحدد العنصر
+  // المطلوب منه: عقد، أو طلب صرف بتحويل، أو نموذج استحقاق بسلفة.
+  requiresInterpreter            Boolean      @default(false)
+  interpreterContractType        String?      // CONTRACT | TRANSFER | ADVANCE
   status                         CourseStatus @default(PREPARATION)
 
   operationalProjectId           String
@@ -249,6 +284,7 @@ model Course {
   auditLogs                      AuditLog[]
   messages                       Message[]
   blockers                       ElementBlocker[]
+  interpreter                    CourseInterpreter?
 
   // ----- الإدخال المتأخر للدورة -----
   // المنصة تكتشف التأخير بنفسها (مقارنة لحظة الإدخال بتواريخ الدورة)

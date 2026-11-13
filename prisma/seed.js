@@ -215,6 +215,11 @@ async function main() {
     { key: 'materials',            name: 'إعادة المواد التدريبية المعارة', isFormBased: false, deadlineRefPoint: 'END', deadlineIdealHours:  24,  deadlineMaxHours:  72, isDeadlineWorkingDays: false, elementType: 'CONDITIONAL', conditionField: 'materialsIssued' },
     { key: 'settlement',           name: 'تسوية السلفة المؤقتة',        isFormBased: true,  deadlineRefPoint: 'END',   deadlineIdealHours: 120,  deadlineMaxHours: 240, isDeadlineWorkingDays: true,  elementType: 'CONDITIONAL', conditionField: 'requiresAdvanceSettlement' },
     { key: 'medical_insurance',    name: 'استخراج التأمين الطبي للمتدربين', isFormBased: true, deadlineRefPoint: 'START', deadlineIdealHours: -72, deadlineMaxHours:  72, isDeadlineWorkingDays: false, elementType: 'CONDITIONAL', conditionField: 'courseType=external' },
+    // ----- مترجم الدورة: نوع التعاقد يحدد العنصر المطلوب -----
+    { key: 'interpreter_contract', name: 'عقد مترجم الدورة',              isFormBased: true,  deadlineRefPoint: 'START', deadlineIdealHours: -120, deadlineMaxHours: -72, isDeadlineWorkingDays: true, elementType: 'CONDITIONAL', conditionField: 'interpreterContractType=CONTRACT' },
+    { key: 'interpreter_transfer', name: 'طلب صرف مستحقات المترجم (تحويل)', isFormBased: true, deadlineRefPoint: 'END',  deadlineIdealHours:  72,  deadlineMaxHours: 120, isDeadlineWorkingDays: true, elementType: 'CONDITIONAL', conditionField: 'interpreterContractType=TRANSFER' },
+    { key: 'interpreter_advance',  name: 'نموذج استحقاق مترجم الدورة (سلفة)', isFormBased: true, deadlineRefPoint: 'END', deadlineIdealHours:  72,  deadlineMaxHours: 120, isDeadlineWorkingDays: true, elementType: 'CONDITIONAL', conditionField: 'interpreterContractType=ADVANCE' },
+    { key: 'interpreter_certificate', name: 'شهادة إنجاز الترجمة',        isFormBased: true,  deadlineRefPoint: 'END',   deadlineIdealHours:  72,  deadlineMaxHours: 120, isDeadlineWorkingDays: true, elementType: 'CONDITIONAL', conditionField: 'requiresInterpreter' },
   ];
 
   // الخطوة 1: upsert الحقول الأساسية فقط (آمنة دائماً)

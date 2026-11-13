@@ -89,6 +89,8 @@ const SETTINGS = [
   { key: 'blockers.partyDirectory', value: '', category: 'blockers', label: 'عناوين الجهات المنتظَرة (سطر لكل جهة: الاسم = البريد)' },
   // ── الإدخال المتأخر للدورة ──
   { key: 'course.entryLeadHours', value: process.env.COURSE_ENTRY_LEAD_HOURS || '72', category: 'courses', label: 'المهلة المطلوبة لإدخال الدورة قبل بدايتها (ساعة)' },
+  // ── مترجم الدورة ──
+  { key: 'interpreter.transfer.email.to', value: process.env.INTERPRETER_TRANSFER_EMAIL_TO || 'AAlfaifi@nauss.edu.sa', category: 'email', label: 'مستلم طلب صرف مستحقات المترجم (تحويل)' },
 ];
 
 async function main() {
