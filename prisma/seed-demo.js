@@ -6,7 +6,7 @@
 //
 // ASSUMES the BASE seed (prisma/seed.js) has ALREADY run, i.e.:
 //   - 3 OperationalProjects exist (proj_1, proj_2, proj_3)
-//   - 15 ClosureElements exist (looked up by their unique `key`)
+//   - ClosureElements exist (looked up by their unique `key`)
 //   - the real admin user Nalshahrani@nauss.edu.sa exists
 //   - the 3 default ScheduledJobs exist
 //   - (optionally) an EmployeeKpiSetting exists

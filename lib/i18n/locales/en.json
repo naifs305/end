@@ -392,7 +392,8 @@
     "closureElements": "Closure Elements",
     "jobs": "Scheduled Jobs",
     "audit": "Audit Log",
-    "profile": "Profile"
+    "profile": "Profile",
+    "settings": "Operational settings"
   },
   "auth": {
     "loginTitle": "Sign In",

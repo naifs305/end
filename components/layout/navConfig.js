@@ -15,6 +15,7 @@ import {
   FolderKanban,
   ListChecks,
   Settings,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { isAdminRole, canAccessKpis, canViewReportsOnly } from '../../lib/roles';
 
@@ -79,6 +80,7 @@ export function buildNavSections(activeRole, t) {
       item('/users', Users, t('nav.users')),
       item('/projects', FolderKanban, t('nav.projects')),
       item('/closure-elements', ListChecks, t('nav.closureElements')),
+      item('/settings', SlidersHorizontal, t('nav.settings')),
       item('/jobs', Settings, t('nav.jobs')),
     ]);
   }
