@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   HeartPulse,
   FileText,
+  Languages,
 } from 'lucide-react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
@@ -21,6 +22,7 @@ import useAuth from '../../context/AuthContext';
 import { useTranslation } from '../../lib/i18n';
 import { useSettings } from '../../lib/hooks/useSettings';
 import CourseReportForm from './CourseReportForm';
+import InterpreterForm from './InterpreterForm';
 import ReasonModal from './ReasonModal';
 import BlockerPanel from './BlockerPanel';
 
@@ -49,6 +51,14 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const isClosingReport = element?.element?.key === 'closing_report';
   const isCourseReport = isOpeningReport || isClosingReport;
   const [showReportForm, setShowReportForm] = useState(false);
+
+  // عناصر مترجم الدورة: «تقديم» يفتح نموذج المترجم ثم المستند ثم التقديم
+  const INTERPRETER_KEYS = [
+    'interpreter_contract', 'interpreter_transfer',
+    'interpreter_advance', 'interpreter_certificate',
+  ];
+  const isInterpreterElement = INTERPRETER_KEYS.includes(element?.element?.key);
+  const [showInterpreterForm, setShowInterpreterForm] = useState(false);
   const solfUrl = getSetting('solf.url', process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-nif.vercel.app');
 
   // ── نموذج التأمين الطبي ──
@@ -293,7 +303,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   // العرض
   // ======================================================================
   return (
-    <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
+    <div className="flex w-full max-w-full flex-col items-end gap-2">
       {/* زر منصة السلف */}
       {canExecute && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
         <button
@@ -306,8 +316,8 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       )}
 
       {canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status) && (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col items-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {isMedicalInsurance ? (
               <button
                 onClick={() => setShowInsuranceForm((v) => !v)}
@@ -316,6 +326,15 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               >
                 <HeartPulse size={14} aria-hidden="true" />
                 {element.status === 'RETURNED' ? t('element.resubmit') : t('element.submitInsurance')}
+              </button>
+            ) : isInterpreterElement ? (
+              <button
+                onClick={() => setShowInterpreterForm(true)}
+                disabled={loading}
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-primary-dark disabled:opacity-50"
+              >
+                <Languages size={14} aria-hidden="true" />
+                {element.status === 'RETURNED' ? t('element.resubmit') : t('element.submit')}
               </button>
             ) : isCourseReport ? (
               <button
@@ -673,6 +692,22 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             </div>
           )}
         </div>
+      )}
+
+      {/* ── نموذج مترجم الدورة ────────────────────────────────────── */}
+      {isInterpreterElement && showInterpreterForm && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
+          <div className="my-8 w-full max-w-3xl">
+            <InterpreterForm
+              trackingId={element.id}
+              courseId={element.courseId || element.course?.id}
+              elementKey={element.element.key}
+              onClose={() => setShowInterpreterForm(false)}
+              onSuccess={onUpdate}
+            />
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* ── نموذج تقرير الافتتاح/الاختتام ─────────────────────────── */}
