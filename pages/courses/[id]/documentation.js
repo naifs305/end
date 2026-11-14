@@ -13,11 +13,23 @@ import {
   Star, ImagePlus, Trash2, ArrowRight, ArrowLeft, Check, Circle, Save, Plus, X,
   CalendarDays, MapPin, Users, Send, EyeOff, Image as ImageIcon, ListOrdered, BookOpenText,
   GraduationCap, ClipboardPaste, Camera, BookOpen, FileBarChart2, Layers, Link2, Copy, ExternalLink, QrCode,
+  Pencil, Sparkles, FileUp, Loader2, Square, RectangleVertical,
 } from 'lucide-react';
 import MainLayout from '../../../components/layout/MainLayout';
 import Avatar from '../../../components/shared/Avatar';
 import api from '../../../lib/axios';
 import { isAcceptableImageFile, fileToDocumentationPhoto, fileToAvatarDataUrl } from '../../../lib/clientImage';
+import PhotoEditor from '../../../components/documentation/PhotoEditor';
+import { imgStyle, filterDefsMarkup } from '../../../lib/documentation/photoLook';
+
+const FILTER_DEFS = filterDefsMarkup();
+const SESSION_PHOTOS = 4;
+const readAsDataUrl = (file) => new Promise((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(r.result);
+  r.onerror = reject;
+  r.readAsDataURL(file);
+});
 
 const unwrap = (res) => res?.data?.data ?? res?.data;
 const fmt = (v) => (v ? new Date(v).toLocaleDateString('ar-SA-u-ca-gregory', { day: 'numeric', month: 'long', year: 'numeric' }) : '—');
@@ -57,7 +69,17 @@ export default function CourseDocumentationPage() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [schedOpen, setSchedOpen] = useState(false);
+  const [schedText, setSchedText] = useState('');
+  const [schedFound, setSchedFound] = useState(null);
+  const [schedBusy, setSchedBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(null); // 'all' أو رقم الجلسة
+  const [picker, setPicker] = useState(null); // رقم الجلسة التي تُختار صورها
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportDraft, setReportDraft] = useState(null);
   const fileRef = useRef(null);
+  const pdfRef = useRef(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -66,7 +88,7 @@ export default function CourseDocumentationPage() {
       setData(d);
       setIntro(d.documentation?.intro || '');
       setClosing(d.documentation?.closing || '');
-      setSessions((d.documentation?.sessions || []).map((s) => ({ ...s, date: toDateInput(s.date) })));
+      setSessions((d.documentation?.sessions || []).map((s) => ({ ...s, date: toDateInput(s.date), photoIds: s.photoIds || [] })));
       setReportSummary(d.documentation?.reportSummary || '');
       setRecommendations(d.documentation?.recommendations || '');
       setTrainees((d.documentation?.trainees || []).map((t) => ({ ...t, score: t.score ?? '' })));
@@ -138,13 +160,13 @@ export default function CourseDocumentationPage() {
     try { await api.put(`/courses/${id}/documentation`, { order: ids }); } catch { toast.error('تعذّر حفظ الترتيب'); load(); }
   };
 
-  const save = async () => {
+  const save = async (over = {}, { quiet = false } = {}) => {
     setSaving(true);
     try {
-      const d = unwrap(await api.put(`/courses/${id}/documentation`, { intro, closing, sessions, reportSummary, recommendations, trainees }));
+      const d = unwrap(await api.put(`/courses/${id}/documentation`, { intro, closing, sessions, reportSummary, recommendations, trainees, ...over }));
       setData(d);
       setDirty(false);
-      toast.success('حُفظ التوثيق');
+      if (!quiet) toast.success('حُفظ التوثيق');
     } catch (e) {
       toast.error(e.response?.data?.message || 'تعذّر الحفظ');
     } finally {
@@ -169,6 +191,109 @@ export default function CourseDocumentationPage() {
 
   const setSession = (i, k, v) => { setSessions((list) => list.map((s, x) => (x === i ? { ...s, [k]: v } : s))); setDirty(true); };
   const setTrainee = (i, k, v) => { setTrainees((list) => list.map((t, x) => (x === i ? { ...t, [k]: v } : t))); setDirty(true); };
+
+  // ── صور الجلسات ──
+  const sessionOf = (mid) => sessions.findIndex((s) => (s.photoIds || []).includes(mid));
+  const togglePickerPhoto = (si, mid) => {
+    setSessions((list) => list.map((s, x) => {
+      if (x !== si) return s;
+      const ids = s.photoIds || [];
+      if (ids.includes(mid)) return { ...s, photoIds: ids.filter((p) => p !== mid) };
+      if (ids.length >= SESSION_PHOTOS) { toast.error(`${SESSION_PHOTOS} صور للجلسة على الأكثر`); return s; }
+      return { ...s, photoIds: [...ids, mid] };
+    }));
+    setDirty(true);
+  };
+  // بعد حفظ المحرّر: تُنقل الصورة إلى الجلسة المختارة وتُحفظ الجلسات فوراً
+  const afterEdit = async ({ sessionIndex, changedSession }) => {
+    const mid = editing?.id;
+    setEditing(null);
+    if (changedSession && mid) {
+      const next = sessions.map((s, x) => {
+        const ids = (s.photoIds || []).filter((p) => p !== mid);
+        if (x === sessionIndex) return { ...s, photoIds: [...ids, mid].slice(-SESSION_PHOTOS) };
+        return { ...s, photoIds: ids };
+      });
+      setSessions(next);
+      await save({ sessions: next }, { quiet: true });
+    }
+    await load();
+    toast.success('حُفظت الصورة');
+  };
+
+  // ── اللصق الذكي من منصة التدريب ──
+  const readSchedule = async () => {
+    setSchedBusy(true);
+    try {
+      const r = unwrap(await api.post(`/courses/${id}/documentation/assist`, { action: 'schedule', text: schedText }));
+      setSchedFound(r.sessions || []);
+      if (!r.sessions?.length) toast.error('لم يُتعرّف على جلسات في النص — تأكد أنك نسخت صفحة الجدول كاملة');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذّرت قراءة الجدول');
+    } finally { setSchedBusy(false); }
+  };
+  const applySchedule = (mode) => {
+    const rows = (schedFound || []).map((x) => ({ title: x.title, presenter: x.presenter || '', date: x.date || '', time: x.time || '', description: '', photoIds: [] }));
+    setSessions((list) => (mode === 'replace' ? rows : [...list, ...rows]));
+    setDirty(true);
+    setSchedOpen(false); setSchedText(''); setSchedFound(null);
+    toast.success(`أُضيفت ${rows.length} جلسة — راجعها ثم احفظ`);
+  };
+
+  // ── أوصاف الجلسات بالذكاء الاصطناعي ──
+  const describe = async (indexes, tag) => {
+    if (!indexes.length) { toast('كل الجلسات موصوفة — لإعادة كتابة وصف استعمل الزر بجانبه'); return; }
+    setAiBusy(tag);
+    try {
+      const r = unwrap(await api.post(`/courses/${id}/documentation/assist`, { action: 'describe', sessions, indexes, intro }, { timeout: 200000 }));
+      const map = r.descriptions || {};
+      const n = Object.keys(map).length;
+      setSessions((list) => list.map((s, i) => (map[i] ? { ...s, description: map[i] } : s)));
+      if (n) { setDirty(true); toast.success(n > 1 ? `كُتبت ${n} أوصاف — راجعها وعدّل ما تشاء` : 'كُتب الوصف — راجعه وعدّل ما تشاء'); }
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذّرت كتابة الأوصاف');
+    } finally { setAiBusy(null); }
+  };
+
+  // ── تقرير الجهة المنفّذة ──
+  const importReport = async (file) => {
+    if (!file) return;
+    if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) { toast.error('أرفق التقرير بصيغة PDF'); return; }
+    if (file.size > 15 * 1024 * 1024) { toast.error('حجم التقرير أكبر من ١٥ ميجابايت'); return; }
+    setReportBusy(true);
+    try {
+      let pdf = await readAsDataUrl(file);
+      pdf = pdf.replace(/^data:[^;]*;/, 'data:application/pdf;');
+      const r = unwrap(await api.post(`/courses/${id}/documentation/assist`, { action: 'report', pdf }, { timeout: 200000 }));
+      setReportDraft({
+        ...r,
+        use: {
+          summary: !!r.summary,
+          recommendations: r.recommendations?.length > 0,
+          intro: !!r.intro && intro.trim().length < 60,
+          modules: r.modules?.length > 0 && sessions.length === 0,
+          trainees: r.trainees?.length > 0 && trainees.length === 0,
+        },
+      });
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذّرت قراءة التقرير');
+    } finally { setReportBusy(false); }
+  };
+  const applyReport = () => {
+    const r = reportDraft; const u = r.use;
+    if (u.summary) setReportSummary([r.summary, r.outcomes?.length ? `\n\nأبرز المخرجات:\n${r.outcomes.map((o) => `• ${o}`).join('\n')}` : ''].join('').trim());
+    if (u.recommendations) setRecommendations(r.recommendations.join('\n'));
+    if (u.intro) setIntro(r.intro);
+    if (u.modules) setSessions((list) => [...list, ...r.modules.map((m) => ({ title: m.title, presenter: '', date: '', time: '', description: m.description, photoIds: [] }))]);
+    if (u.trainees) setTrainees((list) => [...list, ...r.trainees.map((t) => ({ name: t.name, entity: t.entity, score: t.score ?? '', distinction: '', isDistinguished: false }))]);
+    setReportDraft(null);
+    setDirty(true);
+    toast.success('نُقلت المادة إلى الحقول — راجعها ثم احفظ');
+  };
+
+  const setFormat = async (format) => {
+    try { const d = unwrap(await api.put(`/courses/${id}/documentation`, { format })); setData(d); } catch { toast.error('تعذّر تغيير المقاس'); }
+  };
 
   // صورة المتدرب: مربعة مصغّرة، تُرفع فوراً ويُحفظ مفتاحها مع القائمة
   const uploadTraineePhoto = async (i, file) => {
@@ -254,7 +379,7 @@ export default function CourseDocumentationPage() {
             {/* ── الصور ── */}
             <section className={PANEL} aria-labelledby="h-photos">
               <SectionHead icon={ImageIcon} title={<span id="h-photos">صور الدورة <span className="text-text-soft">({media.length})</span></span>}
-                hint="تُضغط في جهازك قبل الرفع. اختر غلافاً بالنجمة، ورتّب بالأسهم، واكتب تعليقاً لكل صورة.">
+                hint="انقر على أي صورة لتعديلها: موضع الوجوه، والفلتر، وجلستها. والنجمة تجعلها الغلاف.">
                 {editable && (
                   <button type="button" onClick={() => fileRef.current?.click()} disabled={uploads.total > 0}
                     className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-[13px] font-bold text-white shadow-[0_8px_18px_-10px_rgba(46,96,102,0.85)] hover:bg-primary-dark disabled:opacity-60">
@@ -287,15 +412,22 @@ export default function CourseDocumentationPage() {
                   onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); if (editable) onFiles(e.dataTransfer.files); }}>
                   {media.map((m, i) => {
                     const isCover = doc.coverMediaId === m.id;
+                    const si = sessionOf(m.id);
                     return (
                       <li key={m.id} className={`group overflow-hidden rounded-2xl border bg-white ${isCover ? 'border-accent shadow-[0_0_0_2px_#C6AA76]' : 'border-border'}`}>
                         <div className="relative aspect-[4/3] bg-background">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={m.thumbUrl} alt={m.caption || `صورة ${i + 1}`} loading="lazy" className="h-full w-full object-cover" />
-                          {isCover && <span className="absolute start-2 top-2 rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-extrabold text-white">الغلاف</span>}
+                          <img src={m.thumbUrl} alt={m.caption || `صورة ${i + 1}`} loading="lazy" className="h-full w-full" style={imgStyle(m.edit)} />
+                          {editable && (
+                            <button type="button" onClick={() => setEditing(m)} aria-label={`تعديل الصورة ${i + 1}`} className="absolute inset-0 cursor-pointer" />
+                          )}
+                          {isCover && <span className="pointer-events-none absolute start-2 top-2 rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-extrabold text-white">الغلاف</span>}
+                          {si >= 0 && <span className="pointer-events-none absolute end-2 top-2 rounded-full bg-primary/90 px-2 py-0.5 text-[10.5px] font-extrabold text-white">جلسة {si + 1}</span>}
+                          {m.width < 1400 && m.height < 1400 && <span className="pointer-events-none absolute bottom-12 start-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-bold text-white" title="دقتها أقل مما يناسب الطباعة الكبيرة">دقة منخفضة</span>}
                           {editable && (
                             <div className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
                               <button type="button" onClick={() => setCover(m.id)} title="اجعلها الغلاف" aria-label="اجعلها الغلاف" className="grid h-8 w-8 place-items-center rounded-full bg-white/90 text-warning"><Star size={15} fill={isCover ? 'currentColor' : 'none'} /></button>
+                              <button type="button" onClick={() => setEditing(m)} title="تعديل: التركيز والفلتر والجلسة" aria-label="تعديل الصورة" className="grid h-8 w-8 place-items-center rounded-full bg-white/90 text-primary"><Pencil size={14} /></button>
                               <button type="button" onClick={() => move(i, -1)} title="تقديم" aria-label="تقديم" className="grid h-8 w-8 place-items-center rounded-full bg-white/90 text-text-main"><ArrowRight size={15} /></button>
                               <button type="button" onClick={() => move(i, 1)} title="تأخير" aria-label="تأخير" className="grid h-8 w-8 place-items-center rounded-full bg-white/90 text-text-main"><ArrowLeft size={15} /></button>
                               <button type="button" onClick={() => removePhoto(m.id)} title="حذف" aria-label="حذف الصورة" className="ms-auto grid h-8 w-8 place-items-center rounded-full bg-white/90 text-danger"><Trash2 size={15} /></button>
@@ -333,16 +465,68 @@ export default function CourseDocumentationPage() {
 
             {/* ── الجلسات ── */}
             <section className={PANEL} aria-labelledby="h-sessions">
-              <SectionHead icon={ListOrdered} title={<span id="h-sessions">جدول الجلسات <span className="text-text-soft">({sessions.length})</span></span>} hint="اختياري — يظهر في المجلة جدولاً زمنياً للدورة.">
+              <SectionHead icon={ListOrdered} title={<span id="h-sessions">جدول الجلسات <span className="text-text-soft">({sessions.length})</span></span>} hint="الصق الجدول من منصة التدريب، وأسند لكل جلسة صورها، فتظهر في المجلة بقصتها وصورها.">
                 {editable && (
-                  <button type="button" onClick={() => { setSessions((l) => [...l, { title: '', presenter: '', date: '', time: '', description: '' }]); setDirty(true); }}
-                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-primary hover:bg-primary-light">
-                    <Plus size={15} aria-hidden="true" /> جلسة
-                  </button>
+                  <div className="flex flex-wrap gap-1">
+                    <button type="button" onClick={() => setSchedOpen((v) => !v)} aria-expanded={schedOpen}
+                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-text-soft hover:bg-background hover:text-primary">
+                      <ClipboardPaste size={15} aria-hidden="true" /> لصق من منصة التدريب
+                    </button>
+                    {data.aiEnabled && sessions.length > 0 && (
+                      <button type="button" disabled={!!aiBusy} onClick={() => describe(sessions.map((x, i) => (x.title?.trim() && !x.description?.trim() ? i : -1)).filter((i) => i >= 0), 'all')}
+                        className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-warning hover:bg-sand/15 disabled:opacity-60">
+                        {aiBusy === 'all' ? <Loader2 size={15} aria-hidden="true" className="animate-spin" /> : <Sparkles size={15} aria-hidden="true" />} اكتب الأوصاف
+                      </button>
+                    )}
+                    <button type="button" onClick={() => { setSessions((l) => [...l, { title: '', presenter: '', date: '', time: '', description: '', photoIds: [] }]); setDirty(true); }}
+                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-primary hover:bg-primary-light">
+                      <Plus size={15} aria-hidden="true" /> جلسة
+                    </button>
+                  </div>
                 )}
               </SectionHead>
+              {schedOpen && (
+                <div className="border-b border-border bg-primary-light/30 p-4">
+                  {!schedFound ? (
+                    <>
+                      <p className="mb-2 text-[12.5px] text-text-soft">افتح جدول الدورة في منصة التدريب، وحدّد الصفحة كلها (Ctrl+A) وانسخها، ثم الصقها هنا كما هي. تُستخرج العناوين والتواريخ والأوقات، وتُتجاهل الاستراحات والملفات والروابط.</p>
+                      <textarea value={schedText} onChange={(e) => setSchedText(e.target.value)} rows={7} aria-label="نص الجدول المنسوخ"
+                        className="w-full rounded-2xl border border-border bg-white px-3 py-2 text-[13px] outline-none focus:border-primary" />
+                      <div className="mt-2 flex gap-1">
+                        <button type="button" onClick={readSchedule} disabled={!schedText.trim() || schedBusy} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50">
+                          {schedBusy ? <Loader2 size={14} aria-hidden="true" className="animate-spin" /> : <Check size={14} aria-hidden="true" />} استخراج الجلسات
+                        </button>
+                        <button type="button" onClick={() => setSchedOpen(false)} className="rounded-full px-3 py-2 text-[13px] font-bold text-text-soft hover:bg-white">إلغاء</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mb-2 text-[13px] font-extrabold text-text-main">وُجدت {schedFound.length} جلسة — راجعها:</p>
+                      <ol className="mb-3 max-h-64 space-y-1 overflow-y-auto rounded-2xl bg-white p-3 text-[12.5px]">
+                        {schedFound.map((x, i) => (
+                          <li key={i} className="flex flex-wrap gap-x-3 border-b border-border/60 py-1 last:border-0">
+                            <b className="text-text-main">{i + 1}. {x.title}</b>
+                            <span className="text-text-soft" dir="ltr">{x.date || ''} {x.time || ''}</span>
+                            {x.presenter && <span className="text-warning">{x.presenter}</span>}
+                          </li>
+                        ))}
+                      </ol>
+                      <div className="flex flex-wrap gap-1">
+                        {sessions.length > 0 && (
+                          <button type="button" onClick={() => applySchedule('replace')} disabled={!schedFound.length} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50">استبدال الجدول الحالي</button>
+                        )}
+                        <button type="button" onClick={() => applySchedule('append')} disabled={!schedFound.length}
+                          className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold disabled:opacity-50 ${sessions.length ? 'border border-primary text-primary' : 'bg-primary text-white'}`}>
+                          <Plus size={14} aria-hidden="true" /> {sessions.length ? 'إضافة إلى الجدول' : 'اعتماد الجلسات'}
+                        </button>
+                        <button type="button" onClick={() => setSchedFound(null)} className="rounded-full px-3 py-2 text-[13px] font-bold text-text-soft hover:bg-white">رجوع</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               <div className="space-y-3 p-4">
-                {sessions.length === 0 && <p className="py-4 text-center text-[13px] text-text-soft">لا جلسات بعد.</p>}
+                {sessions.length === 0 && <p className="py-4 text-center text-[13px] text-text-soft">لا جلسات بعد — الصقها من منصة التدريب بنقرة.</p>}
                 {sessions.map((s, i) => (
                   <div key={i} className="grid gap-2 rounded-2xl border border-border p-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_140px_110px_auto]">
                     <input value={s.title} disabled={!editable} onChange={(e) => setSession(i, 'title', e.target.value)} placeholder="عنوان الجلسة" aria-label="عنوان الجلسة" className="rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-primary" />
@@ -352,8 +536,35 @@ export default function CourseDocumentationPage() {
                     {editable && (
                       <button type="button" onClick={() => { setSessions((l) => l.filter((_, x) => x !== i)); setDirty(true); }} aria-label="حذف الجلسة" className="grid h-10 w-10 place-items-center rounded-full text-danger hover:bg-burgundy/5"><X size={16} /></button>
                     )}
-                    <textarea value={s.description || ''} disabled={!editable} onChange={(e) => setSession(i, 'description', e.target.value)} rows={2} placeholder="وصف موجز (اختياري)" aria-label="وصف الجلسة"
-                      className="resize-y rounded-xl border border-border px-3 py-2 text-[13px] outline-none focus:border-primary sm:col-span-5" />
+                    <div className="relative sm:col-span-5">
+                      <textarea value={s.description || ''} disabled={!editable} onChange={(e) => setSession(i, 'description', e.target.value)} rows={2} placeholder="وصف موجز (اختياري)" aria-label="وصف الجلسة"
+                        className="block w-full resize-y rounded-xl border border-border px-3 py-2 pe-11 text-[13px] leading-relaxed outline-none focus:border-primary" />
+                      {editable && data.aiEnabled && s.title?.trim() && (
+                        <button type="button" disabled={!!aiBusy} onClick={() => describe([i], i)} title={s.description ? 'أعد كتابة الوصف' : 'اكتب الوصف'} aria-label="كتابة الوصف بالذكاء الاصطناعي"
+                          className="absolute end-1.5 top-1.5 grid h-8 w-8 place-items-center rounded-full text-warning hover:bg-sand/20 disabled:opacity-50">
+                          {aiBusy === i ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                        </button>
+                      )}
+                    </div>
+                    {/* صور الجلسة */}
+                    <div className="flex flex-wrap items-center gap-1.5 sm:col-span-5">
+                      {(s.photoIds || []).map((pid) => {
+                        const m = media.find((x) => x.id === pid);
+                        if (!m) return null;
+                        return (
+                          <span key={pid} className="relative h-12 w-16 overflow-hidden rounded-lg border border-border">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={m.thumbUrl} alt="" className="h-full w-full" style={imgStyle(m.edit)} />
+                          </span>
+                        );
+                      })}
+                      {editable && media.length > 0 && (
+                        <button type="button" onClick={() => setPicker(i)}
+                          className="inline-flex h-12 items-center gap-1.5 rounded-lg border border-dashed border-border px-3 text-[12px] font-bold text-text-soft hover:border-primary/50 hover:text-primary">
+                          <ImageIcon size={14} aria-hidden="true" /> {(s.photoIds || []).length ? 'تغيير الصور' : 'صور الجلسة'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -362,7 +573,46 @@ export default function CourseDocumentationPage() {
             {/* ── التقرير الفني ── */}
             <section className={PANEL} aria-labelledby="h-report">
               <SectionHead icon={FileBarChart2} title={<span id="h-report">التقرير الفني</span>}
-                hint="للقيادات وجهة التدريب: يُستخرج من داخل المنصة وحدها، ولا يظهر في المجلة العامة." />
+                hint="للقيادات وجهة التدريب: يُستخرج من داخل المنصة وحدها، ولا يظهر في المجلة العامة.">
+                {editable && data.aiEnabled && (
+                  <>
+                    <button type="button" onClick={() => pdfRef.current?.click()} disabled={reportBusy}
+                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-warning hover:bg-sand/15 disabled:opacity-60">
+                      {reportBusy ? <Loader2 size={15} aria-hidden="true" className="animate-spin" /> : <FileUp size={15} aria-hidden="true" />}
+                      {reportBusy ? 'يقرأ التقرير…' : 'من تقرير الجهة المنفّذة'}
+                    </button>
+                    <input ref={pdfRef} type="file" accept="application/pdf,.pdf" className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; importReport(f); }} />
+                  </>
+                )}
+              </SectionHead>
+              {reportDraft && (
+                <div className="border-b border-border bg-sand/10 p-4">
+                  <p className="mb-1 flex items-center gap-1.5 text-[13px] font-extrabold text-text-main"><Sparkles size={15} aria-hidden="true" className="text-warning" /> قرأ المساعد التقرير — اختر ما يُنقل إلى الحقول:</p>
+                  <p className="mb-3 text-[11.5px] text-text-soft">كل ما يُنقل يبقى قابلاً للتعديل قبل الحفظ.</p>
+                  <div className="space-y-2">
+                    {[
+                      { k: 'summary', label: 'ملخص التنفيذ وأبرز المخرجات', show: !!reportDraft.summary, preview: reportDraft.summary },
+                      { k: 'recommendations', label: `التوصيات (${reportDraft.recommendations?.length || 0})`, show: reportDraft.recommendations?.length > 0, preview: reportDraft.recommendations?.join(' · ') },
+                      { k: 'intro', label: 'مقدمة المجلة', show: !!reportDraft.intro, preview: reportDraft.intro, warn: intro.trim().length >= 60 ? 'ستحل محل المقدمة الحالية' : '' },
+                      { k: 'modules', label: `محاور البرنامج جلساتٍ بأوصافها (${reportDraft.modules?.length || 0})`, show: reportDraft.modules?.length > 0, preview: reportDraft.modules?.map((m) => m.title).join(' · '), warn: sessions.length ? 'تُضاف بعد الجلسات الحالية' : '' },
+                      { k: 'trainees', label: `المتدربون ودرجاتهم (${reportDraft.trainees?.length || 0})`, show: reportDraft.trainees?.length > 0, preview: reportDraft.trainees?.slice(0, 5).map((t) => t.name).join(' · ') },
+                    ].filter((x) => x.show).map((x) => (
+                      <label key={x.k} className="flex cursor-pointer items-start gap-2.5 rounded-2xl border border-border bg-white p-3">
+                        <input type="checkbox" checked={!!reportDraft.use[x.k]} onChange={(e) => setReportDraft((d) => ({ ...d, use: { ...d.use, [x.k]: e.target.checked } }))} className="mt-1 h-4 w-4 accent-[#00676a]" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[13px] font-bold text-text-main">{x.label}{x.warn && <span className="ms-2 text-[11px] font-bold text-warning">— {x.warn}</span>}</span>
+                          <span className="line-clamp-2 block text-[12px] leading-relaxed text-text-soft">{x.preview}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex gap-1">
+                    <button type="button" onClick={applyReport} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-bold text-white"><Check size={14} aria-hidden="true" /> نقل المختار</button>
+                    <button type="button" onClick={() => setReportDraft(null)} className="rounded-full px-3 py-2 text-[13px] font-bold text-text-soft hover:bg-white">تجاهل</button>
+                  </div>
+                </div>
+              )}
               <div className="space-y-4 p-5">
                 <label className="block">
                   <span className="mb-1 block text-xs font-bold text-text-main">ملخص التنفيذ <span className="font-normal text-text-soft">— ما تحقق من أهداف البرنامج وأبرز مخرجاته</span></span>
@@ -490,6 +740,20 @@ export default function CourseDocumentationPage() {
             {doc && (
               <div className={PANEL}>
                 <p className="border-b border-border px-5 py-3 text-[13px] font-extrabold text-text-main">الإصدارات</p>
+                <div className="border-b border-border px-4 py-3">
+                  <p className="mb-2 text-[11.5px] font-bold text-text-soft">مقاس المجلة</p>
+                  <div className="grid grid-cols-2 gap-1 rounded-full bg-background p-1" role="radiogroup" aria-label="مقاس المجلة">
+                    {[{ v: 'A4', label: 'A4 طولي', Icon: RectangleVertical }, { v: 'SQUARE', label: 'مربع', Icon: Square }].map(({ v, label, Icon }) => {
+                      const on = (doc.format || 'A4') === v;
+                      return (
+                        <button key={v} type="button" role="radio" aria-checked={on} disabled={!editable} onClick={() => !on && setFormat(v)}
+                          className={`inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-bold ${on ? 'bg-white text-primary shadow-sm' : 'text-text-soft hover:text-text-main'}`}>
+                          <Icon size={14} aria-hidden="true" /> {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div className="space-y-1 p-3">
                   {[
                     { e: 'magazine', label: 'المجلة', hint: 'غلاف، وتقديم، وجلسات، ومعرض، وختام', Icon: BookOpen },
@@ -536,7 +800,7 @@ export default function CourseDocumentationPage() {
             )}
 
             {editable && (
-              <button type="button" onClick={save} disabled={saving || !dirty}
+              <button type="button" onClick={() => save()} disabled={saving || !dirty}
                 className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_8px_18px_-10px_rgba(46,96,102,0.85)] hover:bg-primary-dark disabled:opacity-50">
                 <Save size={15} aria-hidden="true" /> {saving ? 'جارٍ الحفظ…' : dirty ? 'حفظ النص والجلسات' : 'كل شيء محفوظ'}
               </button>
@@ -544,6 +808,43 @@ export default function CourseDocumentationPage() {
           </aside>
         </div>
       </div>
+
+      <div aria-hidden="true" dangerouslySetInnerHTML={{ __html: FILTER_DEFS }} />
+      {editing && (
+        <PhotoEditor media={editing} isCover={doc.coverMediaId === editing.id} sessions={sessions} sessionIndex={sessionOf(editing.id)}
+          onClose={() => setEditing(null)} onSaved={afterEdit} />
+      )}
+      {picker !== null && sessions[picker] && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#0b2224]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="صور الجلسة"
+          onClick={(e) => { if (e.target === e.currentTarget) setPicker(null); }}>
+          <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-[22px] bg-white shadow-2xl">
+            <div className="border-b border-border px-5 py-3">
+              <p className="text-[15px] font-extrabold text-text-main">صور الجلسة: {sessions[picker].title || `الجلسة ${picker + 1}`}</p>
+              <p className="text-[12px] text-text-soft">اختر حتى {SESSION_PHOTOS} صور — تظهر مع الجلسة في المجلة بدل المعرض العام.</p>
+            </div>
+            <ul className="grid flex-1 grid-cols-3 gap-2 overflow-y-auto p-4 sm:grid-cols-4">
+              {media.map((m) => {
+                const on = (sessions[picker].photoIds || []).includes(m.id);
+                const other = !on ? sessionOf(m.id) : -1;
+                return (
+                  <li key={m.id}>
+                    <button type="button" onClick={() => togglePickerPhoto(picker, m.id)} aria-pressed={on}
+                      className={`relative block aspect-[4/3] w-full overflow-hidden rounded-xl border-[3px] ${on ? 'border-primary' : 'border-transparent'}`}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={m.thumbUrl} alt={m.caption || ''} className="h-full w-full" style={imgStyle(m.edit)} />
+                      {on && <span className="absolute end-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-primary text-white"><Check size={14} /></span>}
+                      {other >= 0 && <span className="absolute start-1.5 top-1.5 rounded-full bg-black/55 px-1.5 text-[10px] font-bold text-white">جلسة {other + 1}</span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="flex justify-end border-t border-border bg-background px-4 py-3">
+              <button type="button" onClick={() => setPicker(null)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2 text-[13px] font-bold text-white"><Check size={15} aria-hidden="true" /> تم</button>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 }

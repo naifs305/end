@@ -4,27 +4,31 @@
 // • نمط الكتاب: صفحتان متقابلتان تُقلَّبان (من اليمين إلى اليسار)، بالأزرار
 //   أو بأسهم لوحة المفاتيح.
 // • نمط التمرير: الصفحات متتابعة — وهو الافتراضي على الجوال.
-// • الطباعة: الصفحات بمقاسها A4 تماماً، واحدة في كل ورقة. و«نسخة المطبعة»
-//   تضيف ٣ ملم نزفاً حول كل صفحة وعلامات القصّ لإدارة المطابع.
+// • الطباعة: الصفحات بمقاسها تماماً (A4 أو مربعة ٢١٠×٢١٠)، واحدة في كل
+//   ورقة. و«نسخة المطبعة» تضيف ٣ ملم نزفاً حول كل صفحة وعلامات القصّ.
 // ======================================================================
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, Rows3, ChevronRight, ChevronLeft, Printer, Link2, Check, Scissors } from 'lucide-react';
 import { MAGAZINE_CSS } from './MagazinePages';
+import { filterDefsMarkup } from '../../lib/documentation/photoLook';
 
 const PAGE_PX = 793.7; // ٢١٠ ملم بدقة ٩٦ نقطة
-const RATIO = 297 / 210;
+const FILTER_DEFS = filterDefsMarkup();
 const toAr = (n) => String(n ?? '').replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d]);
 
-function ScaledPage({ node, width }) {
+function ScaledPage({ node, width, ratio }) {
   const scale = width / PAGE_PX;
   return (
-    <div className="mzv-page" style={{ width, height: width * RATIO }}>
+    <div className="mzv-page" style={{ width, height: width * ratio }}>
       <div className="mzv-page-inner" style={{ transform: `scale(${scale})` }}>{node}</div>
     </div>
   );
 }
 
-export default function MagazineViewer({ pages, shareUrl = null, title = '', allowPress = false }) {
+export default function MagazineViewer({ pages, shareUrl = null, title = '', allowPress = false, format = 'A4' }) {
+  const square = format === 'SQUARE';
+  const RATIO = square ? 1 : 297 / 210;
+  const pageMm = square ? 210 : 297;
   const wrapRef = useRef(null);
   const [box, setBox] = useState({ w: 1200, h: 800 });
   const [mode, setMode] = useState('book');
@@ -87,8 +91,9 @@ export default function MagazineViewer({ pages, shareUrl = null, title = '', all
   const current = spreads[spread] || [0];
 
   return (
-    <div className="mzv" ref={wrapRef}>
-      <style>{MAGAZINE_CSS + VIEWER_CSS(press)}</style>
+    <div className={`mzv ${square ? 'mz-fmt-sq' : ''}`} ref={wrapRef}>
+      <style>{MAGAZINE_CSS + VIEWER_CSS(press, pageMm)}</style>
+      <div aria-hidden="true" dangerouslySetInnerHTML={{ __html: FILTER_DEFS }} />
 
       {/* ── شريط الأدوات ── */}
       <div className="mzv-bar">
@@ -119,7 +124,7 @@ export default function MagazineViewer({ pages, shareUrl = null, title = '', all
         <div className="mzv-book">
           <button type="button" className="mzv-nav" onClick={() => go(-1)} disabled={spread === 0} aria-label="الصفحة السابقة"><ChevronLeft size={22} /></button>
           <div key={spread} className={`mzv-spread ${anim}`} onAnimationEnd={() => setAnim('')}>
-            {current.map((i) => <ScaledPage key={pages[i].key} node={pages[i].node} width={pageW} />)}
+            {current.map((i) => <ScaledPage key={pages[i].key} node={pages[i].node} width={pageW} ratio={RATIO} />)}
           </div>
           <button type="button" className="mzv-nav" onClick={() => go(1)} disabled={spread === spreads.length - 1} aria-label="الصفحة التالية"><ChevronRight size={22} /></button>
           <p className="mzv-count">
@@ -128,7 +133,7 @@ export default function MagazineViewer({ pages, shareUrl = null, title = '', all
         </div>
       ) : (
         <div className="mzv-scroll">
-          {pages.map((p) => <ScaledPage key={p.key} node={p.node} width={pageW} />)}
+          {pages.map((p) => <ScaledPage key={p.key} node={p.node} width={pageW} ratio={RATIO} />)}
         </div>
       )}
 
@@ -145,11 +150,13 @@ export default function MagazineViewer({ pages, shareUrl = null, title = '', all
   );
 }
 
-// نسخة المطبعة: الورقة ٢٢٦×٣١٣ ملم = الصفحة ٢١٠×٢٩٧ + نزف ٣ ملم + هامش علامات ٥ ملم.
-// والصفحة تُكبَّر إلى ٢١٦×٣٠٣ فيمتدّ لونها وصورها في النزف، والمحتوى في مأمن داخل الحواف.
-function VIEWER_CSS(press) {
+// نسخة المطبعة: الورقة = الصفحة + نزف ٣ ملم + هامش علامات ٥ ملم من كل جانب
+// (٢٢٦×٣١٣ للـA4، و٢٢٦×٢٢٦ للمربعة). والصفحة تُكبَّر بنسبة واحدة فيمتدّ
+// لونها وصورها في النزف، والمحتوى في مأمن داخل الحواف.
+function VIEWER_CSS(press, pageH = 297) {
   const sheetW = press ? 226 : 210;
-  const sheetH = press ? 313 : 297;
+  const sheetH = press ? pageH + 16 : pageH;
+
   return `
 .mzv{min-height:100vh;background:#e9ece9}
 .mzv-bar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 16px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid #E3E7E7;font-family:Cairo,sans-serif;direction:rtl}
@@ -176,7 +183,7 @@ function VIEWER_CSS(press) {
 .mzv-scroll{display:flex;flex-direction:column;align-items:center;gap:16px;padding:16px 12px 40px}
 .mzv-scroll .mzv-page{box-shadow:0 18px 40px -24px rgba(11,63,66,.5)}
 .mzv-page{position:relative;overflow:hidden;background:#fff;flex:none}
-.mzv-page-inner{position:absolute;top:0;left:0;width:210mm;height:297mm;transform-origin:top left}
+.mzv-page-inner{position:absolute;top:0;left:0;width:210mm;height:${pageH}mm;transform-origin:top left}
 .mzv-print{display:none}
 @media (prefers-reduced-motion:reduce){.mzv-turn-next,.mzv-turn-prev{animation:none}}
 @media print{
@@ -188,7 +195,7 @@ function VIEWER_CSS(press) {
   .mzv-bar,.mzv-book,.mzv-scroll{display:none!important}
   .mzv-sheet{width:${sheetW}mm;height:${sheetH}mm;position:relative;overflow:hidden;break-after:page;page-break-after:always;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#fff}
   .mzv-sheet:last-child{break-after:auto;page-break-after:auto}
-  .mzv-sheet-page{position:absolute;top:${press ? 5 : 0}mm;left:${press ? 5 : 0}mm;width:210mm;height:297mm;transform-origin:top left;${press ? 'transform:scale(1.02857);' : ''}}
+  .mzv-sheet-page{position:absolute;top:${press ? 5 : 0}mm;left:${press ? 5 : 0}mm;width:210mm;height:${pageH}mm;transform-origin:top left;${press ? 'transform:scale(1.02857);' : ''}}
   .mzv-crop{position:absolute;background:#000;visibility:visible}
   .mzv-crop.tl,.mzv-crop.tr,.mzv-crop.bl,.mzv-crop.br{width:0;height:0}
   .mzv-crop:before,.mzv-crop:after{content:"";position:absolute;background:#000}

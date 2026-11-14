@@ -40,7 +40,7 @@ export default function DocumentationEdition() {
   return (
     <>
       <Head><title>{`${TITLES[edition]} — ${data.course.name}`}</title></Head>
-      <MagazineViewer pages={pages} shareUrl={edition === 'magazine' ? shareUrl : null} title={`${TITLES[edition]} · ${data.course.name}`} allowPress />
+      <MagazineViewer pages={pages} shareUrl={edition === 'magazine' ? shareUrl : null} title={`${TITLES[edition]} · ${data.course.name}`} allowPress format={data.documentation.format} />
     </>
   );
 }

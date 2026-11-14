@@ -1,6 +1,6 @@
 // GET    /api/documentation/media/[mediaId]?s=thumb|full[&e&t] — الصورة نفسها
 //        (عامة إن كان التوثيق منشوراً، وإلا برابط موقَّع قصير العمر)
-// PATCH  — التعليق، أو جعلها الغلاف { caption, cover: true }
+// PATCH  — التعليق، والغلاف، وتعديل المظهر { caption, cover: true, edit, replace }
 // DELETE — حذفها
 const { withAuth, ok, fail } = require('../../../../lib/server/http');
 const svc = require('../../../../lib/modules/documentation/documentation.service');
@@ -39,3 +39,5 @@ async function handler(req, res) {
 
 module.exports = handler;
 module.exports.default = handler;
+// التدوير يرسل الصورة كاملة بعد تدويرها
+module.exports.config = { api: { bodyParser: { sizeLimit: '8mb' } } };

@@ -36,7 +36,7 @@ export default function PublicMagazine({ data, url, qrSvg }) {
         <meta property="og:description" content="إصدار توثيقي من وكالة الجامعة للتدريب" />
         {cover && <meta property="og:image" content={new URL(cover.fullUrl, url).toString()} />}
       </Head>
-      <MagazineViewer pages={pages} shareUrl={url} title={data.course.name} />
+      <MagazineViewer pages={pages} shareUrl={url} title={data.course.name} format={data.documentation.format} />
     </>
   );
 }

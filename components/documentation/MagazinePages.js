@@ -1,5 +1,5 @@
 // ======================================================================
-// صفحات المجلة والتقرير الفني — بمقاس A4 تماماً
+// صفحات المجلة والتقرير الفني — بمقاس A4، أو مربعة ٢١٠×٢١٠ ملم
 // ----------------------------------------------------------------------
 // صفحة واحدة تخدم ثلاثة: التصفّح بالتقليب على الشاشة، والعرض المتتابع
 // على الجوال، والطباعة (ونسخة المطبعة بهوامش القصّ). فما يراه المنسق
@@ -7,7 +7,12 @@
 //
 // الصياغة عربية أكاديمية بنَفَس مؤسسي سعودي، وما يكتبه المنسق يُعرض
 // نصاً (React يهرّبه) فلا يُنفَّذ منه شيء.
+//
+// كل صورة تُعرض بموضع تركيزها وفلترها المحفوظين (lib/documentation/photoLook)،
+// فلا تُقصّ الرؤوس، ولا تُعاد كتابة الصورة. وصور كل جلسة تظهر معها في
+// صفحات «من قلب الجلسات»، وما بقي يتوزّع على المعرض بحسب اتجاهه.
 // ======================================================================
+import { imgStyle, orientation } from '../../lib/documentation/photoLook';
 
 const fmtDate = (v, opts = { day: 'numeric', month: 'long', year: 'numeric' }) =>
   (v ? new Date(v).toLocaleDateString('ar-SA-u-ca-gregory-nu-arab', opts) : '');
@@ -23,6 +28,12 @@ function chunk(list, size) {
   const out = [];
   for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
   return out;
+}
+
+// توزيع متوازن بحد أقصى للصفحة (٦ عناصر بحد ٤ = ٣ + ٣، لا ٤ + ٢)
+function balanced(list, max) {
+  if (!list.length) return [];
+  return chunk(list, Math.ceil(list.length / Math.ceil(list.length / max)));
 }
 
 const LOGO = '/nauss-logo.png';
@@ -46,7 +57,7 @@ function Photo({ m, className = '', showCaption = true }) {
   if (!m) return null;
   return (
     <figure className={`mz-photo ${className}`}>
-      <img src={m.fullUrl} alt={m.caption || 'صورة من الدورة'} />
+      <img src={m.fullUrl} alt={m.caption || 'صورة من الدورة'} style={imgStyle(m.edit)} />
       {showCaption && m.caption && <figcaption>{m.caption}</figcaption>}
     </figure>
   );
@@ -57,7 +68,7 @@ function Cover({ course, cover, edition }) {
   const kicker = edition === 'report' ? 'التقرير الفني' : 'إصدار توثيقي';
   return (
     <section className="mz-page mz-cover">
-      {cover && <img className="mz-cover-img" src={cover.fullUrl} alt="" />}
+      {cover && <img className="mz-cover-img" src={cover.fullUrl} alt="" style={imgStyle(cover.edit)} />}
       <div className="mz-cover-veil" />
       <div className="mz-cover-top">
         <img src={LOGO} alt="جامعة نايف العربية للعلوم الأمنية" className="mz-logo-white" />
@@ -145,7 +156,35 @@ function Sessions({ course, sessions, page, part }) {
   );
 }
 
-// ── المعرض: ثلاثة تصاميم تتناوب ─────────────────────────────
+// ── من قلب الجلسات: كل جلسة بصورها وقصتها ──────────────────
+function SessionFeatures({ course, items, page }) {
+  return (
+    <section className="mz-page mz-inner">
+      <RunningHead course={course} label="من قلب الجلسات" />
+      <div className="mz-body mz-feats">
+        {items.map(({ s, n, photos }, k) => (
+          <article key={s.id || `${n}`} className={`mz-feat mz-feat-p${Math.min(photos.length, 4)} ${k % 2 ? 'mz-feat-flip' : ''}`}>
+            <div className="mz-feat-photos">
+              {photos.slice(0, 4).map((m) => <Photo key={m.id} m={m} showCaption={false} />)}
+            </div>
+            <div className="mz-feat-text">
+              <span className="mz-feat-no">الجلسة {toAr(n)}</span>
+              <h3>{s.title}</h3>
+              <p className="mz-feat-meta">
+                {[s.date ? fmtDate(s.date, { weekday: 'long', day: 'numeric', month: 'long' }) : '', s.time ? toAr(s.time) : ''].filter(Boolean).join(' · ')}
+              </p>
+              {s.presenter && <p className="mz-feat-who">{s.presenter}</p>}
+              {s.description && <p className="mz-feat-desc">{s.description}</p>}
+            </div>
+          </article>
+        ))}
+      </div>
+      <Folio n={page} />
+    </section>
+  );
+}
+
+// ── المعرض: تصاميم تتناوب وتراعي اتجاه الصور ─────────────────
 const GALLERY_TITLES = ['من أجواء الدورة', 'لقطات من الجلسات', 'مشاهد من البرنامج', 'محطات من الدورة'];
 
 function Gallery({ course, photos, layout, page, index }) {
@@ -232,7 +271,23 @@ function ReportDivider() {
   );
 }
 
-function Executive({ course, doc, trainees, sessions, photosCount, page }) {
+function SummaryPage({ course, doc, trainees, page }) {
+  return (
+    <section className="mz-page mz-inner mz-report">
+      <RunningHead course={course} label="التقرير الفني" />
+      <div className="mz-body">
+        <span className="mz-kicker">الملخص التنفيذي</span>
+        <h2 className="mz-h2 mz-h2-sm">ملخص التنفيذ</h2>
+        <p className="mz-text">
+          {doc.reportSummary || `نُفّذ البرنامج وفق الخطة المعتمدة، وحقّق أهدافه التدريبية بمشاركة ${toAr(trainees.length || course.numTrainees || 0)} متدرباً، وقد اتسمت الجلسات بالتفاعل والتطبيق العملي.`}
+        </p>
+      </div>
+      <Folio n={page} />
+    </section>
+  );
+}
+
+function Executive({ course, doc, trainees, sessions, photosCount, page, withSummary = true }) {
   const scores = trainees.map((t) => t.score).filter((x) => Number.isFinite(x));
   const average = avg(scores);
   const top = scores.length ? Math.max(...scores) : null;
@@ -265,10 +320,14 @@ function Executive({ course, doc, trainees, sessions, photosCount, page }) {
             <tr><th>التوثيق المصوّر</th><td>{toAr(photosCount)} صورة</td></tr>
           </tbody>
         </table>
-        <h3 className="mz-h3">ملخص التنفيذ</h3>
-        <p className="mz-text">
-          {doc.reportSummary || `نُفّذ البرنامج وفق الخطة المعتمدة، وحقّق أهدافه التدريبية بمشاركة ${toAr(trainees.length || course.numTrainees || 0)} متدرباً، وقد اتسمت الجلسات بالتفاعل والتطبيق العملي.`}
-        </p>
+        {withSummary && (
+          <>
+            <h3 className="mz-h3">ملخص التنفيذ</h3>
+            <p className="mz-text">
+              {doc.reportSummary || `نُفّذ البرنامج وفق الخطة المعتمدة، وحقّق أهدافه التدريبية بمشاركة ${toAr(trainees.length || course.numTrainees || 0)} متدرباً، وقد اتسمت الجلسات بالتفاعل والتطبيق العملي.`}
+            </p>
+          </>
+        )}
       </div>
       <Folio n={page} />
     </section>
@@ -361,11 +420,23 @@ function Recommendations({ course, doc, page }) {
  * edition: magazine | report | both
  */
 export function buildPages({ course, documentation: doc, edition = 'magazine', qrSvg = null }) {
+  const square = doc.format === 'SQUARE';
+  // سعة الصفحة: المربعة أقصر بثلث تقريباً
+  const per = square
+    ? { timeline: 5, features: 1, trainees: 7, stars: 3 }
+    : { timeline: 7, features: 2, trainees: 12, stars: 6 };
   const media = doc.media || [];
+  const byId = new Map(media.map((m) => [m.id, m]));
   const sessions = doc.sessions || [];
   const trainees = doc.trainees || [];
   const cover = media.find((m) => m.id === doc.coverMediaId) || media[0] || null;
-  const rest = media.filter((m) => m.id !== cover?.id);
+
+  // صور الجلسات تظهر مع جلساتها، لا في المعرض
+  const features = sessions
+    .map((s, i) => ({ s, n: i + 1, photos: (s.photoIds || []).map((pid) => byId.get(pid)).filter((m) => m && m.id !== cover?.id) }))
+    .filter((f) => f.photos.length);
+  const used = new Set(features.flatMap((f) => f.photos.map((m) => m.id)));
+  const rest = media.filter((m) => m.id !== cover?.id && !used.has(m.id));
 
   const pages = [];
   let n = 1;
@@ -377,20 +448,29 @@ export function buildPages({ course, documentation: doc, edition = 'magazine', q
   push('cover', () => <Cover course={course} cover={cover} edition={edition} />);
 
   if (withMagazine) {
-    const introPhoto = rest[0] || null;
-    const gallery = introPhoto ? rest.slice(1) : rest;
+    // صورة التقديم عرضية إن وُجدت (المربعة لا تتسع لها)
+    const introPhoto = square ? null : (rest.find((m) => orientation(m) === 'landscape') || rest[0] || null);
+    const gallery = rest.filter((m) => m !== introPhoto);
     push('intro', (p) => <Intro course={course} doc={doc} photo={introPhoto} page={p} />);
-    chunk(sessions, 7).forEach((part, i) => push(`sessions-${i}`, (p) => <Sessions course={course} sessions={part} page={p} part={i + 1} />));
+    balanced(sessions, per.timeline).forEach((part, i) => push(`sessions-${i}`, (p) => <Sessions course={course} sessions={part} page={p} part={i + 1} />));
+    chunk(features, per.features).forEach((part, i) => push(`feat-${i}`, (p) => <SessionFeatures course={course} items={part} page={p} />));
 
-    // المعرض: أنماط تتناوب — بطل وصورتان، ثم شبكة أربع، ثم عمود وصورتان
+    // المعرض: بطل وصورتان، ثم شبكة أربع، ثم عمود وصورتان — والطوليات
+    // الثلاث المتتالية تُصفّ أعمدةً، والبطل عرضيّ، والعمود طوليّ
     const layouts = [{ k: 'hero', size: 3 }, { k: 'grid', size: 4 }, { k: 'side', size: 3 }];
+    const ratio = (m) => (Number(m.width) || 1) / (Number(m.height) || 1);
     let i = 0; let g = 0;
     while (i < gallery.length) {
-      const l = layouts[g % layouts.length];
-      const part = gallery.slice(i, i + l.size);
-      const layout = part.length < l.size ? (part.length === 1 ? 'single' : part.length === 2 ? 'pair' : l.k) : l.k;
+      let l = layouts[g % layouts.length];
+      const next3 = gallery.slice(i, i + 3);
+      if (next3.length === 3 && next3.every((m) => orientation(m) === 'portrait')) l = { k: 'trio', size: 3 };
+      let part = gallery.slice(i, i + l.size);
+      if (l.k === 'hero') part = [...part].sort((a, b) => ratio(b) - ratio(a));
+      if (l.k === 'side') part = [...part].sort((a, b) => ratio(a) - ratio(b));
+      const layout = part.length < l.size ? (part.length === 1 ? 'single' : part.length === 2 ? (part.every((m) => orientation(m) === 'portrait') ? 'pair-tall' : 'pair') : l.k) : l.k;
       const gi = g;
-      push(`gal-${g}`, (p) => <Gallery course={course} photos={part} layout={layout} page={p} index={gi} />);
+      const photos = part;
+      push(`gal-${g}`, (p) => <Gallery course={course} photos={photos} layout={layout} page={p} index={gi} />);
       i += l.size; g += 1;
     }
     const days = daysBetween(course.startDate, course.endDate);
@@ -405,12 +485,13 @@ export function buildPages({ course, documentation: doc, edition = 'magazine', q
 
   if (withReport) {
     if (withMagazine) push('report-divider', () => <ReportDivider />);
-    push('executive', (p) => <Executive course={course} doc={doc} trainees={trainees} sessions={sessions} photosCount={media.length} page={p} />);
+    push('executive', (p) => <Executive course={course} doc={doc} trainees={trainees} sessions={sessions} photosCount={media.length} page={p} withSummary={!square} />);
+    if (square) push('summary', (p) => <SummaryPage course={course} doc={doc} trainees={trainees} page={p} />);
     // توزيع متوازن على الصفحات (١٥ متدرباً = ٨ + ٧، لا ١٢ + ٣)
-    const perPage = trainees.length ? Math.ceil(trainees.length / Math.ceil(trainees.length / 12)) : 12;
+    const perPage = trainees.length ? Math.ceil(trainees.length / Math.ceil(trainees.length / per.trainees)) : per.trainees;
     chunk(trainees, perPage).forEach((part, i) => push(`trainees-${i}`, (p) => <TraineesTable course={course} trainees={part} page={p} part={i + 1} startIndex={i * perPage} />));
     const stars = trainees.filter((t) => t.isDistinguished);
-    chunk(stars, 6).forEach((part, i) => push(`stars-${i}`, (p) => <Distinguished course={course} list={part} page={p} />));
+    chunk(stars, per.stars).forEach((part, i) => push(`stars-${i}`, (p) => <Distinguished course={course} list={part} page={p} />));
     push('recs', (p) => <Recommendations course={course} doc={doc} page={p} />);
   }
 
@@ -474,7 +555,59 @@ export const MAGAZINE_CSS = `
 .mz-gal-side{grid-template-columns:1.25fr 1fr;grid-template-rows:1fr 1fr}
 .mz-gal-side .mz-photo:first-child{grid-row:1/-1}
 .mz-gal-pair{grid-template-rows:1fr 1fr}
+.mz-gal-pair-tall{grid-template-columns:1fr 1fr}
+.mz-gal-trio{grid-template-columns:repeat(3,1fr)}
 .mz-gal-single{grid-template-rows:1fr}
+
+/* من قلب الجلسات */
+.mz-feats{gap:7mm}
+.mz-feat{flex:1;min-height:0;display:grid;grid-template-columns:1.3fr 1fr;gap:6mm;align-items:stretch}
+.mz-feat-flip{grid-template-columns:1fr 1.3fr}
+.mz-feat-flip .mz-feat-photos{order:2}
+.mz-feat-photos{display:grid;gap:2.5mm;min-height:0}
+.mz-feat-p2 .mz-feat-photos{grid-template-rows:1fr 1fr}
+.mz-feat-p3 .mz-feat-photos,.mz-feat-p4 .mz-feat-photos{grid-template-columns:1.6fr 1fr}
+.mz-feat-p3 .mz-feat-photos .mz-photo:first-child{grid-row:1/3}
+.mz-feat-p4 .mz-feat-photos .mz-photo:first-child{grid-row:1/4}
+.mz-feat-text{display:flex;flex-direction:column;justify-content:center;min-width:0;border-inline-start:0.6mm solid #C6AA76;padding-inline-start:5mm}
+.mz-feat-flip .mz-feat-text{border-inline-start:0;border-inline-end:0.6mm solid #C6AA76;padding-inline-start:0;padding-inline-end:5mm}
+.mz-feat-no{align-self:flex-start;font-size:3mm;font-weight:800;color:#fff;background:#00676a;border-radius:2mm;padding:0.6mm 2.5mm}
+.mz-feat h3{font-size:5.2mm;line-height:1.4;font-weight:800;color:#0b3f42;margin:2.5mm 0 1.5mm}
+.mz-feat-meta{font-size:3.1mm;color:#8a6d3a;font-weight:700;margin:0}
+.mz-feat-who{font-size:3.3mm;color:#00676a;font-weight:800;margin:1mm 0 0}
+.mz-feat-desc{font-size:3.4mm;line-height:1.85;color:#3e5b5c;margin:2.5mm 0 0;text-align:justify;display:-webkit-box;-webkit-line-clamp:9;-webkit-box-orient:vertical;overflow:hidden}
+
+/* ═════ المقاس المربع ٢١٠×٢١٠ ═════ */
+.mz-fmt-sq .mz-page{height:210mm}
+.mz-fmt-sq .mz-body{inset:25mm 16mm 18mm 16mm}
+.mz-fmt-sq .mz-head{height:17mm;padding:0 16mm}
+.mz-fmt-sq .mz-head-logo{height:8mm}
+.mz-fmt-sq .mz-folio{bottom:6mm}
+.mz-fmt-sq .mz-h2{font-size:8mm;margin-bottom:4mm}
+.mz-fmt-sq .mz-h2-sm{font-size:6.2mm}
+.mz-fmt-sq .mz-lead{font-size:3.9mm;line-height:1.95}
+.mz-fmt-sq .mz-cover-body{bottom:26mm;inset-inline:16mm}
+.mz-fmt-sq .mz-cover h1{font-size:11mm}
+.mz-fmt-sq .mz-cover-top{top:12mm;inset-inline:16mm}
+.mz-fmt-sq .mz-logo-white{height:13mm}
+.mz-fmt-sq .mz-cover-foot{bottom:10mm;inset-inline:16mm}
+.mz-fmt-sq .mz-intro-grid{grid-template-columns:1fr 52mm;gap:6mm}
+.mz-fmt-sq .mz-facts{padding:4mm;gap:2.5mm}
+.mz-fmt-sq .mz-timeline{gap:3mm}
+.mz-fmt-sq .mz-feat,.mz-fmt-sq .mz-feat-flip{grid-template-columns:none;grid-template-rows:1.5fr auto;gap:4mm}
+.mz-fmt-sq .mz-feat-flip .mz-feat-photos{order:0}
+.mz-fmt-sq .mz-feat-p2 .mz-feat-photos{grid-template-rows:none;grid-template-columns:1fr 1fr}
+.mz-fmt-sq .mz-feat-text,.mz-fmt-sq .mz-feat-flip .mz-feat-text{border:0;border-top:0.6mm solid #C6AA76;padding:3mm 0 0}
+.mz-fmt-sq .mz-feat-desc{-webkit-line-clamp:4}
+.mz-fmt-sq .mz-stats{margin:6mm 0}
+.mz-fmt-sq .mz-stats b{font-size:8mm}
+.mz-fmt-sq .mz-qr div{width:25mm;height:25mm}
+.mz-fmt-sq .mz-signoff b{font-size:4.4mm}
+.mz-fmt-sq .mz-kpis{gap:3mm;margin-bottom:4mm}
+.mz-fmt-sq .mz-kpis div{padding:3mm 2mm}
+.mz-fmt-sq .mz-kpis b{font-size:7mm}
+.mz-fmt-sq .mz-back-logo{height:22mm}
+.mz-fmt-sq .mz-divider h2{font-size:13mm}
 
 /* الجلسات */
 .mz-timeline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4mm;position:relative}

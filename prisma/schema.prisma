@@ -989,6 +989,7 @@ model CourseDocumentation {
   intro         String?
   closing       String?
   coverMediaId  String?
+  format        String    @default("A4") // A4 | SQUARE — مقاس المجلة
   publishedAt   DateTime?
   publishedById String?
   starAwarded   Boolean   @default(false)
@@ -1019,6 +1020,8 @@ model DocumentationMedia {
   height          Int
   size            Int
   caption         String?
+  // تعديل لا يمسّ الأصل: موضع التركيز والتقريب والفلتر (يُطبَّق عند العرض)
+  edit            Json?
   sortOrder       Int                 @default(0)
   uploadedById    String?
   createdAt       DateTime            @default(now())
@@ -1035,6 +1038,8 @@ model DocumentationSession {
   date            DateTime?
   time            String?
   description     String?
+  // صور الجلسة من صور التوثيق (حتى ٤) — تظهر معها في المجلة
+  photoIds        String[]            @default([])
   sortOrder       Int                 @default(0)
 
   @@index([documentationId, sortOrder])
