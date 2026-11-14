@@ -8,7 +8,8 @@ import { ArrowLeft, User, Search, Star, BarChart3, KeyRound, ChevronUp, ChevronD
 import ConfirmModal from '../../components/operational/ConfirmModal';
 import { useTranslation } from '../../lib/i18n';
 import Avatar from '../../components/shared/Avatar';
-import { isAcceptableImageFile, fileToAvatarDataUrl, fileToSignatureDataUrl } from '../../lib/clientImage';
+import { isAcceptableImageFile, fileToAvatarDataUrl } from '../../lib/clientImage';
+import SignatureEditor from '../../components/shared/SignatureEditor';
 
 // تكوين الأدوار — الأيقونات هنا، التسميات من roles.* والأوصاف من admin.users.*
 const ROLE_CFG = [
@@ -41,12 +42,18 @@ export default function EditUser() {
   // تُصغَّر قبل الحفظ فتظهر في بطاقات الدورات دون أن تُثقلها.
   // التوقيع الإلكتروني: يُدرج تلقائياً في شهادة إنجاز الترجمة وما شابهها
   const [savingSig, setSavingSig] = useState(false);
-  const saveSignature = async (file) => {
+  // الصورة المختارة تمر بمحرّر التوقيع (قص وإزالة خلفية ولون) قبل الحفظ
+  const [sigFile, setSigFile] = useState(null);
+  const pickSignature = (file) => {
     if (!file) return;
-    if (file !== 'remove' && !isAcceptableImageFile(file)) { toast.error('اختر ملف صورة'); return; }
+    if (!isAcceptableImageFile(file)) { toast.error('اختر ملف صورة'); return; }
+    setSigFile(file);
+  };
+  const saveSignature = async (dataUrl) => {
+    if (!dataUrl) return;
     setSavingSig(true);
     try {
-      const signatureImage = file === 'remove' ? null : await fileToSignatureDataUrl(file);
+      const signatureImage = dataUrl === 'remove' ? null : dataUrl;
       await api.put(`/users/${id}`, { signatureImage });
       setUser((u) => ({ ...u, signatureImage }));
       toast.success(signatureImage ? 'حُفظ التوقيع' : 'أُزيل التوقيع');
@@ -286,7 +293,7 @@ export default function EditUser() {
                   <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-bold text-white hover:bg-primary-dark ${savingSig ? 'opacity-60' : ''}`}>
                     <PenLine size={14} aria-hidden="true" /> {user.signatureImage ? 'تغيير التوقيع' : 'رفع التوقيع'}
                     <input type="file" accept="image/*,.heic,.heif" className="hidden" disabled={savingSig}
-                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; saveSignature(f); }} />
+                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; pickSignature(f); }} />
                   </label>
                   {user.signatureImage && (
                     <button type="button" onClick={() => saveSignature('remove')} disabled={savingSig}
@@ -366,6 +373,14 @@ export default function EditUser() {
         )}
 
       </div>
+
+      {sigFile && (
+        <SignatureEditor
+          file={sigFile}
+          onCancel={() => setSigFile(null)}
+          onSave={(dataUrl) => { setSigFile(null); saveSignature(dataUrl); }}
+        />
+      )}
 
       <ConfirmModal
         open={confirmDelete}
