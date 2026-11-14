@@ -72,6 +72,30 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
+  // سجل المترجمين: يختار منه المنسق فتُملأ البيانات الثابتة، ويبقى
+  // المبلغ وما يتغيّر مع كل تعاقد له. ومن لم يكن في السجل يُكتب
+  // يدوياً ويدخل السجل تلقائياً عند الحفظ.
+  const [directory, setDirectory] = useState([]);
+  const [pickedId, setPickedId] = useState('');
+  useEffect(() => {
+    api.get('/interpreters')
+      .then((res) => setDirectory(res?.data?.data ?? res?.data ?? []))
+      .catch(() => setDirectory([]));
+  }, []);
+  const pickFromDirectory = (id) => {
+    setPickedId(id);
+    const i = directory.find((d) => d.id === id);
+    if (!i) return;
+    setForm((p) => ({
+      ...p,
+      fullName: i.fullName || '', nationalId: i.nationalId || '', nationality: i.nationality || '',
+      email: i.email || '', mobile: i.mobile || '', address: i.address || '',
+      bankName: i.bankName || '', bankBranch: i.bankBranch || '',
+      bankCountry: i.bankCountry || '', iban: i.iban || '',
+    }));
+    setSaved(false);
+  };
+
   const load = useCallback(async () => {
     try {
       const res = await api.get(`/courses/${courseId}/interpreter`);
@@ -240,6 +264,23 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
           بيانات المترجم تُعبَّأ مرة واحدة للدورة، ويُبنى منها {docLabel} مع بيانات البرنامج تلقائياً.
           {contractType === 'CONTRACT' && ' والعقد قابل للتعديل في صفحته قبل الطباعة.'}
         </p>
+
+        {directory.length > 0 && (
+          <label className="mb-4 block rounded-xl border border-primary/20 bg-primary-light/40 p-3">
+            <span className="mb-1.5 block text-xs font-extrabold text-primary">اختر المترجم من السجل</span>
+            <select
+              value={pickedId}
+              onChange={(e) => pickFromDirectory(e.target.value)}
+              className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none focus:border-primary"
+            >
+              <option value="">— مترجم جديد (يُكتب يدوياً ويدخل السجل) —</option>
+              {directory.map((d) => (
+                <option key={d.id} value={d.id}>{d.fullName} · {d.nationalId}</option>
+              ))}
+            </select>
+            <span className="mt-1.5 block text-[11px] text-text-soft">تُملأ البيانات الشخصية والبنكية، ويبقى عليك المبلغ.</span>
+          </label>
+        )}
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Field label="اسم المترجم رباعياً" value={form.fullName} onChange={(v) => set('fullName', v)} placeholder="كما في الهوية" required />

@@ -186,6 +186,7 @@ model User {
   createdSuspensions   ElementSuspension[]        @relation("SuspensionCreator")
   lateEntryDecisions   Course[]                   @relation("LateEntryDecider")
   interpreterRecords   CourseInterpreter[]        @relation("InterpreterDataAuthor")
+  interpretersAdded    Interpreter[]              @relation("InterpreterDirectoryAuthor")
 }
 
 // =============================================================
@@ -221,6 +222,42 @@ model CourseInterpreter {
   createdBy   User?    @relation("InterpreterDataAuthor", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // المترجم في السجل الذي اختير منه — والبيانات أعلاه نسخة الدورة منه،
+  // فتعديل السجل لاحقاً لا يغيّر عقداً وُقّع
+  interpreterId String?
+  interpreter   Interpreter? @relation(fields: [interpreterId], references: [id], onDelete: SetNull)
+
+  @@index([interpreterId])
+}
+
+// سجل المترجمين — قاعدة واحدة يختار منها المنسق بدل إعادة إدخال
+// البيانات في كل دورة. يديره المدير، ويُضاف إليه تلقائياً كل مترجم
+// جديد يسجّله منسق. البيانات الثابتة وحدها (الشخصية والبنكية)؛
+// أما المتغيّر مع كل تعاقد (المبلغ، المدة، البرنامج) فمكانه الدورة.
+model Interpreter {
+  id          String   @id @default(uuid())
+  fullName    String
+  nationalId  String   @unique
+  nationality String?
+  email       String
+  mobile      String
+  address     String
+  specialty   String?
+  bankName    String?
+  bankBranch  String?
+  bankCountry String?
+  iban        String?
+  notes       String?
+
+  createdById String?
+  createdBy   User?    @relation("InterpreterDirectoryAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  courses     CourseInterpreter[]
+
+  @@index([fullName])
 }
 
 // =============================================================
