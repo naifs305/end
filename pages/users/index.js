@@ -5,6 +5,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Search, Pencil, UserPlus } from 'lucide-react';
 import { useTranslation } from '../../lib/i18n';
+import Avatar from '../../components/shared/Avatar';
 
 const ROLE_OPTIONS = ['EMPLOYEE', 'PROJECT_SUPERVISOR', 'MANAGER', 'QUALITY_VIEWER'];
 
@@ -321,9 +322,7 @@ export default function UserManagement() {
               {filtered.map((u) => (
                 <div key={u.id} className="flex items-center gap-4 px-4 py-3 hover:bg-background transition">
                   {/* أفاتار */}
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white ${u.isActive ? 'bg-primary' : 'bg-text-soft'}`}>
-                    {u.firstName?.[0]}{u.lastName?.[0]}
-                  </div>
+                  <Avatar user={u} size={40} className={u.isActive ? '' : 'opacity-50 grayscale'} />
 
                   {/* معلومات */}
                   <div className="min-w-0 flex-1">
@@ -339,11 +338,17 @@ export default function UserManagement() {
                           {t(`roles.${r}`)}
                         </span>
                       ))}
+                      {u.isCollaborator && (
+                        <span className="rounded-full bg-sand/20 px-2 py-0.5 text-[10px] font-bold text-warning">منسق متعاون</span>
+                      )}
                       {!u.isActive && <span className="rounded-full bg-burgundy/10 border border-burgundy/20 px-2 py-0.5 text-[10px] font-bold text-danger">{t('admin.users.disabledBadge')}</span>}
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-3 text-xs text-text-soft">
                       <span>{u.email}</span>
                       {u.operationalProject?.name && <span>• {u.operationalProject.name}</span>}
+                      {u.isCollaborator && (
+                        <span>• يتابعه {u.followUpSupervisor ? `${u.followUpSupervisor.firstName} ${u.followUpSupervisor.lastName}` : 'المدير'}</span>
+                      )}
                       {u.mobileNumber && <span>• {u.mobileNumber}</span>}
                     </div>
                   </div>

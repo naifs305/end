@@ -24,8 +24,10 @@ import {
   Trash2,
   BookOpen,
   Check,
+  MapPin,
 } from 'lucide-react';
 import MainLayout from '../../components/layout/MainLayout';
+import Avatar from '../../components/shared/Avatar';
 import api from '../../lib/axios';
 import useAuth from '../../context/AuthContext';
 import { canCreateCourse, normalizeRole } from '../../lib/roles';
@@ -53,106 +55,127 @@ function empName(u) {
   return `${u?.firstName || ''} ${u?.lastName || ''}`.trim() || '-';
 }
 
-// ─── بطاقة دورة ───────────────────────────────────────────────
+// ─── بطاقة دورة: تصميم «بطاقة الملف» ───────────────────────────
+// عمود جانبي للمنسق بصورته، وبجانبه الدورة وتقدّم إقفالها، والأزرار
+// في ذيل البطاقة: «فتح الدورة» حبّة ممتلئة، والبقية روابط هادئة.
+const STATUS_TONE = {
+  PREPARATION: '#8A9A9B',
+  IN_PROGRESS: '#2E6066',
+  EXECUTION: '#2E6066',
+  AWAITING_CLOSURE: '#B2925A',
+  CLOSED: '#3F7479',
+  ARCHIVED: '#9DA3A1',
+};
+
+function closureProgress(course) {
+  const rel = (course.closureElements || []).filter((e) => e.status !== 'NOT_APPLICABLE');
+  if (!rel.length) return null;
+  const done = rel.filter((e) => ['PENDING_APPROVAL', 'APPROVED'].includes(e.status)).length;
+  return Math.round((done / rel.length) * 100);
+}
+
+const LINK_BTN = 'inline-flex items-center gap-1.5 rounded-full px-2.5 py-2 text-[13px] font-bold transition hover:bg-white disabled:opacity-50';
+
 function CourseCard({ course, role, user, onDelete, onArchive, onReassign, busy, t, fmtDate }) {
-  const cfg = STATUS_CFG[course.status] || STATUS_CFG.PREPARATION;
+  const tone = STATUS_TONE[course.status] || STATUS_TONE.PREPARATION;
   const isOwner = course.primaryEmployeeId === user?.id;
   const canEdit = role === 'MANAGER' || role === 'PROJECT_SUPERVISOR' || (isOwner && course.status === 'PREPARATION');
   const canManage = role === 'MANAGER' || role === 'PROJECT_SUPERVISOR';
   const canDel = canManage || (isOwner && course.status === 'PREPARATION');
-  const elCount = course._count?.closureElements ?? 0;
+  const pct = closureProgress(course);
+  const owner = course.primaryEmployee;
+  const team = (course.supportingTeam || []).map((s) => s.user).filter(Boolean);
 
   return (
-    <div className={`group relative rounded-2xl border border-r-4 bg-white shadow-card transition hover:-translate-y-0.5 hover:shadow-soft ${cfg.border}`}>
-      <div className="p-4">
-        <div className="mb-2 flex items-start justify-between gap-2">
-          <Link href={`/courses/${course.id}`} className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 text-sm font-extrabold leading-snug text-text-main transition hover:text-primary">
-              {course.name}
-            </h3>
-          </Link>
-          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${cfg.badge}`}>
+    <article className="group flex flex-col overflow-hidden rounded-[20px] border border-border bg-white shadow-[0_1px_2px_rgba(28,46,48,0.05),0_10px_28px_-16px_rgba(28,46,48,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(28,46,48,0.05),0_16px_34px_-16px_rgba(28,46,48,0.3)]">
+      <div className="grid flex-1 grid-cols-[112px_minmax(0,1fr)]">
+        {/* ── المنسق ── */}
+        <aside
+          className="flex flex-col items-center gap-1.5 border-e border-border px-2 py-4 text-center"
+          style={{ background: `linear-gradient(180deg, ${tone}24, #fff 75%)` }}
+        >
+          {owner?.profileImage ? (
+            <img src={owner.profileImage} alt={`صورة ${empName(owner)}`}
+              className="h-[78px] w-[78px] rounded-[22px] object-cover shadow-[0_0_0_3px_#fff,0_6px_14px_-6px_rgba(28,46,48,0.45)]" />
+          ) : (
+            <span role="img" aria-label={`صورة ${empName(owner)}`}
+              className="grid h-[78px] w-[78px] place-items-center rounded-[22px] bg-forest-50 text-2xl font-extrabold text-primary shadow-[0_0_0_3px_#fff,0_6px_14px_-6px_rgba(28,46,48,0.45)]">
+              {`${owner?.firstName?.[0] || ''}${owner?.lastName?.[0] || ''}` || '؟'}
+            </span>
+          )}
+          <span className="mt-1 text-[13px] font-extrabold leading-snug text-text-main">{empName(owner)}</span>
+          {owner?.isCollaborator ? (
+            <span className="rounded-full bg-sand/25 px-2 py-0.5 text-[10.5px] font-extrabold text-warning">منسق متعاون</span>
+          ) : (
+            <span className="text-[11px] text-text-soft">{t('course.owner')}</span>
+          )}
+        </aside>
+
+        {/* ── الدورة ── */}
+        <div className="flex min-w-0 flex-col gap-1.5 px-4 pb-3 pt-4">
+          <span className="inline-flex items-center gap-1.5 text-[11.5px] font-extrabold" style={{ color: tone }}>
+            <span className="h-[7px] w-[7px] rounded-full" style={{ background: tone }} aria-hidden="true" />
             {statusLabel(t, course.status)}
           </span>
-        </div>
+          <Link href={`/courses/${course.id}`} className="min-w-0">
+            <h3 className="line-clamp-2 text-[15.5px] font-extrabold leading-snug text-text-main transition hover:text-primary">{course.name}</h3>
+          </Link>
+          <ul className="mt-1 space-y-1 text-[12.5px] text-text-soft">
+            <li className="flex items-center gap-1.5"><Calendar size={14} aria-hidden="true" className="shrink-0" /> {fmtDate(course.startDate)} ← {fmtDate(course.endDate)}</li>
+            {(course.city || course.code) && (
+              <li className="flex items-center gap-1.5"><MapPin size={14} aria-hidden="true" className="shrink-0" /> {[course.city, course.code].filter(Boolean).join(' · ')}</li>
+            )}
+            <li className="flex items-center gap-1.5"><FolderKanban size={14} aria-hidden="true" className="shrink-0" /> <span className="truncate">{course.operationalProject?.name || '-'}</span></li>
+          </ul>
 
-        {(course.code || course.city) && (
-          <p className="mb-2 text-xs text-text-soft">{[course.code, course.city].filter(Boolean).join(' • ')}</p>
-        )}
+          {pct !== null && (
+            <div className="mt-2 flex items-center gap-2.5" role="img" aria-label={`نسبة الإقفال ${pct}%`}>
+              <span className="text-[12px] text-text-soft"><b className="text-text-main">{pct}%</b> إقفال</span>
+              <span className="h-[7px] flex-1 overflow-hidden rounded-full bg-[#EDF1F1]">
+                <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: tone }} />
+              </span>
+            </div>
+          )}
 
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-soft">
-          <span className="inline-flex items-center gap-1" title={t('course.owner')}>
-            <User size={13} aria-hidden="true" /> {empName(course.primaryEmployee)}
-          </span>
-          <span className="inline-flex items-center gap-1" title={t('course.project')}>
-            <FolderKanban size={13} aria-hidden="true" /> {course.operationalProject?.name || '-'}
-          </span>
-          <span className="inline-flex items-center gap-1" title={t('course.period')}>
-            <Calendar size={13} aria-hidden="true" /> {fmtDate(course.startDate)} — {fmtDate(course.endDate)}
-          </span>
-          {elCount > 0 && (
-            <span className="inline-flex items-center gap-1" title={t('course.closureElements')}>
-              <ClipboardList size={13} aria-hidden="true" /> {t('course.elementsCount', { count: elCount })}
-            </span>
+          {team.length > 0 && (
+            <div className="mt-1.5 flex items-center" title={team.map(empName).join('، ')}>
+              {team.slice(0, 3).map((m, i) => (
+                <span key={m.id} className={i ? '-ms-1.5' : ''}><Avatar user={m} size={24} /></span>
+              ))}
+              <span className="ms-1.5 text-[11px] text-text-soft">+{team.length} مساند</span>
+            </div>
           )}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 border-t border-border bg-background px-3 py-2">
-        <Link
-          href={`/courses/${course.id}`}
-          className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-3 py-1.5 text-[11px] font-bold text-text-main transition hover:border-primary hover:text-primary"
-        >
-          <FolderOpen size={13} aria-hidden="true" /> {t('course.open')}
+      {/* ── ذيل البطاقة: الأزرار ── */}
+      <div className="flex flex-wrap items-center gap-0.5 border-t border-border bg-background px-3 py-2.5">
+        <Link href={`/courses/${course.id}`}
+          className="me-auto inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-[13px] font-bold text-white shadow-[0_8px_18px_-10px_rgba(46,96,102,0.85)] transition hover:bg-primary-dark">
+          <FolderOpen size={15} aria-hidden="true" /> {t('course.open')}
         </Link>
         {canEdit && (
-          <Link
-            href={`/courses/${course.id}/edit`}
-            className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-3 py-1.5 text-[11px] font-bold text-text-main transition hover:border-primary hover:text-primary"
-          >
-            <Pencil size={13} aria-hidden="true" /> {t('common.edit')}
+          <Link href={`/courses/${course.id}/edit`} className={`${LINK_BTN} text-text-soft hover:text-primary`}>
+            <Pencil size={14} aria-hidden="true" /> {t('common.edit')}
           </Link>
         )}
-
         {canManage && (
-          <>
-            <button
-              onClick={() => onReassign(course.id)}
-              disabled={busy === course.id}
-              className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2.5 py-1.5 text-[11px] font-bold text-text-main transition hover:border-primary hover:text-primary disabled:opacity-50"
-            >
-              <ArrowLeftRight size={13} aria-hidden="true" /> {t('course.move')}
-            </button>
-            {course.status === 'CLOSED' && (
-              <button
-                onClick={() => onArchive(course.id)}
-                disabled={busy === course.id}
-                className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2.5 py-1.5 text-[11px] font-bold text-text-soft transition hover:bg-background disabled:opacity-50"
-              >
-                <Archive size={13} aria-hidden="true" /> {t('nav.archive')}
-              </button>
-            )}
-            <button
-              onClick={() => onDelete(course.id, course.name)}
-              disabled={busy === course.id}
-              className="inline-flex items-center gap-1 rounded-lg border border-burgundy/20 bg-white px-2.5 py-1.5 text-[11px] font-bold text-danger transition hover:bg-burgundy/5 disabled:opacity-50"
-            >
-              <Trash2 size={13} aria-hidden="true" /> {t('common.delete')}
-            </button>
-          </>
+          <button onClick={() => onReassign(course.id)} disabled={busy === course.id} className={`${LINK_BTN} text-text-soft hover:text-primary`}>
+            <ArrowLeftRight size={14} aria-hidden="true" /> {t('course.move')}
+          </button>
         )}
-
-        {!canManage && canDel && (
-          <button
-            onClick={() => onDelete(course.id, course.name)}
-            disabled={busy === course.id}
-            className="inline-flex items-center gap-1 rounded-lg border border-burgundy/20 px-2.5 py-1.5 text-[11px] font-bold text-danger transition hover:bg-burgundy/5 disabled:opacity-50"
-          >
-            <Trash2 size={13} aria-hidden="true" /> {t('common.delete')}
+        {canManage && course.status === 'CLOSED' && (
+          <button onClick={() => onArchive(course.id)} disabled={busy === course.id} className={`${LINK_BTN} text-text-soft hover:text-primary`}>
+            <Archive size={14} aria-hidden="true" /> {t('nav.archive')}
+          </button>
+        )}
+        {canDel && (
+          <button onClick={() => onDelete(course.id, course.name)} disabled={busy === course.id} className={`${LINK_BTN} text-danger`}>
+            <Trash2 size={14} aria-hidden="true" /> {t('common.delete')}
           </button>
         )}
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -505,7 +528,7 @@ export default function CoursesPage() {
             )}
           </div>
         ) : view === 'grid' ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
             {paginated.map((c) => (
               <CourseCard
                 key={c.id}

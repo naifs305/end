@@ -133,8 +133,14 @@ model User {
   signatureImage       String?
   roles                Role[]
   isActive             Boolean  @default(true)
-  operationalProjectId String
-  operationalProject   OperationalProject @relation(fields: [operationalProjectId], references: [id])
+  // فارغ للمنسق المتعاون: لا ينتمي لمشروع، ومرجعه المدير
+  operationalProjectId String?
+  operationalProject   OperationalProject? @relation(fields: [operationalProjectId], references: [id])
+  // منسق متعاون من خارج موظفي العمليات — يتابعه مشرف يسنده المدير
+  isCollaborator       Boolean  @default(false)
+  followUpSupervisorId String?
+  followUpSupervisor   User?    @relation("FollowUpSupervisor", fields: [followUpSupervisorId], references: [id], onDelete: SetNull)
+  followedCollaborators User[]  @relation("FollowUpSupervisor")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   termsAccepted        Boolean  @default(false)
@@ -168,6 +174,7 @@ model User {
   createdClosureElements ClosureElement[]         @relation("ClosureElementCreator")
   optionalReports      CourseOptionalReport[]     @relation("OptionalReportAuthor")
   fieldReports         FieldReport[]              @relation("FieldReportAuthor")
+  fieldReportComments  FieldReportComment[]       @relation("FieldReportCommentAuthor")
 
   // ----- علاقة الإشراف على مشاريع تشغيلية -----
   supervisedProjects   ProjectSupervisor[]        @relation("SupervisorUser")
@@ -187,6 +194,8 @@ model User {
   lateEntryDecisions   Course[]                   @relation("LateEntryDecider")
   interpreterRecords   CourseInterpreter[]        @relation("InterpreterDataAuthor")
   interpretersAdded    Interpreter[]              @relation("InterpreterDirectoryAuthor")
+
+  @@index([followUpSupervisorId])
 }
 
 // =============================================================
@@ -391,9 +400,23 @@ model FieldReport {
   author    User     @relation("FieldReportAuthor", fields: [authorId], references: [id])
   formData  Json
   createdAt DateTime @default(now())
+  comments  FieldReportComment[]
 
   @@index([courseId])
   @@index([authorId])
+}
+
+// تعليقات الزملاء على التقرير الميداني — ليُتلافى ما لوحظ في الدورات القادمة
+model FieldReportComment {
+  id        String      @id @default(uuid())
+  reportId  String
+  report    FieldReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User        @relation("FieldReportCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime    @default(now())
+
+  @@index([reportId, createdAt])
 }
 
 model ClosureElement {

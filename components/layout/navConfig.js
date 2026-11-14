@@ -17,6 +17,7 @@ import {
   Settings,
   SlidersHorizontal,
   Languages,
+  NotebookPen,
 } from 'lucide-react';
 import { isAdminRole, canAccessKpis, canViewReportsOnly } from '../../lib/roles';
 
@@ -62,6 +63,8 @@ export function buildNavSections(activeRole, t) {
   const reports = [];
   if (canViewKpis) reports.push(item('/kpis', Gauge, t('nav.kpis')));
   reports.push(item('/reports', BarChart3, t('nav.reports')));
+  // التقارير الميدانية مفتوحة للجميع: يطّلع الزملاء على الملاحظات ويعلّقون
+  reports.push(item('/field-reports', NotebookPen, t('nav.fieldReports')));
   if (isOversight) reports.push(item('/executive-report', FileText, t('nav.executiveReport')));
   if (isOversight) reports.push(item('/audit', FileSearch, t('nav.audit')));
   push('reportsFollowup', t('navSections.reportsFollowup'), reports);

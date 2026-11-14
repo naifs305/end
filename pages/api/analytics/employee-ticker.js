@@ -228,6 +228,12 @@ async function handler(req, res) {
       });
     }
 
+    // تقارير الزملاء الميدانية الجديدة — ليطّلع عليها الجميع
+    try {
+      const fieldReports = require('../../../lib/modules/fieldReports/fieldReports.service');
+      items.unshift(...(await fieldReports.tickerItems(userId, now)));
+    } catch { /* شريط الأخبار لا يتعطّل بسببها */ }
+
     // ١١. رسالة مخصصة حسب الوقت واليوم
     items.push({ id: 'greeting', icon: '👋', tone: 'primary', text: greeting(name, hour) });
     const wMsg = weekdayMsg(dayOfWeek);

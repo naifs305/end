@@ -190,7 +190,11 @@ function NewsTicker({ items }) {
             return (
               <span key={`${item.id}-${i}`} className="flex items-center gap-2 px-4 whitespace-nowrap">
                 <span className="text-sm">{item.icon}</span>
-                <span className={`text-xs font-bold ${tc}`}>{item.text}</span>
+                {item.href ? (
+                  <a href={item.href} className={`text-xs font-bold underline-offset-4 hover:underline ${tc}`}>{item.text}</a>
+                ) : (
+                  <span className={`text-xs font-bold ${tc}`}>{item.text}</span>
+                )}
                 <span className={`mx-2 text-sm font-light ${sc}`}>◆</span>
               </span>
             );

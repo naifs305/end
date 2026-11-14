@@ -4,7 +4,7 @@ import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
-import { isAcceptableImageFile, normalizeImageFile } from '../lib/clientImage';
+import { isAcceptableImageFile, normalizeImageFile, fileToAvatarDataUrl } from '../lib/clientImage';
 import { Upload, Trash2, Save, KeyRound, Mail, MailCheck, User, ShieldCheck } from 'lucide-react';
 import { useTranslation } from '../lib/i18n';
 
@@ -126,10 +126,13 @@ export default function Profile() {
     }
 
     try {
-      const normalized = await normalizeImageFile(file);
-      const dataUrl = await readFileAsDataUrl(normalized);
-      if (field === 'profileImage') setProfileImage(dataUrl);
-      else setSignatureImage(dataUrl);
+      if (field === 'profileImage') {
+        // الصورة الشخصية تُصغَّر لتظهر في البطاقات دون أن تُثقلها
+        setProfileImage(await fileToAvatarDataUrl(file));
+      } else {
+        const normalized = await normalizeImageFile(file);
+        setSignatureImage(await readFileAsDataUrl(normalized));
+      }
     } catch {
       toast.error(t('profile.imageReadFailed'));
     }

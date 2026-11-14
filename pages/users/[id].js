@@ -4,9 +4,11 @@ import MainLayout from '../../components/layout/MainLayout';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
 import useAuth from '../../context/AuthContext';
-import { ArrowLeft, User, Search, Star, BarChart3, KeyRound, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
+import { ArrowLeft, User, Search, Star, BarChart3, KeyRound, ChevronUp, ChevronDown, Trash2, Camera, Handshake } from 'lucide-react';
 import ConfirmModal from '../../components/operational/ConfirmModal';
 import { useTranslation } from '../../lib/i18n';
+import Avatar from '../../components/shared/Avatar';
+import { isAcceptableImageFile, fileToAvatarDataUrl } from '../../lib/clientImage';
 
 // تكوين الأدوار — الأيقونات هنا، التسميات من roles.* والأوصاف من admin.users.*
 const ROLE_CFG = [
@@ -32,14 +34,36 @@ export default function EditUser() {
   const [newPass,  setNewPass]  = useState('');
   const [savingPw, setSavingPw] = useState(false);
   const [showPw,   setShowPw]   = useState(false);
+  const [savingPhoto, setSavingPhoto] = useState(false);
+  const [supervisors, setSupervisors] = useState([]);
+
+  // صورة المستخدم: يضعها المدير هنا، أو صاحبها من ملفه الشخصي.
+  // تُصغَّر قبل الحفظ فتظهر في بطاقات الدورات دون أن تُثقلها.
+  const savePhoto = async (file) => {
+    if (!file) return;
+    if (file !== 'remove' && !isAcceptableImageFile(file)) { toast.error('اختر ملف صورة'); return; }
+    setSavingPhoto(true);
+    try {
+      const profileImage = file === 'remove' ? null : await fileToAvatarDataUrl(file);
+      await api.put(`/users/${id}`, { profileImage });
+      setUser((u) => ({ ...u, profileImage }));
+      toast.success(profileImage ? 'حُفظت الصورة' : 'أُزيلت الصورة');
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'تعذّر حفظ الصورة');
+    } finally {
+      setSavingPhoto(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
-    Promise.all([api.get(`/users/${id}`), api.get('/projects')])
-      .then(([ur, pr]) => {
+    Promise.all([api.get(`/users/${id}`), api.get('/projects'), api.get('/users').catch(() => ({ data: [] }))])
+      .then(([ur, pr, all]) => {
         setUser(ur.data);
         const d = pr.data;
         setProjects(Array.isArray(d) ? d : d?.data || []);
+        const list = Array.isArray(all.data) ? all.data : all.data?.data || [];
+        setSupervisors(list.filter((u) => u.isActive && (u.roles || []).includes('PROJECT_SUPERVISOR')));
       })
       .catch(() => toast.error(t('admin.users.loadFailed')))
       .finally(() => setLoading(false));
@@ -68,7 +92,11 @@ export default function EditUser() {
         lastName:            user.lastName,
         roles:               user.roles,
         isActive:            user.isActive,
-        operationalProjectId:user.operationalProjectId,
+        operationalProjectId:user.isCollaborator ? null : user.operationalProjectId,
+        ...(isManager ? {
+          isCollaborator:      !!user.isCollaborator,
+          followUpSupervisorId:user.isCollaborator ? (user.followUpSupervisorId || null) : null,
+        } : {}),
       });
       if (currentUser?.id === id) {
         try {
@@ -137,12 +165,24 @@ export default function EditUser() {
         <div className="rounded-2xl border border-border bg-white px-5 py-4 shadow-card">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-full text-lg font-extrabold text-white ${user.isActive ? 'bg-primary' : 'bg-text-soft/40'}`}>
-                {user.firstName?.[0]}{user.lastName?.[0]}
+              <div className="relative">
+                <Avatar user={user} size={64} className={user.isActive ? '' : 'opacity-50'} />
+                {isManager && (
+                  <label className="absolute -bottom-1 -end-1 grid h-7 w-7 cursor-pointer place-items-center rounded-full bg-primary text-white shadow-md hover:bg-primary-dark" title="تغيير الصورة">
+                    <Camera size={14} aria-hidden="true" />
+                    <span className="sr-only">تغيير الصورة</span>
+                    <input type="file" accept="image/*,.heic,.heif" className="hidden" disabled={savingPhoto}
+                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; savePhoto(f); }} />
+                  </label>
+                )}
               </div>
               <div>
                 <h1 className="font-extrabold text-primary">{user.firstName} {user.lastName}</h1>
                 <p className="text-xs text-text-soft">{user.email}</p>
+                {isManager && user.profileImage && (
+                  <button type="button" onClick={() => savePhoto('remove')} disabled={savingPhoto}
+                    className="mt-1 text-[11px] font-bold text-danger hover:underline">إزالة الصورة</button>
+                )}
               </div>
             </div>
             <button onClick={() => router.back()}
@@ -166,13 +206,37 @@ export default function EditUser() {
                 <label className="mb-1.5 block text-xs font-bold text-text-main">{t('admin.users.lastName')}</label>
                 <input className={inputCls} value={user.lastName||''} onChange={e=>setUser({...user,lastName:e.target.value})} />
               </div>
-              <div className="col-span-2">
-                <label className="mb-1.5 block text-xs font-bold text-text-main">{t('admin.users.operationalProject')}</label>
-                <select className={inputCls} value={user.operationalProjectId||''} onChange={e=>setUser({...user,operationalProjectId:e.target.value})}>
-                  <option value="">{t('admin.users.selectProject')}</option>
-                  {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
+              {isManager && (
+                <label className={`col-span-2 flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${user.isCollaborator ? 'border-accent/50 bg-sand/10' : 'border-border bg-background'}`}>
+                  <input type="checkbox" checked={!!user.isCollaborator}
+                    onChange={e=>setUser({...user,isCollaborator:e.target.checked})}
+                    className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+                  <Handshake size={20} aria-hidden="true" className={user.isCollaborator ? 'text-warning' : 'text-text-soft'} />
+                  <span>
+                    <span className="block text-sm font-bold text-text-main">منسق متعاون</span>
+                    <span className="block text-[11px] text-text-soft">من خارج موظفي العمليات: لا ينتمي لمشروع، ومرجعه المدير، ويُسند متابعته لمشرف.</span>
+                  </span>
+                </label>
+              )}
+              {user.isCollaborator ? (
+                <div className="col-span-2">
+                  <label className="mb-1.5 block text-xs font-bold text-text-main">المشرف المتابع</label>
+                  <select className={inputCls} value={user.followUpSupervisorId||''} disabled={!isManager}
+                    onChange={e=>setUser({...user,followUpSupervisorId:e.target.value||null})}>
+                    <option value="">المدير وحده</option>
+                    {supervisors.filter(s=>s.id!==id).map(s=><option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+                  </select>
+                  <p className="mt-1 text-[11px] text-text-soft">يعتمد عناصر دوراته ويتابعها، بدل مشرف مشروع الدورة.</p>
+                </div>
+              ) : (
+                <div className="col-span-2">
+                  <label className="mb-1.5 block text-xs font-bold text-text-main">{t('admin.users.operationalProject')}</label>
+                  <select className={inputCls} value={user.operationalProjectId||''} onChange={e=>setUser({...user,operationalProjectId:e.target.value})}>
+                    <option value="">{t('admin.users.selectProject')}</option>
+                    {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="col-span-2">
                 <label className="mb-1.5 block text-xs font-bold text-text-main">{t('admin.users.statusLabel')}</label>
                 <div className="flex gap-2">
