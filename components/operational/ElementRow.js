@@ -302,6 +302,12 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
     }
   };
 
+  // بطاقة المترجم تُفتح للاطلاع في كل حالاتها: قبل التقديم لمن لا ينفّذ،
+  // وبعد التقديم أو الاعتماد للجميع — فيُرى العقد ورسائل القانونية والمالية.
+  const [interpreterReadOnly, setInterpreterReadOnly] = useState(false);
+  const canFillInterpreter = canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status);
+  const canViewInterpreter = isInterpreterElement && !canFillInterpreter && element.status !== 'NOT_APPLICABLE';
+
   const Spinner = () => <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />;
 
   // ======================================================================
@@ -334,7 +340,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               </button>
             ) : isInterpreterElement ? (
               <button
-                onClick={() => setShowInterpreterForm(true)}
+                onClick={() => { setInterpreterReadOnly(false); setShowInterpreterForm(true); }}
                 disabled={loading}
                 className={BTN.primary}
               >
@@ -482,6 +488,17 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             </div>
           )}
         </div>
+      )}
+
+      {canViewInterpreter && (
+        <button
+          type="button"
+          onClick={() => { setInterpreterReadOnly(true); setShowInterpreterForm(true); }}
+          className={BTN.primary}
+        >
+          <Languages size={14} aria-hidden="true" />
+          {element.element.key === 'interpreter_contract' ? 'عرض العقد والرسائل' : 'عرض المستند'}
+        </button>
       )}
 
       {canVolunteerReport && (
@@ -687,6 +704,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               initialFormData={element.formData || null}
               onClose={() => setShowInterpreterForm(false)}
               onSuccess={onUpdate}
+              readOnly={interpreterReadOnly}
             />
           </div>
         </div>,

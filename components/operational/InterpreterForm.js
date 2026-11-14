@@ -29,7 +29,7 @@ const DOC_LABEL = {
   interpreter_certificate: 'شهادة إنجاز الترجمة',
 };
 
-function Field({ label, value, onChange, placeholder, hint, required, type = 'text' }) {
+function Field({ label, value, onChange, placeholder, hint, required, type = 'text', disabled = false }) {
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-bold text-text-main">
@@ -39,15 +39,18 @@ function Field({ label, value, onChange, placeholder, hint, required, type = 'te
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none transition focus:border-primary"
+        placeholder={disabled ? '' : placeholder}
+        disabled={disabled}
+        className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none transition focus:border-primary disabled:bg-background disabled:text-text-main"
       />
       {hint && <span className="mt-1 block text-[11px] text-text-soft">{hint}</span>}
     </label>
   );
 }
 
-export default function InterpreterForm({ trackingId, courseId, elementKey, initialFormData, onClose, onSuccess }) {
+// readOnly: للاطلاع بعد التقديم أو الاعتماد، ولمن لا يملك التنفيذ — تُعرض
+// البيانات ويُفتح العقد ورسائل القانونية والمالية، ولا يُحفظ ولا يُقدَّم شيء.
+export default function InterpreterForm({ trackingId, courseId, elementKey, initialFormData, onClose, onSuccess, readOnly = false }) {
   const [form, setForm] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -248,6 +251,12 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
+        {readOnly && (
+          <p className="mb-4 rounded-xl border border-primary/20 bg-primary-light/40 px-4 py-3 text-xs font-bold text-primary">
+            وضع الاطلاع: البيانات كما حُفظت، ومنها يُفتح {docLabel} ورسائله.
+          </p>
+        )}
+        {!readOnly && (
         <ol className="mb-5 flex flex-wrap items-center gap-2 text-[11px] font-bold">
           <li className={`rounded-full border px-3 py-1 ${saved ? 'border-accent/30 bg-forest-50 text-accent' : 'border-primary bg-primary text-white'}`}>
             {saved ? <span className="inline-flex items-center gap-1"><Check size={12} aria-hidden="true" /> البيانات</span> : '١ — البيانات'}
@@ -259,13 +268,14 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
           <ArrowRight size={14} aria-hidden="true" className="rotate-180 text-text-soft" />
           <li className="rounded-full border border-border bg-background px-3 py-1 text-text-soft">٣ — التقديم</li>
         </ol>
+        )}
 
         <p className="mb-4 text-xs text-text-soft">
           بيانات المترجم تُعبَّأ مرة واحدة للدورة، ويُبنى منها {docLabel} مع بيانات البرنامج تلقائياً.
           {contractType === 'CONTRACT' && ' والعقد قابل للتعديل في صفحته قبل الطباعة.'}
         </p>
 
-        {directory.length > 0 && (
+        {!readOnly && directory.length > 0 && (
           <label className="mb-4 block rounded-xl border border-primary/20 bg-primary-light/40 p-3">
             <span className="mb-1.5 block text-xs font-extrabold text-primary">اختر المترجم من السجل</span>
             <select
@@ -283,12 +293,12 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
         )}
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label="اسم المترجم رباعياً" value={form.fullName} onChange={(v) => set('fullName', v)} placeholder="كما في الهوية" required />
-          <Field label="رقم الهوية الوطنية" value={form.nationalId} onChange={(v) => set('nationalId', v)} placeholder="عشرة أرقام" required />
-          <Field label="البريد الإلكتروني" type="email" value={form.email} onChange={(v) => set('email', v)} placeholder="name@example.com" required />
-          <Field label="رقم الجوال" value={form.mobile} onChange={(v) => set('mobile', v)} placeholder="05xxxxxxxx" required />
-          <Field label="الجنسية" value={form.nationality} onChange={(v) => set('nationality', v)} placeholder="سعودي" hint="تُذكر في صدر العقد" />
-          <Field label="العنوان" value={form.address} onChange={(v) => set('address', v)} placeholder="المدينة — الحي" required />
+          <Field label="اسم المترجم رباعياً" value={form.fullName} onChange={(v) => set('fullName', v)} placeholder="كما في الهوية" required disabled={readOnly} />
+          <Field label="رقم الهوية الوطنية" value={form.nationalId} onChange={(v) => set('nationalId', v)} placeholder="عشرة أرقام" required disabled={readOnly} />
+          <Field label="البريد الإلكتروني" type="email" value={form.email} onChange={(v) => set('email', v)} placeholder="name@example.com" required disabled={readOnly} />
+          <Field label="رقم الجوال" value={form.mobile} onChange={(v) => set('mobile', v)} placeholder="05xxxxxxxx" required disabled={readOnly} />
+          <Field label="الجنسية" value={form.nationality} onChange={(v) => set('nationality', v)} placeholder="سعودي" hint="تُذكر في صدر العقد" disabled={readOnly} />
+          <Field label="العنوان" value={form.address} onChange={(v) => set('address', v)} placeholder="المدينة — الحي" required disabled={readOnly} />
         </div>
 
         {needsPayment && (
@@ -296,19 +306,19 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
             <p className="mb-2 mt-5 text-sm font-extrabold text-text-main">المستحق المالي وبيانات الحساب</p>
             <p className="mb-3 text-xs text-text-soft">المبلغ يُكتب كتابةً من الرقم تلقائياً، فلا يختلف الرقم عن الكلمات.</p>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field label="قيمة المستحق (ريال)" value={form.amount} onChange={(v) => set('amount', v)} placeholder="12000" required />
-              <Field label="اسم البنك" value={form.bankName} onChange={(v) => set('bankName', v)} placeholder="مصرف الراجحي" required />
-              <Field label="الفرع" value={form.bankBranch} onChange={(v) => set('bankBranch', v)} placeholder="اختياري" />
-              <Field label="الدولة" value={form.bankCountry} onChange={(v) => set('bankCountry', v)} placeholder="إن كان الحساب خارج دولة المقر" />
+              <Field label="قيمة المستحق (ريال)" value={form.amount} onChange={(v) => set('amount', v)} placeholder="12000" required disabled={readOnly} />
+              <Field label="اسم البنك" value={form.bankName} onChange={(v) => set('bankName', v)} placeholder="مصرف الراجحي" required disabled={readOnly} />
+              <Field label="الفرع" value={form.bankBranch} onChange={(v) => set('bankBranch', v)} placeholder="اختياري" disabled={readOnly} />
+              <Field label="الدولة" value={form.bankCountry} onChange={(v) => set('bankCountry', v)} placeholder="إن كان الحساب خارج دولة المقر" disabled={readOnly} />
               <div className="md:col-span-2">
-                <Field label="رقم الحساب الدولي (IBAN)" value={form.iban} onChange={(v) => set('iban', v)} placeholder="SA0000000000000000000000" required />
+                <Field label="رقم الحساب الدولي (IBAN)" value={form.iban} onChange={(v) => set('iban', v)} placeholder="SA0000000000000000000000" required disabled={readOnly} />
               </div>
             </div>
           </>
         )}
 
         <div className="mt-3">
-          <Field label="ملاحظات" value={form.notes} onChange={(v) => set('notes', v)} placeholder="اختياري" />
+          <Field label="ملاحظات" value={form.notes} onChange={(v) => set('notes', v)} placeholder="اختياري" disabled={readOnly} />
         </div>
 
         {/* ── المخرجات: المستند ورسائله ───────────────────────── */}
@@ -375,6 +385,7 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
                 type="checkbox"
                 checked={agentSigned}
                 onChange={(e) => { setAgentSigned(e.target.checked); setSignatureSaved(false); }}
+                disabled={readOnly}
                 className="h-4 w-4 accent-[#016564]"
               />
               وقّع وكيل الجامعة للتدريب على العقد
@@ -389,17 +400,18 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
                     value={agentSignedAt}
                     max={new Date().toISOString().slice(0, 10)}
                     onChange={(e) => { setAgentSignedAt(e.target.value); setSignatureSaved(false); }}
+                    disabled={readOnly}
                     className="rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary"
                   />
                 </label>
-                <button
+                {!readOnly && <button
                   type="button"
                   onClick={saveSignature}
                   disabled={savingSignature}
                   className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white transition hover:bg-primary-dark disabled:opacity-60"
                 >
                   <Check size={15} aria-hidden="true" /> {savingSignature ? 'جارٍ التسجيل…' : 'تأكيد التوقيع'}
-                </button>
+                </button>}
                 {signatureSaved && (
                   <span className="inline-flex items-center gap-1 text-xs font-bold text-accent">
                     <Check size={13} aria-hidden="true" /> مُسجَّل
@@ -412,6 +424,12 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background px-5 py-4">
+        {readOnly ? (
+          <button type="button" onClick={onClose}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-text-main transition hover:bg-background">
+            إغلاق
+          </button>
+        ) : (<>
         <button
           type="button"
           onClick={save}
@@ -433,6 +451,7 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
         >
           <Send size={15} aria-hidden="true" /> {submitting ? 'جارٍ التقديم…' : 'تقديم للاعتماد'}
         </button>
+        </>)}
       </div>
     </div>
   );
