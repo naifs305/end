@@ -34,6 +34,31 @@ function paperLuminance(data) {
   return 230;
 }
 
+// صورة PNG شفافة: بكسلاتها الشفافة سوداء اللون في الحقيقة (شفافيتها
+// وحدها تخفيها)، فلو قُرئت إضاءتها كما هي لحُسبت الخلفية كلها حبراً.
+// فتُبسط الصورة على ورق أبيض أولاً. وإن كان الحبر نفسه فاتحاً (توقيع
+// أبيض على شفاف) قُلبت ألوانه ليصير حبراً داكناً على ورق.
+function flattenOnPaper(ctx, w, h) {
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  let transparent = 0, opaque = 0, opaqueLum = 0;
+  for (let i = 0; i < d.length; i += 16) {
+    if (d[i + 3] < 128) transparent += 1;
+    else { opaque += 1; opaqueLum += lum(d[i], d[i + 1], d[i + 2]); }
+  }
+  if (!transparent) return; // لا شفافية: صورة ورق عادية
+  const lightInk = opaque > 0 && opaqueLum / opaque > 170;
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3] / 255;
+    for (let k = 0; k < 3; k += 1) {
+      const c = lightInk ? 255 - d[i + k] : d[i + k];
+      d[i + k] = Math.round(c * a + 255 * (1 - a));
+    }
+    d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -91,6 +116,8 @@ export default function SignatureEditor({ file, onCancel, onSave }) {
       ctx.translate(c.width / 2, c.height / 2);
       ctx.rotate((rotate * Math.PI) / 180);
       ctx.drawImage(source, -w / 2, -h / 2, w, h);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (!base) flattenOnPaper(ctx, c.width, c.height);
       setWork(c);
       setCrop(null);
     } catch {
