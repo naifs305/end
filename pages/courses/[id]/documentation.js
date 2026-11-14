@@ -6,6 +6,7 @@
 // بيانات الدورة تُقرأ من المنصة نفسها، فلا تُدخل مرتين.
 // ======================================================================
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
@@ -13,14 +14,15 @@ import {
   Star, ImagePlus, Trash2, ArrowRight, ArrowLeft, Check, Circle, Save, Plus, X,
   CalendarDays, MapPin, Users, Send, EyeOff, Image as ImageIcon, ListOrdered, BookOpenText,
   GraduationCap, ClipboardPaste, Camera, BookOpen, FileBarChart2, Layers, Link2, Copy, ExternalLink, QrCode,
-  Pencil, Sparkles, FileUp, Loader2, Square, RectangleVertical,
+  Pencil, Sparkles, FileUp, Loader2, Square, RectangleVertical, Award, Upload,
 } from 'lucide-react';
 import MainLayout from '../../../components/layout/MainLayout';
 import Avatar from '../../../components/shared/Avatar';
 import api from '../../../lib/axios';
-import { isAcceptableImageFile, fileToDocumentationPhoto, fileToAvatarDataUrl } from '../../../lib/clientImage';
+import { isAcceptableImageFile, fileToDocumentationPhoto, fileToAvatarDataUrl, fileToSignatureDataUrl } from '../../../lib/clientImage';
 import PhotoEditor from '../../../components/documentation/PhotoEditor';
-import { imgStyle, filterDefsMarkup } from '../../../lib/documentation/photoLook';
+import { filterDefsMarkup } from '../../../lib/documentation/photoLook';
+import PhotoImg from '../../../components/documentation/PhotoImg';
 
 const FILTER_DEFS = filterDefsMarkup();
 const SESSION_PHOTOS = 4;
@@ -50,6 +52,39 @@ function SectionHead({ icon: Icon, title, hint, children }) {
   );
 }
 
+// نافذة فوق الصفحة كلها أينما كان موضع الزر
+function Portal({ children }) {
+  if (typeof document === 'undefined') return null;
+  return createPortal(children, document.body);
+}
+
+// حقل نص بزر «اكتب بالمساعد» — المساعد يصوغ، والمنسق يراجع ويعدّل
+function AiText({ label, hint, value, onChange, rows = 4, max = 3000, editable, onAi, busy, placeholder }) {
+  return (
+    <div>
+      <div className="mb-1 flex flex-wrap items-end gap-2">
+        <span className="text-xs font-bold text-text-main">{label} {hint && <span className="font-normal text-text-soft">— {hint}</span>}</span>
+        {editable && onAi && (
+          <button type="button" onClick={onAi} disabled={busy}
+            className="ms-auto inline-flex items-center gap-1.5 rounded-full bg-sand/20 px-3 py-1.5 text-[12px] font-bold text-warning hover:bg-sand/35 disabled:opacity-60">
+            {busy ? <Loader2 size={14} aria-hidden="true" className="animate-spin" /> : <Sparkles size={14} aria-hidden="true" />}
+            {value?.trim() ? 'أعد الصياغة بالمساعد' : 'اكتبها بالمساعد'}
+          </button>
+        )}
+      </div>
+      <textarea value={value} disabled={!editable} rows={rows} maxLength={max} placeholder={placeholder} aria-label={label}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full resize-y rounded-2xl border border-border px-4 py-3 text-sm leading-loose outline-none focus:border-primary" />
+    </div>
+  );
+}
+
+const PATRONAGE_PRESETS = [
+  'تحت إشراف برامج الشراكات الدولية بوزارة الداخلية',
+  'بالتعاون مع برامج الشراكات الدولية بوزارة الداخلية',
+  'ضمن برامج الشراكة مع الجهات الأمنية العربية',
+];
+
 export default function CourseDocumentationPage() {
   const router = useRouter();
   const { id } = router.query;
@@ -78,6 +113,11 @@ export default function CourseDocumentationPage() {
   const [picker, setPicker] = useState(null); // رقم الجلسة التي تُختار صورها
   const [reportBusy, setReportBusy] = useState(false);
   const [reportDraft, setReportDraft] = useState(null);
+  const [welcome, setWelcome] = useState('');
+  const [patronage, setPatronage] = useState('');
+  const [logos, setLogos] = useState([]);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const logoRef = useRef(null);
   const fileRef = useRef(null);
   const pdfRef = useRef(null);
 
@@ -91,6 +131,9 @@ export default function CourseDocumentationPage() {
       setSessions((d.documentation?.sessions || []).map((s) => ({ ...s, date: toDateInput(s.date), photoIds: s.photoIds || [] })));
       setReportSummary(d.documentation?.reportSummary || '');
       setRecommendations(d.documentation?.recommendations || '');
+      setWelcome(d.documentation?.welcome || '');
+      setPatronage(d.documentation?.patronage || '');
+      setLogos(d.documentation?.logos || []);
       setTrainees((d.documentation?.trainees || []).map((t) => ({ ...t, score: t.score ?? '' })));
       setDirty(false);
       if (d.documentation?.status === 'PUBLISHED') {
@@ -163,7 +206,7 @@ export default function CourseDocumentationPage() {
   const save = async (over = {}, { quiet = false } = {}) => {
     setSaving(true);
     try {
-      const d = unwrap(await api.put(`/courses/${id}/documentation`, { intro, closing, sessions, reportSummary, recommendations, trainees, ...over }));
+      const d = unwrap(await api.put(`/courses/${id}/documentation`, { intro, closing, sessions, reportSummary, recommendations, trainees, welcome, patronage, logos, ...over }));
       setData(d);
       setDirty(false);
       if (!quiet) toast.success('حُفظ التوثيق');
@@ -177,7 +220,7 @@ export default function CourseDocumentationPage() {
   const publish = async (on) => {
     setPublishing(true);
     try {
-      if (on && dirty) await api.put(`/courses/${id}/documentation`, { intro, closing, sessions, reportSummary, recommendations, trainees });
+      if (on && dirty) await api.put(`/courses/${id}/documentation`, { intro, closing, sessions, reportSummary, recommendations, trainees, welcome, patronage, logos });
       const d = unwrap(await api.post(`/courses/${id}/documentation/publish`, { publish: on }));
       setData(d);
       setDirty(false);
@@ -291,6 +334,37 @@ export default function CourseDocumentationPage() {
     toast.success('نُقلت المادة إلى الحقول — راجعها ثم احفظ');
   };
 
+  const FIELD_SETTERS = { intro: setIntro, closing: setClosing, welcome: setWelcome, reportSummary: setReportSummary, recommendations: setRecommendations };
+  const compose = async (field) => {
+    setAiBusy(field);
+    try {
+      const r = unwrap(await api.post(`/courses/${id}/documentation/assist`, {
+        action: 'compose', field, intro, closing, welcome, patronage, reportSummary, recommendations, sessions,
+        trainees: trainees.map((t) => ({ score: t.score, entity: t.entity, isDistinguished: t.isDistinguished, distinction: t.distinction })),
+      }, { timeout: 200000 }));
+      if (r.text) { FIELD_SETTERS[field](r.text); setDirty(true); toast.success('صاغها المساعد — راجعها وعدّل ما تشاء'); }
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذّرت الصياغة');
+    } finally { setAiBusy(null); }
+  };
+
+  // ── شعارات الشركاء (شعار الجامعة أساسي دائماً) ──
+  const hasPreset = (k) => logos.some((l) => l.preset === k);
+  const togglePreset = (k) => { setLogos((l) => (l.some((x) => x.preset === k) ? l.filter((x) => x.preset !== k) : [...l, { preset: k }])); setDirty(true); };
+  const uploadLogo = async (file) => {
+    if (!file || !isAcceptableImageFile(file)) return;
+    if (logos.length >= 4) { toast.error('أربعة شعارات شركاء على الأكثر'); return; }
+    setLogoBusy(true);
+    try {
+      const image = await fileToSignatureDataUrl(file, 700);
+      const r = unwrap(await api.post(`/courses/${id}/documentation/logo`, { image }));
+      setLogos((l) => [...l, { key: r.key, url: r.url, name: file.name.replace(/\.[^.]+$/, '').slice(0, 60) }]);
+      setDirty(true);
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذّر رفع الشعار');
+    } finally { setLogoBusy(false); }
+  };
+
   const setFormat = async (format) => {
     try { const d = unwrap(await api.put(`/courses/${id}/documentation`, { format })); setData(d); } catch { toast.error('تعذّر تغيير المقاس'); }
   };
@@ -379,7 +453,7 @@ export default function CourseDocumentationPage() {
             {/* ── الصور ── */}
             <section className={PANEL} aria-labelledby="h-photos">
               <SectionHead icon={ImageIcon} title={<span id="h-photos">صور الدورة <span className="text-text-soft">({media.length})</span></span>}
-                hint="انقر على أي صورة لتعديلها: موضع الوجوه، والفلتر، وجلستها. والنجمة تجعلها الغلاف.">
+                hint="اضغط «قصّ وتحسين» لأي صورة، واختر صورة الغلاف بزرّها. الصور العمودية والأفقية من الجوال مقبولة كلها.">
                 {editable && (
                   <button type="button" onClick={() => fileRef.current?.click()} disabled={uploads.total > 0}
                     className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-[13px] font-bold text-white shadow-[0_8px_18px_-10px_rgba(46,96,102,0.85)] hover:bg-primary-dark disabled:opacity-60">
@@ -414,29 +488,30 @@ export default function CourseDocumentationPage() {
                     const isCover = doc.coverMediaId === m.id;
                     const si = sessionOf(m.id);
                     return (
-                      <li key={m.id} className={`group overflow-hidden rounded-2xl border bg-white ${isCover ? 'border-accent shadow-[0_0_0_2px_#C6AA76]' : 'border-border'}`}>
-                        <div className="relative aspect-[4/3] bg-background">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={m.thumbUrl} alt={m.caption || `صورة ${i + 1}`} loading="lazy" className="h-full w-full" style={imgStyle(m.edit)} />
-                          {editable && (
-                            <button type="button" onClick={() => setEditing(m)} aria-label={`تعديل الصورة ${i + 1}`} className="absolute inset-0 cursor-pointer" />
-                          )}
-                          {isCover && <span className="pointer-events-none absolute start-2 top-2 rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-extrabold text-white">الغلاف</span>}
-                          {si >= 0 && <span className="pointer-events-none absolute end-2 top-2 rounded-full bg-primary/90 px-2 py-0.5 text-[10.5px] font-extrabold text-white">جلسة {si + 1}</span>}
-                          {m.width < 1400 && m.height < 1400 && <span className="pointer-events-none absolute bottom-12 start-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-bold text-white" title="دقتها أقل مما يناسب الطباعة الكبيرة">دقة منخفضة</span>}
-                          {editable && (
-                            <div className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
-                              <button type="button" onClick={() => setCover(m.id)} title="اجعلها الغلاف" aria-label="اجعلها الغلاف" className="grid h-8 w-8 place-items-center rounded-full bg-white/90 text-warning"><Star size={15} fill={isCover ? 'currentColor' : 'none'} /></button>
-                              <button type="button" onClick={() => setEditing(m)} title="تعديل: التركيز والفلتر والجلسة" aria-label="تعديل الصورة" className="grid h-8 w-8 place-items-center rounded-full bg-white/90 text-primary"><Pencil size={14} /></button>
-                              <button type="button" onClick={() => move(i, -1)} title="تقديم" aria-label="تقديم" className="grid h-8 w-8 place-items-center rounded-full bg-white/90 text-text-main"><ArrowRight size={15} /></button>
-                              <button type="button" onClick={() => move(i, 1)} title="تأخير" aria-label="تأخير" className="grid h-8 w-8 place-items-center rounded-full bg-white/90 text-text-main"><ArrowLeft size={15} /></button>
-                              <button type="button" onClick={() => removePhoto(m.id)} title="حذف" aria-label="حذف الصورة" className="ms-auto grid h-8 w-8 place-items-center rounded-full bg-white/90 text-danger"><Trash2 size={15} /></button>
+                      <li key={m.id} className={`overflow-hidden rounded-2xl border bg-white ${isCover ? 'border-accent shadow-[0_0_0_2px_#C6AA76]' : 'border-border'}`}>
+                        <button type="button" disabled={!editable} onClick={() => setEditing(m)} aria-label={`تعديل الصورة ${i + 1}`}
+                          className="relative block aspect-[4/3] w-full overflow-hidden bg-background">
+                          <PhotoImg m={m} src={m.thumbUrl} alt={m.caption || `صورة ${i + 1}`} loading="lazy" />
+                          {isCover && <span className="absolute start-2 top-2 inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-extrabold text-white"><Star size={11} fill="currentColor" aria-hidden="true" /> صورة الغلاف</span>}
+                          {si >= 0 && <span className="absolute end-2 top-2 rounded-full bg-primary/90 px-2 py-0.5 text-[10.5px] font-extrabold text-white">جلسة {si + 1}</span>}
+                          {m.width < 1400 && m.height < 1400 && <span className="absolute bottom-2 start-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-bold text-white" title="دقتها أقل مما يناسب الطباعة الكبيرة">دقة منخفضة</span>}
+                        </button>
+                        {editable && (
+                          <div className="flex flex-col gap-1 border-t border-border p-1.5">
+                            <button type="button" onClick={() => setEditing(m)} className="inline-flex items-center justify-center gap-1 rounded-lg bg-primary-light/60 px-2 py-1.5 text-[11.5px] font-bold text-primary hover:bg-primary-light">
+                              <Pencil size={13} aria-hidden="true" /> قصّ وتحسين
+                            </button>
+                            <button type="button" onClick={() => setCover(m.id)} disabled={isCover}
+                              className={`inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[11.5px] font-bold ${isCover ? 'bg-sand/20 text-warning' : 'bg-background text-text-main hover:bg-sand/15 hover:text-warning'}`}>
+                              <Star size={13} aria-hidden="true" fill={isCover ? 'currentColor' : 'none'} /> {isCover ? 'الغلاف' : 'اجعلها الغلاف'}
+                            </button>
+                            <div className="flex items-center gap-1">
+                              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} title="تقديمها في الترتيب" className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-text-soft hover:bg-background disabled:opacity-30"><ArrowRight size={13} aria-hidden="true" /> قبل</button>
+                              <button type="button" onClick={() => move(i, 1)} disabled={i === media.length - 1} title="تأخيرها في الترتيب" className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-text-soft hover:bg-background disabled:opacity-30">بعد <ArrowLeft size={13} aria-hidden="true" /></button>
+                              <button type="button" onClick={() => { if (window.confirm('حذف هذه الصورة نهائياً؟')) removePhoto(m.id); }} title="حذف الصورة" className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-danger hover:bg-burgundy/5"><Trash2 size={13} aria-hidden="true" /> حذف</button>
                             </div>
-                          )}
-                        </div>
-                        <input defaultValue={m.caption || ''} disabled={!editable} placeholder="تعليق على الصورة" aria-label={`تعليق الصورة ${i + 1}`}
-                          onBlur={(e) => { if ((e.target.value || '') !== (m.caption || '')) saveCaption(m.id, e.target.value); }}
-                          className="w-full border-0 border-t border-border px-2.5 py-2 text-[12px] outline-none focus:bg-primary-light/30 disabled:bg-white" />
+                          </div>
+                        )}
                       </li>
                     );
                   })}
@@ -444,22 +519,66 @@ export default function CourseDocumentationPage() {
               )}
             </section>
 
+            {/* ── الترحيب والإشراف والشعارات ── */}
+            <section className={PANEL} aria-labelledby="h-front">
+              <SectionHead icon={Award} title={<span id="h-front">الغلاف والترحيب</span>} hint="كلها اختيارية: عبارة إشراف على الغلاف، وكلمة ترحيب، وشعارات الشركاء بجوار شعار الجامعة." />
+              <div className="space-y-5 p-5">
+                <div>
+                  <span className="mb-1 block text-xs font-bold text-text-main">عبارة الإشراف أو الشراكة <span className="font-normal text-text-soft">— تظهر على الغلاف</span></span>
+                  <input value={patronage} disabled={!editable} maxLength={160} onChange={(e) => { setPatronage(e.target.value); setDirty(true); }} placeholder="اتركها فارغة إن لم تكن هناك جهة مشرفة"
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-primary" />
+                  {editable && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {PATRONAGE_PRESETS.map((t) => (
+                        <button key={t} type="button" onClick={() => { setPatronage(t); setDirty(true); }}
+                          className={`rounded-full border px-3 py-1 text-[11.5px] font-bold ${patronage === t ? 'border-primary bg-primary-light text-primary' : 'border-border text-text-soft hover:border-primary/40 hover:text-primary'}`}>{t}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <AiText label="كلمة الترحيب" hint="صفحة بعد الغلاف، تُحذف إن تُركت فارغة" value={welcome} rows={3} max={1500} editable={editable}
+                  onChange={(v) => { setWelcome(v); setDirty(true); }} onAi={() => compose('welcome')} busy={aiBusy === 'welcome'} />
+                <div>
+                  <span className="mb-1 block text-xs font-bold text-text-main">الشعارات <span className="font-normal text-text-soft">— شعار الجامعة ثابت في كل الإصدارات، وتُضاف بجواره شعارات الشركاء</span></span>
+                  <div className="flex flex-wrap items-stretch gap-2">
+                    <span className="grid h-20 w-36 place-items-center rounded-2xl border border-border bg-[#0b3f42] p-2" title="شعار الجامعة — أساسي">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/brand/nauss-logo-gold.png" alt="شعار الجامعة" className="max-h-full max-w-full object-contain" />
+                    </span>
+                    <button type="button" disabled={!editable} onClick={() => togglePreset('moi-partnerships')} aria-pressed={hasPreset('moi-partnerships')}
+                      className={`relative grid h-20 w-24 place-items-center rounded-2xl border-2 bg-white p-1.5 ${hasPreset('moi-partnerships') ? 'border-primary' : 'border-dashed border-border opacity-60 hover:opacity-100'}`} title="شعار برامج الشراكات الدولية — وزارة الداخلية">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/brand/moi-partnerships.png" alt="برامج الشراكات الدولية" className="max-h-full max-w-full object-contain" />
+                      {hasPreset('moi-partnerships') && <span className="absolute -end-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-primary text-white"><Check size={12} /></span>}
+                    </button>
+                    {logos.filter((l) => l.key).map((l) => (
+                      <span key={l.key} className="relative grid h-20 w-24 place-items-center rounded-2xl border border-border bg-white p-1.5" title={l.name}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={l.url} alt={l.name || 'شعار شريك'} className="max-h-full max-w-full object-contain" />
+                        {editable && <button type="button" onClick={() => { setLogos((x) => x.filter((y) => y.key !== l.key)); setDirty(true); }} aria-label="إزالة الشعار" className="absolute -end-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-danger text-white"><X size={12} /></button>}
+                      </span>
+                    ))}
+                    {editable && (
+                      <button type="button" onClick={() => logoRef.current?.click()} disabled={logoBusy}
+                        className="grid h-20 w-24 place-items-center rounded-2xl border-2 border-dashed border-border text-[11px] font-bold text-text-soft hover:border-primary/50 hover:text-primary">
+                        <span className="flex flex-col items-center gap-1">{logoBusy ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} aria-hidden="true" />} شعار آخر</span>
+                      </button>
+                    )}
+                    <input ref={logoRef} type="file" accept="image/png,image/svg+xml,image/webp,image/jpeg" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; uploadLogo(f); }} />
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-text-soft">يُفضّل الشعار بخلفية شفافة (PNG).</p>
+                </div>
+              </div>
+            </section>
+
             {/* ── المقدمة والخاتمة ── */}
             <section className={PANEL} aria-labelledby="h-texts">
-              <SectionHead icon={BookOpenText} title={<span id="h-texts">نص التوثيق</span>} hint="المقدمة تفتتح المجلة والتقرير، والخاتمة تختمهما." />
+              <SectionHead icon={BookOpenText} title={<span id="h-texts">نص التوثيق</span>} hint="يصوغها المساعد من بيانات الدورة وجلساتها، وتراجعها أنت وتعدّل ما تشاء." />
               <div className="space-y-4 p-5">
-                <label className="block">
-                  <span className="mb-1 block text-xs font-bold text-text-main">المقدمة <span className="font-normal text-text-soft">— عن الدورة وأهدافها وما ميّزها</span></span>
-                  <textarea value={intro} disabled={!editable} rows={5} maxLength={3000}
-                    onChange={(e) => { setIntro(e.target.value); setDirty(true); }}
-                    className="w-full resize-y rounded-2xl border border-border px-4 py-3 text-sm leading-loose outline-none focus:border-primary" />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-xs font-bold text-text-main">الخاتمة <span className="font-normal text-text-soft">— اختيارية</span></span>
-                  <textarea value={closing} disabled={!editable} rows={3} maxLength={3000}
-                    onChange={(e) => { setClosing(e.target.value); setDirty(true); }}
-                    className="w-full resize-y rounded-2xl border border-border px-4 py-3 text-sm leading-loose outline-none focus:border-primary" />
-                </label>
+                <AiText label="المقدمة" hint="عن الدورة وأهدافها وما ميّزها" value={intro} rows={5} editable={editable}
+                  onChange={(v) => { setIntro(v); setDirty(true); }} onAi={() => compose('intro')} busy={aiBusy === 'intro'} />
+                <AiText label="الخاتمة" hint="اختيارية" value={closing} rows={3} editable={editable}
+                  onChange={(v) => { setClosing(v); setDirty(true); }} onAi={() => compose('closing')} busy={aiBusy === 'closing'} />
               </div>
             </section>
 
@@ -472,7 +591,7 @@ export default function CourseDocumentationPage() {
                       className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-text-soft hover:bg-background hover:text-primary">
                       <ClipboardPaste size={15} aria-hidden="true" /> لصق من منصة التدريب
                     </button>
-                    {data.aiEnabled && sessions.length > 0 && (
+                    {sessions.length > 0 && (
                       <button type="button" disabled={!!aiBusy} onClick={() => describe(sessions.map((x, i) => (x.title?.trim() && !x.description?.trim() ? i : -1)).filter((i) => i >= 0), 'all')}
                         className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-warning hover:bg-sand/15 disabled:opacity-60">
                         {aiBusy === 'all' ? <Loader2 size={15} aria-hidden="true" className="animate-spin" /> : <Sparkles size={15} aria-hidden="true" />} اكتب الأوصاف
@@ -539,7 +658,7 @@ export default function CourseDocumentationPage() {
                     <div className="relative sm:col-span-5">
                       <textarea value={s.description || ''} disabled={!editable} onChange={(e) => setSession(i, 'description', e.target.value)} rows={2} placeholder="وصف موجز (اختياري)" aria-label="وصف الجلسة"
                         className="block w-full resize-y rounded-xl border border-border px-3 py-2 pe-11 text-[13px] leading-relaxed outline-none focus:border-primary" />
-                      {editable && data.aiEnabled && s.title?.trim() && (
+                      {editable && s.title?.trim() && (
                         <button type="button" disabled={!!aiBusy} onClick={() => describe([i], i)} title={s.description ? 'أعد كتابة الوصف' : 'اكتب الوصف'} aria-label="كتابة الوصف بالذكاء الاصطناعي"
                           className="absolute end-1.5 top-1.5 grid h-8 w-8 place-items-center rounded-full text-warning hover:bg-sand/20 disabled:opacity-50">
                           {aiBusy === i ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
@@ -553,8 +672,7 @@ export default function CourseDocumentationPage() {
                         if (!m) return null;
                         return (
                           <span key={pid} className="relative h-12 w-16 overflow-hidden rounded-lg border border-border">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={m.thumbUrl} alt="" className="h-full w-full" style={imgStyle(m.edit)} />
+                            <PhotoImg m={m} src={m.thumbUrl} />
                           </span>
                         );
                       })}
@@ -574,7 +692,7 @@ export default function CourseDocumentationPage() {
             <section className={PANEL} aria-labelledby="h-report">
               <SectionHead icon={FileBarChart2} title={<span id="h-report">التقرير الفني</span>}
                 hint="للقيادات وجهة التدريب: يُستخرج من داخل المنصة وحدها، ولا يظهر في المجلة العامة.">
-                {editable && data.aiEnabled && (
+                {editable && (
                   <>
                     <button type="button" onClick={() => pdfRef.current?.click()} disabled={reportBusy}
                       className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-warning hover:bg-sand/15 disabled:opacity-60">
@@ -614,18 +732,10 @@ export default function CourseDocumentationPage() {
                 </div>
               )}
               <div className="space-y-4 p-5">
-                <label className="block">
-                  <span className="mb-1 block text-xs font-bold text-text-main">ملخص التنفيذ <span className="font-normal text-text-soft">— ما تحقق من أهداف البرنامج وأبرز مخرجاته</span></span>
-                  <textarea value={reportSummary} disabled={!editable} rows={4} maxLength={4000}
-                    onChange={(e) => { setReportSummary(e.target.value); setDirty(true); }}
-                    className="w-full resize-y rounded-2xl border border-border px-4 py-3 text-sm leading-loose outline-none focus:border-primary" />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-xs font-bold text-text-main">التوصيات <span className="font-normal text-text-soft">— توصية في كل سطر</span></span>
-                  <textarea value={recommendations} disabled={!editable} rows={4} maxLength={4000}
-                    onChange={(e) => { setRecommendations(e.target.value); setDirty(true); }}
-                    className="w-full resize-y rounded-2xl border border-border px-4 py-3 text-sm leading-loose outline-none focus:border-primary" />
-                </label>
+                <AiText label="ملخص التنفيذ" hint="ما تحقق من أهداف البرنامج وأبرز مخرجاته" value={reportSummary} rows={5} max={4000} editable={editable}
+                  onChange={(v) => { setReportSummary(v); setDirty(true); }} onAi={() => compose('reportSummary')} busy={aiBusy === 'reportSummary'} />
+                <AiText label="التوصيات" hint="توصية في كل سطر" value={recommendations} rows={4} max={4000} editable={editable}
+                  onChange={(v) => { setRecommendations(v); setDirty(true); }} onAi={() => compose('recommendations')} busy={aiBusy === 'recommendations'} />
               </div>
             </section>
 
@@ -815,7 +925,8 @@ export default function CourseDocumentationPage() {
           onClose={() => setEditing(null)} onSaved={afterEdit} />
       )}
       {picker !== null && sessions[picker] && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#0b2224]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="صور الجلسة"
+        <Portal>
+        <div dir="rtl" className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0b2224]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="صور الجلسة"
           onClick={(e) => { if (e.target === e.currentTarget) setPicker(null); }}>
           <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-[22px] bg-white shadow-2xl">
             <div className="border-b border-border px-5 py-3">
@@ -830,8 +941,7 @@ export default function CourseDocumentationPage() {
                   <li key={m.id}>
                     <button type="button" onClick={() => togglePickerPhoto(picker, m.id)} aria-pressed={on}
                       className={`relative block aspect-[4/3] w-full overflow-hidden rounded-xl border-[3px] ${on ? 'border-primary' : 'border-transparent'}`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={m.thumbUrl} alt={m.caption || ''} className="h-full w-full" style={imgStyle(m.edit)} />
+                      <PhotoImg m={m} src={m.thumbUrl} alt={m.caption || ''} />
                       {on && <span className="absolute end-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-primary text-white"><Check size={14} /></span>}
                       {other >= 0 && <span className="absolute start-1.5 top-1.5 rounded-full bg-black/55 px-1.5 text-[10px] font-bold text-white">جلسة {other + 1}</span>}
                     </button>
@@ -844,6 +954,7 @@ export default function CourseDocumentationPage() {
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </MainLayout>
   );

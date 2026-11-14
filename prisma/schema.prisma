@@ -990,6 +990,11 @@ model CourseDocumentation {
   closing       String?
   coverMediaId  String?
   format        String    @default("A4") // A4 | SQUARE — مقاس المجلة
+  welcome       String?   // كلمة ترحيب اختيارية في أول المجلة
+  patronage     String?   // عبارة الإشراف أو الشراكة على الغلاف (اختيارية)
+  logos         Json?     // شعارات الشركاء بجوار شعار الجامعة [{ preset } أو { key, name }]
+  featured      Boolean   @default(false) // «إصدار مميّز» يمنحه المدير في مكتبة الإصدارات
+  featuredAt    DateTime?
   publishedAt   DateTime?
   publishedById String?
   starAwarded   Boolean   @default(false)
@@ -1008,6 +1013,7 @@ model CourseDocumentation {
   trainees      DocumentationTrainee[]
 
   @@index([status])
+  @@index([status, publishedAt])
 }
 
 model DocumentationMedia {

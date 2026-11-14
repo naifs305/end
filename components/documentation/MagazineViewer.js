@@ -1,13 +1,14 @@
 // ======================================================================
 // عارض المجلة
 // ----------------------------------------------------------------------
-// • نمط الكتاب: صفحتان متقابلتان تُقلَّبان (من اليمين إلى اليسار)، بالأزرار
-//   أو بأسهم لوحة المفاتيح.
+// • نمط الكتاب: تقليب واقعي كالورق (page-flip — المكتبة نفسها في «توثيق»):
+//   اسحب طرف الصفحة أو انقره، أو استعمل الأزرار وأسهم لوحة المفاتيح،
+//   والاتجاه عربي (يُقلَّب من اليسار إلى اليمين).
 // • نمط التمرير: الصفحات متتابعة — وهو الافتراضي على الجوال.
 // • الطباعة: الصفحات بمقاسها تماماً (A4 أو مربعة ٢١٠×٢١٠)، واحدة في كل
 //   ورقة. و«نسخة المطبعة» تضيف ٣ ملم نزفاً حول كل صفحة وعلامات القصّ.
 // ======================================================================
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, Rows3, ChevronRight, ChevronLeft, Printer, Link2, Check, Scissors } from 'lucide-react';
 import { MAGAZINE_CSS } from './MagazinePages';
 import { filterDefsMarkup } from '../../lib/documentation/photoLook';
@@ -32,8 +33,6 @@ export default function MagazineViewer({ pages, shareUrl = null, title = '', all
   const wrapRef = useRef(null);
   const [box, setBox] = useState({ w: 1200, h: 800 });
   const [mode, setMode] = useState('book');
-  const [spread, setSpread] = useState(0);
-  const [anim, setAnim] = useState('');
   const [copied, setCopied] = useState(false);
   const [press, setPress] = useState(false);
 
@@ -50,31 +49,84 @@ export default function MagazineViewer({ pages, shareUrl = null, title = '', all
   const narrow = box.w < 900;
   const effectiveMode = narrow ? 'scroll' : mode;
 
-  // صفحات الكتاب: الغلاف وحده، ثم كل صفحتين متقابلتين، والأخيرة وحدها إن بقيت
-  const spreads = useMemo(() => {
-    const out = [[0]];
-    for (let i = 1; i < pages.length; i += 2) out.push(i + 1 < pages.length ? [i, i + 1] : [i]);
-    return out;
-  }, [pages.length]);
+  // ── التقليب الواقعي ──
+  // page-flip لا يدعم الاتجاه العربي، فتُمرَّر الصفحات معكوسة ويُبدأ من آخرها،
+  // فيقع الغلاف يميناً وتُقلَّب الصفحات كالكتاب العربي. وتُنسخ الصفحات إلى
+  // حاوية لا يديرها React حتى لا يتعارض نقل المكتبة لعناصرها مع React.
+  const srcRef = useRef(null);
+  const holderRef = useRef(null);
+  const flipRef = useRef(null);
+  const [flipIdx, setFlipIdx] = useState(0);
+  const [flipCount, setFlipCount] = useState(0);
+  const bookPages = useMemo(() => {
+    // عدد زوجي حتى ينغلق الغلاف الخلفي وحده
+    if (pages.length % 2 === 0) return pages;
+    return [...pages.slice(0, -1), { key: 'blank', node: <section className="mz-page" />, blank: true }, pages[pages.length - 1]];
+  }, [pages]);
 
-  const go = useCallback((dir) => {
-    setSpread((s) => {
-      const next = Math.max(0, Math.min(spreads.length - 1, s + dir));
-      if (next !== s) setAnim(dir > 0 ? 'mzv-turn-next' : 'mzv-turn-prev');
-      return next;
-    });
-  }, [spreads.length]);
+  const scale = Math.min((box.w - 120) / (PAGE_PX * 2), (box.h - 20) / (PAGE_PX * RATIO));
+  const fScale = Math.max(0.2, Math.min(scale, 1.4));
+
+  useEffect(() => {
+    if (effectiveMode !== 'book') return undefined;
+    let cancelled = false;
+    let pf = null;
+    (async () => {
+      const mod = await import('page-flip');
+      const PageFlip = mod.PageFlip || mod.default?.PageFlip;
+      const holder = holderRef.current;
+      const src = srcRef.current;
+      if (cancelled || !holder || !src) return;
+      holder.innerHTML = '';
+      const book = document.createElement('div');
+      holder.appendChild(book);
+      const clones = Array.from(src.querySelectorAll(':scope > .flip-page')).map((el) => el.cloneNode(true)).reverse();
+      if (!clones.length) return;
+      pf = new PageFlip(book, {
+        width: Math.round(PAGE_PX),
+        height: Math.round(PAGE_PX * RATIO),
+        size: 'fixed',
+        showCover: true,
+        usePortrait: false,
+        startPage: clones.length - 1,
+        drawShadow: true,
+        maxShadowOpacity: 0.45,
+        flippingTime: 900,
+        useMouseEvents: true,
+        swipeDistance: 20,
+        mobileScrollSupport: true,
+      });
+      pf.loadFromHTML(clones);
+      if (cancelled) { try { pf.destroy(); } catch { /* فُكّك قبل اكتمال التهيئة */ } return; }
+      flipRef.current = pf;
+      const total = pf.getPageCount();
+      setFlipCount(total);
+      setFlipIdx(total - 1 - pf.getCurrentPageIndex());
+      pf.on('flip', (e) => setFlipIdx(total - 1 - Number(e.data)));
+    })().catch((e) => { console.error('[flipbook]', e); }); // eslint-disable-line no-console
+    return () => {
+      cancelled = true;
+      flipRef.current = null;
+      try { pf?.destroy(); } catch { /* أزالت React الحاوية قبل التدمير */ }
+    };
+  }, [effectiveMode, bookPages, RATIO]);
+
+  // في الكتاب العربي: «التالي» قراءةً هو الرجوع في فهرس المكتبة المعكوس
+  const go = (dir) => {
+    const f = flipRef.current;
+    if (!f) return;
+    if (dir > 0) f.flipPrev(); else f.flipNext();
+  };
 
   useEffect(() => {
     if (effectiveMode !== 'book') return undefined;
     const onKey = (e) => {
-      // في كتاب عربي: اليسار هو التالي
       if (e.key === 'ArrowLeft') go(1);
       if (e.key === 'ArrowRight') go(-1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [effectiveMode, go]);
+  }, [effectiveMode]);
 
   const copy = async () => {
     try { await navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* المتصفح منع النسخ */ }
@@ -85,10 +137,10 @@ export default function MagazineViewer({ pages, shareUrl = null, title = '', all
     setTimeout(() => window.print(), 150);
   };
 
-  const pageW = effectiveMode === 'book'
-    ? Math.min((box.w - 40) / 2, box.h / RATIO)
-    : Math.min(box.w - 24, 820);
-  const current = spreads[spread] || [0];
+  const pageW = Math.min(box.w - 24, 820);
+  const readingLabel = flipCount
+    ? (flipIdx === 0 ? 'الغلاف' : flipIdx >= flipCount - 1 ? 'الغلاف الخلفي' : `الصفحتان ${toAr(flipIdx)}–${toAr(Math.min(flipIdx + 1, flipCount - 1))}`)
+    : '';
 
   return (
     <div className={`mzv ${square ? 'mz-fmt-sq' : ''}`} ref={wrapRef}>
@@ -122,14 +174,22 @@ export default function MagazineViewer({ pages, shareUrl = null, title = '', all
       {/* ── العرض ── */}
       {effectiveMode === 'book' ? (
         <div className="mzv-book">
-          <button type="button" className="mzv-nav" onClick={() => go(-1)} disabled={spread === 0} aria-label="الصفحة السابقة"><ChevronLeft size={22} /></button>
-          <div key={spread} className={`mzv-spread ${anim}`} onAnimationEnd={() => setAnim('')}>
-            {current.map((i) => <ScaledPage key={pages[i].key} node={pages[i].node} width={pageW} ratio={RATIO} />)}
+          <button type="button" className="mzv-nav mzv-nav-r" onClick={() => go(-1)} disabled={flipIdx <= 0} aria-label="الصفحة السابقة"><ChevronRight size={22} /></button>
+          <div className="mzv-flip-box" style={{ width: PAGE_PX * 2 * fScale, height: PAGE_PX * RATIO * fScale }}>
+            <div className="mzv-flip-scale" style={{ width: PAGE_PX * 2, height: PAGE_PX * RATIO, transform: `scale(${fScale})` }}>
+              <div ref={holderRef} className="mzv-flip-holder" />
+            </div>
           </div>
-          <button type="button" className="mzv-nav" onClick={() => go(1)} disabled={spread === spreads.length - 1} aria-label="الصفحة التالية"><ChevronRight size={22} /></button>
-          <p className="mzv-count">
-            {current.length === 2 ? `الصفحتان ${toAr(current[0] + 1)}–${toAr(current[1] + 1)}` : `الصفحة ${toAr(current[0] + 1)}`} من {toAr(pages.length)}
-          </p>
+          <button type="button" className="mzv-nav mzv-nav-l" onClick={() => go(1)} disabled={flipCount > 0 && flipIdx >= flipCount - 1} aria-label="الصفحة التالية"><ChevronLeft size={22} /></button>
+          <p className="mzv-count">{readingLabel}{flipCount ? ` · ${toAr(pages.length)} صفحة` : ''} — اسحب طرف الصفحة أو انقره للتقليب</p>
+          {/* مصدر الصفحات للتقليب (تُنسخ منه، ولا يُعرض) */}
+          <div ref={srcRef} className="mzv-flip-src" aria-hidden="true">
+            {bookPages.map((p, k) => (
+              <div key={p.key} className="flip-page" data-density={k === 0 || k === bookPages.length - 1 ? 'hard' : 'soft'} style={{ width: PAGE_PX, height: PAGE_PX * RATIO }}>
+                {p.node}
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="mzv-scroll">
@@ -172,8 +232,13 @@ function VIEWER_CSS(press, pageH = 297) {
 .mzv-spread{display:flex;direction:rtl;box-shadow:0 30px 60px -30px rgba(11,63,66,.55);perspective:2000px}
 .mzv-spread .mzv-page+.mzv-page{box-shadow:inset 18px 0 22px -18px rgba(0,0,0,.25)}
 .mzv-nav{position:absolute;top:45%;width:46px;height:46px;border-radius:50%;border:0;background:#fff;color:#2E6066;box-shadow:0 6px 18px -6px rgba(0,0,0,.25);cursor:pointer;display:grid;place-items:center;z-index:5}
-.mzv-nav:first-of-type{right:14px}
-.mzv-nav:last-of-type{left:14px}
+.mzv-nav-r{right:14px}
+.mzv-nav-l{left:14px}
+.mzv-flip-box{position:relative;filter:drop-shadow(0 30px 40px rgba(11,63,66,.35))}
+.mzv-flip-scale{position:absolute;top:0;left:0;transform-origin:top left;direction:ltr}
+.mzv-flip-holder{width:100%;height:100%}
+.mzv-flip-holder .flip-page{overflow:hidden;background:#fcfaf5}
+.mzv-flip-src{position:absolute;left:-100000px;top:0;visibility:hidden;pointer-events:none;direction:ltr}
 .mzv-nav:disabled{opacity:.35;cursor:default}
 .mzv-count{font:700 13px Cairo,sans-serif;color:#5E6F70;margin:12px 0 0;direction:rtl}
 .mzv-turn-next{animation:mzvNext .55s cubic-bezier(.2,.7,.2,1)}

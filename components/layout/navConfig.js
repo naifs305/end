@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   Languages,
   NotebookPen,
+  LibraryBig,
 } from 'lucide-react';
 import { isAdminRole, canAccessKpis, canViewReportsOnly } from '../../lib/roles';
 
@@ -70,7 +71,8 @@ export function buildNavSections(activeRole, t) {
   push('reportsFollowup', t('navSections.reportsFollowup'), reports);
 
   // ── 4. التحفيز ──
-  push('engagement', t('navSections.engagement'), [item('/motivation', Award, t('nav.motivation'))]);
+  // مكتبة الإصدارات مفتوحة للجميع: مجلات التوثيق المنشورة، والمميّزة في صدارتها
+  push('engagement', t('navSections.engagement'), [item('/motivation', Award, t('nav.motivation')), item('/library', LibraryBig, t('nav.library'))]);
 
   // ── 5. الاتصال ──
   push('communication', t('navSections.communication'), [
