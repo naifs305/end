@@ -123,7 +123,10 @@ async function handler(req, res) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.status(200).send(renderInterpreterCertificate({ course, interpreter, sections }, { bare: true, issuedAt }));
   }
-  const courseRef = course.code ? ` (${course.code})` : '';
+  // اسم المترجم ثنائياً (الأول والأخير) — لاسم مرفق الشهادة
+  const nameParts = String(interpreter.fullName || '').trim().split(/\s+/).filter(Boolean);
+  const shortName = nameParts.length > 1 ? `${nameParts[0]} ${nameParts[nameParts.length - 1]}` : (nameParts[0] || 'المترجم');
+  const certFileName = `شهادة إنجاز - ${shortName}`;
 
   // ── رسالة الإدارة القانونية ─────────────────────────────────
   if (output === 'legal-eml') {
@@ -131,7 +134,7 @@ async function handler(req, res) {
     const eml = buildEmlMessage({
       to,
       cc,
-      subject: `طلب مراجعة واعتماد عقد مترجم — ${course.name || 'برنامج تدريبي'}${courseRef} — عقد رقم ${facts.contractNo}`,
+      subject: `طلب مراجعة واعتماد عقد مترجم — ${course.name || 'برنامج تدريبي'} — عقد رقم ${facts.contractNo}`,
       htmlBody: renderLegalReviewEmail({ course, interpreter, config }),
     });
     return sendEml(res, { eml, course, prefix: 'interpreter-legal-review' });
@@ -142,8 +145,8 @@ async function handler(req, res) {
     const stage = key === 'interpreter_contract' ? 'FIRST' : 'FINAL';
     const [to, cc] = await Promise.all([setting('interpreter.finance.email.to'), setting('interpreter.finance.email.cc')]);
     const subject = stage === 'FIRST'
-      ? `طلب صرف الدفعة الأولى لمترجم — ${course.name || 'برنامج تدريبي'}${courseRef}`
-      : `طلب صرف بقية مستحقات مترجم وفق شهادة الإنجاز — ${course.name || 'برنامج تدريبي'}${courseRef}`;
+      ? `طلب صرف الدفعة الأولى لمترجم — ${course.name || 'برنامج تدريبي'}`
+      : `طلب صرف بقية مستحقات مترجم وفق شهادة الإنجاز — ${course.name || 'برنامج تدريبي'}`;
 
     // طلب بقية المستحقات يُرسل ومعه شهادة الإنجاز: PDF إن حوّلها المتصفح،
     // وإلا فنسختها المستقلة (تُفتح في أي متصفح وتُطبع كما هي)
@@ -151,11 +154,11 @@ async function handler(req, res) {
     if (stage === 'FINAL') {
       const pdf = req.method === 'POST' ? String(req.body?.pdf || '') : '';
       if (/^data:application\/pdf;base64,[A-Za-z0-9+/=]+$/.test(pdf)) {
-        attachments.push({ name: 'interpreter-completion-certificate.pdf', content: pdf });
+        attachments.push({ name: `${certFileName}.pdf`, content: pdf });
       } else {
         const certHtml = renderInterpreterCertificate({ course, interpreter, sections }, { bare: true, issuedAt });
         attachments.push({
-          name: 'interpreter-completion-certificate.html',
+          name: `${certFileName}.html`,
           content: `data:text/html;base64,${Buffer.from(certHtml, 'utf8').toString('base64')}`,
         });
       }
@@ -178,7 +181,7 @@ async function handler(req, res) {
     const to = await setting('interpreter.transfer.email.to');
     const eml = buildEmlMessage({
       to,
-      subject: `طلب صرف مستحقات مترجم — ${course.name || 'برنامج تدريبي'}${courseRef}`,
+      subject: `طلب صرف مستحقات مترجم — ${course.name || 'برنامج تدريبي'}`,
       htmlBody: renderInterpreterTransferEmail({ course, interpreter }),
     });
     return sendEml(res, { eml, course, prefix: 'interpreter-transfer' });
