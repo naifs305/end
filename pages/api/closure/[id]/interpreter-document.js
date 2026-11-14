@@ -9,7 +9,8 @@
 //                             finance-eml طلب صرف الدفعة الأولى
 //   interpreter_advance     → document    نموذج استحقاق
 //   interpreter_certificate → document    شهادة إنجاز
-//                             finance-eml طلب صرف بقية المستحقات
+//                             finance-eml طلب صرف بقية المستحقات، والشهادة مرفقة بها
+//                             certificate-file  الشهادة نسخةً مستقلة (تُحوَّل PDF في المتصفح)
 //   interpreter_transfer    → document    رسالة طلب صرف بالتحويل
 //
 // وعناوين الجهات كلها من إعدادات المنصة لا من الكود.
@@ -19,7 +20,7 @@ const svc = require('../../../../lib/modules/closure/closure.service');
 const interpreterSvc = require('../../../../lib/modules/courses/interpreter.service');
 const permissions = require('../../../../lib/services/permissions');
 const configService = require('../../../../lib/modules/config/config.service');
-const { buildEmlMessage, sanitizeFilename } = require('../../../../lib/email/eml');
+const { buildEmlMessage, normalizeAttachments, sanitizeFilename } = require('../../../../lib/email/eml');
 const {
   CONTRACT_DEFAULTS,
   contractFacts,
@@ -45,7 +46,7 @@ const MAIL_DEFAULTS = {
 const ALLOWED_OUTPUTS = {
   interpreter_contract: ['document', 'legal-eml', 'finance-eml'],
   interpreter_advance: ['document'],
-  interpreter_certificate: ['document', 'finance-eml'],
+  interpreter_certificate: ['document', 'finance-eml', 'certificate-file'],
   interpreter_transfer: ['document'],
 };
 
@@ -113,6 +114,15 @@ async function handler(req, res) {
   ]);
   const config = { rep, repTitle, email: repEmail, bufferDays: Number(bufferDays) };
   const facts = contractFacts({ course, interpreter, config });
+  const sections = (element.formData && element.formData.documentSections) || {};
+  // الشهادة تُؤرَّخ بيوم تقديم العنصر، وقبله بيوم إصدارها
+  const issuedAt = element.executionAt || new Date();
+
+  // ── الشهادة نسخةً مستقلة: المطبوعة والخط مضمّنان، بلا شريط أدوات ──
+  if (output === 'certificate-file') {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(renderInterpreterCertificate({ course, interpreter, sections }, { bare: true, issuedAt }));
+  }
   const courseRef = course.code ? ` (${course.code})` : '';
 
   // ── رسالة الإدارة القانونية ─────────────────────────────────
@@ -135,11 +145,28 @@ async function handler(req, res) {
       ? `طلب صرف الدفعة الأولى لمترجم — ${course.name || 'برنامج تدريبي'}${courseRef}`
       : `طلب صرف بقية مستحقات مترجم وفق شهادة الإنجاز — ${course.name || 'برنامج تدريبي'}${courseRef}`;
 
+    // طلب بقية المستحقات يُرسل ومعه شهادة الإنجاز: PDF إن حوّلها المتصفح،
+    // وإلا فنسختها المستقلة (تُفتح في أي متصفح وتُطبع كما هي)
+    const attachments = [];
+    if (stage === 'FINAL') {
+      const pdf = req.method === 'POST' ? String(req.body?.pdf || '') : '';
+      if (/^data:application\/pdf;base64,[A-Za-z0-9+/=]+$/.test(pdf)) {
+        attachments.push({ name: 'interpreter-completion-certificate.pdf', content: pdf });
+      } else {
+        const certHtml = renderInterpreterCertificate({ course, interpreter, sections }, { bare: true, issuedAt });
+        attachments.push({
+          name: 'interpreter-completion-certificate.html',
+          content: `data:text/html;base64,${Buffer.from(certHtml, 'utf8').toString('base64')}`,
+        });
+      }
+    }
+
     const eml = buildEmlMessage({
       to,
       cc,
       subject,
       htmlBody: renderFinancePaymentEmail({ course, interpreter, stage, config }),
+      attachments: normalizeAttachments(attachments),
     });
     return sendEml(res, {
       eml, course, prefix: stage === 'FIRST' ? 'interpreter-finance-first' : 'interpreter-finance-final',
@@ -158,10 +185,9 @@ async function handler(req, res) {
   }
 
   // ── المستندات المطبوعة: صفحة A4 تُعدَّل ثم تُطبع بصيغة PDF ──
-  const sections = (element.formData && element.formData.documentSections) || {};
   const canEdit = await permissions.canSubmitElement(req.user, req.activeRole, course);
   const payload = { course, interpreter, sections, config };
-  const options = { trackingId: id, canEdit };
+  const options = { trackingId: id, canEdit, issuedAt };
 
   let html;
   if (key === 'interpreter_contract') {
@@ -176,11 +202,13 @@ async function handler(req, res) {
   return res.status(200).send(html);
 }
 
-module.exports = withMethods(['GET'], withAuth(handler));
+module.exports = withMethods(['GET', 'POST'], withAuth(handler));
 module.exports.default = module.exports;
 
 module.exports.config = {
   api: {
     responseLimit: '12mb',
+    // الشهادة PDF تصل من المتصفح لتُرفق بالرسالة
+    bodyParser: { sizeLimit: '8mb' },
   },
 };

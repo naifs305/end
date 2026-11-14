@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Languages, Save, FileText, Mail, Send, X, Check, ArrowRight, PenLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
+import { singlePageHtmlToPdfDataUrl } from '../../lib/clientDocPdf';
 
 const EMPTY = {
   fullName: '', nationalId: '', nationality: '', email: '', mobile: '', address: '',
@@ -160,9 +161,24 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
     const asEml = output !== 'document' || isEmail;
     try {
       if (asEml) {
-        const res = await api.get(`/closure/${trackingId}/interpreter-document`, {
-          params: { output }, responseType: 'blob', headers: { Accept: 'message/rfc822' },
-        });
+        // طلب بقية المستحقات تُرفق به شهادة الإنجاز PDF، تُرسم في المتصفح
+        // بالخط والمطبوعة كما تُطبع. وإن تعذّر الرسم أرفق الخادم نسختها المستقلة.
+        let pdf = null;
+        if (output === 'finance-eml' && isCertificate) {
+          try {
+            const file = await api.get(`/closure/${trackingId}/interpreter-document`, {
+              params: { output: 'certificate-file' }, responseType: 'text', headers: { Accept: 'text/html' },
+            });
+            pdf = await singlePageHtmlToPdfDataUrl(file.data);
+          } catch { pdf = null; }
+        }
+        const res = pdf
+          ? await api.post(`/closure/${trackingId}/interpreter-document`, { pdf }, {
+            params: { output }, responseType: 'blob', headers: { Accept: 'message/rfc822' },
+          })
+          : await api.get(`/closure/${trackingId}/interpreter-document`, {
+            params: { output }, responseType: 'blob', headers: { Accept: 'message/rfc822' },
+          });
         const disposition = res.headers['content-disposition'] || '';
         const match = disposition.match(/filename="?([^";]+)"?/i);
         const url = window.URL.createObjectURL(res.data);
@@ -173,7 +189,9 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
         a.click();
         a.remove();
         window.URL.revokeObjectURL(url);
-        toast.success('نُزِّلت الرسالة — افتحها في برنامج البريد وأرسلها');
+        toast.success(output === 'finance-eml' && isCertificate
+          ? 'نُزِّلت الرسالة وشهادة الإنجاز مرفقة بها — افتحها في برنامج البريد وأرسلها'
+          : 'نُزِّلت الرسالة — افتحها في برنامج البريد وأرسلها');
         return;
       }
 
@@ -329,7 +347,7 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
               {isContract
                 ? 'المستند يُفتح صفحةً تُعدَّل ثم تُطبع بصيغة PDF. والرسالتان تُفتحان في برنامج البريد جاهزتين بوجهتيهما — أرفق بهما نسخة العقد قبل الإرسال.'
                 : isCertificate
-                ? 'الشهادة تُفتح صفحةً تُطبع بصيغة PDF، ورسالة المالية تُفتح في برنامج البريد — أرفق بها الشهادة قبل الإرسال.'
+                ? 'الشهادة تُفتح صفحةً تُطبع بصيغة PDF، وتحمل توقيع المنسق الإلكتروني. ورسالة المالية تُفتح في برنامج البريد والشهادة مرفقة بها.'
                 : 'يُفتح المخرج جاهزاً، وتبقى المراجعة والإرسال بيدك.'}
             </p>
 

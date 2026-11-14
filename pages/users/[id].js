@@ -4,11 +4,11 @@ import MainLayout from '../../components/layout/MainLayout';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
 import useAuth from '../../context/AuthContext';
-import { ArrowLeft, User, Search, Star, BarChart3, KeyRound, ChevronUp, ChevronDown, Trash2, Camera, Handshake } from 'lucide-react';
+import { ArrowLeft, User, Search, Star, BarChart3, KeyRound, ChevronUp, ChevronDown, Trash2, Camera, Handshake, PenLine } from 'lucide-react';
 import ConfirmModal from '../../components/operational/ConfirmModal';
 import { useTranslation } from '../../lib/i18n';
 import Avatar from '../../components/shared/Avatar';
-import { isAcceptableImageFile, fileToAvatarDataUrl } from '../../lib/clientImage';
+import { isAcceptableImageFile, fileToAvatarDataUrl, fileToSignatureDataUrl } from '../../lib/clientImage';
 
 // تكوين الأدوار — الأيقونات هنا، التسميات من roles.* والأوصاف من admin.users.*
 const ROLE_CFG = [
@@ -39,6 +39,24 @@ export default function EditUser() {
 
   // صورة المستخدم: يضعها المدير هنا، أو صاحبها من ملفه الشخصي.
   // تُصغَّر قبل الحفظ فتظهر في بطاقات الدورات دون أن تُثقلها.
+  // التوقيع الإلكتروني: يُدرج تلقائياً في شهادة إنجاز الترجمة وما شابهها
+  const [savingSig, setSavingSig] = useState(false);
+  const saveSignature = async (file) => {
+    if (!file) return;
+    if (file !== 'remove' && !isAcceptableImageFile(file)) { toast.error('اختر ملف صورة'); return; }
+    setSavingSig(true);
+    try {
+      const signatureImage = file === 'remove' ? null : await fileToSignatureDataUrl(file);
+      await api.put(`/users/${id}`, { signatureImage });
+      setUser((u) => ({ ...u, signatureImage }));
+      toast.success(signatureImage ? 'حُفظ التوقيع' : 'أُزيل التوقيع');
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'تعذّر حفظ التوقيع');
+    } finally {
+      setSavingSig(false);
+    }
+  };
+
   const savePhoto = async (file) => {
     if (!file) return;
     if (file !== 'remove' && !isAcceptableImageFile(file)) { toast.error('اختر ملف صورة'); return; }
@@ -250,6 +268,34 @@ export default function EditUser() {
               </div>
             </div>
           </div>
+
+          {/* التوقيع الإلكتروني */}
+          {(isManager || currentUser?.id === id) && (
+            <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
+              <h2 className="mb-1 inline-flex items-center gap-1.5 font-extrabold text-text-main">
+                <PenLine size={16} aria-hidden="true" /> التوقيع الإلكتروني
+              </h2>
+              <p className="mb-3 text-[11px] text-text-soft">يُدرج تلقائياً في شهادة إنجاز الترجمة وغيرها مما يصدره المنسق. يُفضَّل صورة بخلفية شفافة أو بيضاء.</p>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="grid h-24 w-56 place-items-center rounded-xl border border-dashed border-border bg-background">
+                  {user.signatureImage
+                    ? <img src={user.signatureImage} alt={`توقيع ${user.firstName} ${user.lastName}`} className="max-h-20 max-w-52 object-contain" />
+                    : <span className="text-xs text-text-soft">لا توقيع بعد</span>}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-bold text-white hover:bg-primary-dark ${savingSig ? 'opacity-60' : ''}`}>
+                    <PenLine size={14} aria-hidden="true" /> {user.signatureImage ? 'تغيير التوقيع' : 'رفع التوقيع'}
+                    <input type="file" accept="image/*,.heic,.heif" className="hidden" disabled={savingSig}
+                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; saveSignature(f); }} />
+                  </label>
+                  {user.signatureImage && (
+                    <button type="button" onClick={() => saveSignature('remove')} disabled={savingSig}
+                      className="text-start text-[12px] font-bold text-danger hover:underline">إزالة التوقيع</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* الأدوار */}
           <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
