@@ -785,6 +785,12 @@ export default function CourseDetail() {
                   className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-[13px] font-bold text-white shadow-[0_8px_18px_-10px_rgba(178,146,90,0.9)] transition hover:brightness-95">
                   <Star size={15} aria-hidden="true" /> {d ? 'فتح مساحة التوثيق' : 'ابدأ التوثيق'}
                 </Link>
+                {published && d?.slug && (
+                  <a href={`/m/${d.slug}`} target="_blank" rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-warning hover:bg-white">
+                    تصفّح المجلة
+                  </a>
+                )}
               </div>
             </article>
           );

@@ -998,8 +998,13 @@ model CourseDocumentation {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // التقرير الفني للقيادات وجهة التدريب
+  reportSummary   String?
+  recommendations String?
+
   media         DocumentationMedia[]
   sessions      DocumentationSession[]
+  trainees      DocumentationTrainee[]
 
   @@index([status])
 }
@@ -1030,6 +1035,23 @@ model DocumentationSession {
   date            DateTime?
   time            String?
   description     String?
+  sortOrder       Int                 @default(0)
+
+  @@index([documentationId, sortOrder])
+}
+
+// متدربو الدورة في التقرير الفني: صورهم ودرجاتهم وما تميّزوا به.
+// لا تظهر في المجلة العامة — التقرير يُستخرج من داخل المنصة وحدها.
+model DocumentationTrainee {
+  id              String              @id @default(uuid())
+  documentationId String
+  documentation   CourseDocumentation @relation(fields: [documentationId], references: [id], onDelete: Cascade)
+  name            String
+  entity          String?             // جهة المتدرب أو دولته
+  score           Float?
+  distinction     String?             // بماذا تميّز
+  isDistinguished Boolean             @default(false)
+  photoKey        String?
   sortOrder       Int                 @default(0)
 
   @@index([documentationId, sortOrder])

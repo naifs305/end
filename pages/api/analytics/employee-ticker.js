@@ -233,6 +233,11 @@ async function handler(req, res) {
       const fieldReports = require('../../../lib/modules/fieldReports/fieldReports.service');
       items.unshift(...(await fieldReports.tickerItems(userId, now)));
     } catch { /* شريط الأخبار لا يتعطّل بسببها */ }
+    // مجلات التوثيق الصادرة حديثاً — يحتفي بها الجميع
+    try {
+      const documentation = require('../../../lib/modules/documentation/documentation.service');
+      items.unshift(...(await documentation.tickerItems(now)));
+    } catch { /* كذلك */ }
 
     // ١١. رسالة مخصصة حسب الوقت واليوم
     items.push({ id: 'greeting', icon: '👋', tone: 'primary', text: greeting(name, hour) });

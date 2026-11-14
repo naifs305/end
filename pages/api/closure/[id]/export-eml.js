@@ -1,6 +1,8 @@
 const { withMethods, withAuth } = require('../../../../lib/server/http');
 const svc = require('../../../../lib/modules/closure/closure.service');
 const permissions = require('../../../../lib/services/permissions');
+const documentation = require('../../../../lib/modules/documentation/documentation.service');
+const { publicOrigin } = require('../../../../lib/server/origin');
 const { renderOpeningReport } = require('../../../../lib/reports/openingReport');
 const { renderClosingReport } = require('../../../../lib/reports/closingReport');
 const { buildEmlMessage, normalizeAttachments, sanitizeFilename } = require('../../../../lib/email/eml');
@@ -34,7 +36,7 @@ async function handler(req, res) {
   const data = element.formData || {};
   const html = element.element.key === 'opening_report'
     ? renderOpeningReport({ course: element.course, element, data }, { mode: 'email' })
-    : renderClosingReport({ course: element.course, element, data }, { mode: 'email' });
+    : renderClosingReport({ course: element.course, element, data }, { mode: 'email', magazineUrl: await magazineUrlFor(req, element.course.id) });
 
   const [toAddr, ccAddr] = await Promise.all([
     configService.getSetting('report.email.to', 'OD@NAUSS.EDU.SA'),
@@ -52,6 +54,14 @@ async function handler(req, res) {
   res.setHeader('Content-Type', 'message/rfc822; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${buildFilename(element.course?.name, element.element.key)}"`);
   return res.status(200).send(eml);
+}
+
+// رابط مجلة التوثيق إن نُشرت — يُضاف إلى تقرير الاختتام
+async function magazineUrlFor(req, courseId) {
+  try {
+    const slug = await documentation.publishedSlug(courseId);
+    return slug ? `${publicOrigin(req)}/m/${slug}` : null;
+  } catch { return null; }
 }
 
 module.exports = withMethods(['GET'], withAuth(handler));
