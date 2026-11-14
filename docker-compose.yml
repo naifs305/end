@@ -28,6 +28,8 @@ services:
       - "127.0.0.1:8084:3010"      # الفرق الوحيد عن التأمين: 8084
     volumes:
       - /opt/certs/nauss-ad-ca.pem:/certs/nauss-ad-ca.pem:ro
+      # صور توثيق الدورات — مخزن دائم لا يضيع مع كل نشر
+      - media:/app/storage/media
     depends_on:
       db:
         condition: service_healthy
@@ -37,3 +39,4 @@ services:
 
 volumes:
   dbdata:
+  media:

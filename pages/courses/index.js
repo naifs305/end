@@ -25,6 +25,7 @@ import {
   BookOpen,
   Check,
   MapPin,
+  Star,
 } from 'lucide-react';
 import MainLayout from '../../components/layout/MainLayout';
 import Avatar from '../../components/shared/Avatar';
@@ -113,10 +114,17 @@ function CourseCard({ course, role, user, onDelete, onArchive, onReassign, busy,
 
         {/* ── الدورة ── */}
         <div className="flex min-w-0 flex-col gap-1.5 px-4 pb-3 pt-4">
-          <span className="inline-flex items-center gap-1.5 text-[11.5px] font-extrabold" style={{ color: tone }}>
-            <span className="h-[7px] w-[7px] rounded-full" style={{ background: tone }} aria-hidden="true" />
-            {statusLabel(t, course.status)}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[11.5px] font-extrabold" style={{ color: tone }}>
+              <span className="h-[7px] w-[7px] rounded-full" style={{ background: tone }} aria-hidden="true" />
+              {statusLabel(t, course.status)}
+            </span>
+            {course.documentation?.starAwarded && (
+              <span className="ms-auto inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-extrabold text-white" title="وُثّقت الدورة ونالت نجمة التميّز">
+                <Star size={11} aria-hidden="true" fill="currentColor" /> متميّزة
+              </span>
+            )}
+          </div>
           <Link href={`/courses/${course.id}`} className="min-w-0">
             <h3 className="line-clamp-2 text-[15.5px] font-extrabold leading-snug text-text-main transition hover:text-primary">{course.name}</h3>
           </Link>

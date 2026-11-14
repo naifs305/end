@@ -338,6 +338,8 @@ model Course {
   messages                       Message[]
   blockers                       ElementBlocker[]
   interpreter                    CourseInterpreter?
+  // توثيق الدورة — عنصر تميّز اختياري (لا يدخل في الإقفال ولا يُخصم بغيابه)
+  documentation                  CourseDocumentation?
 
   // ----- الإدخال المتأخر للدورة -----
   // المنصة تكتشف التأخير بنفسها (مقارنة لحظة الإدخال بتواريخ الدورة)
@@ -730,6 +732,7 @@ model EmployeeKpiSnapshot {
   speedScore                       Float               @default(0)
   disciplineScore                  Float               @default(0)
   reportBonusScore                 Float               @default(0)  // مكافأة تقديم التقارير (+0 إلى +5)
+  excellenceBonus                  Float               @default(0)  // مكافأة توثيق الدورات المميّز (+٣ لكل دورة، حد +٦)
   finalScore                       Float               @default(0)
   performanceLevel                 PerformanceLevel    @default(GOOD)
 
@@ -965,4 +968,69 @@ model AppSetting {
   createdAt DateTime @default(now())
 
   @@index([category])
+}
+
+// =============================================================
+// توثيق الدورة — عنصر التميّز
+// -------------------------------------------------------------
+// اختياري في كل دورة: من وثّق دورته بالحد الأدنى من الجودة ونشرها
+// نال «نجمة تميّز» ودرجات إضافية في مؤشره، ومن لم يوثّق لا يُخصم
+// عليه شيء. وبيانات الدورة (اسمها وتواريخها ومكانها ومنسقها) تُقرأ
+// من الدورة نفسها، فلا تُدخل مرتين.
+// الصور تُحفظ في مخزن ملفات المنصة (lib/storage/mediaStore)، وهنا
+// مراجعها وترتيبها وتعليقاتها.
+// =============================================================
+model CourseDocumentation {
+  id            String    @id @default(uuid())
+  courseId      String    @unique
+  course        Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  status        String    @default("DRAFT") // DRAFT | PUBLISHED
+  slug          String?   @unique           // رابط المجلة العام (عشوائي لا يُخمَّن)
+  intro         String?
+  closing       String?
+  coverMediaId  String?
+  publishedAt   DateTime?
+  publishedById String?
+  starAwarded   Boolean   @default(false)
+  starAwardedAt DateTime?
+  views         Int       @default(0)
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  media         DocumentationMedia[]
+  sessions      DocumentationSession[]
+
+  @@index([status])
+}
+
+model DocumentationMedia {
+  id              String              @id @default(uuid())
+  documentationId String
+  documentation   CourseDocumentation @relation(fields: [documentationId], references: [id], onDelete: Cascade)
+  fileKey         String              // النسخة المعروضة (WebP حتى ٢٠٠٠ نقطة)
+  thumbKey        String              // المصغّرة
+  width           Int
+  height          Int
+  size            Int
+  caption         String?
+  sortOrder       Int                 @default(0)
+  uploadedById    String?
+  createdAt       DateTime            @default(now())
+
+  @@index([documentationId, sortOrder])
+}
+
+model DocumentationSession {
+  id              String              @id @default(uuid())
+  documentationId String
+  documentation   CourseDocumentation @relation(fields: [documentationId], references: [id], onDelete: Cascade)
+  title           String
+  presenter       String?
+  date            DateTime?
+  time            String?
+  description     String?
+  sortOrder       Int                 @default(0)
+
+  @@index([documentationId, sortOrder])
 }

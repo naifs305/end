@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import {
   AlertTriangle,
   FileText,
@@ -18,6 +19,7 @@ import {
   CalendarClock,
   ThumbsUp,
   ThumbsDown,
+  Star,
 } from 'lucide-react';
 import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
@@ -305,6 +307,15 @@ export default function CourseDetail() {
       toast.error(t('courseDetail.emlFailed'));
     }
   };
+
+  // ── عنصر التميّز: توثيق الدورة (اختياري، لا يدخل في الإقفال) ──
+  const [docSummary, setDocSummary] = useState(null);
+  useEffect(() => {
+    if (!id) return;
+    api.get(`/courses/${id}/documentation`)
+      .then((res) => setDocSummary(res?.data?.data ?? res?.data))
+      .catch(() => setDocSummary(null));
+  }, [id]);
 
   const sortedElements = useMemo(() => {
     if (!course?.closureElements) return [];
@@ -739,6 +750,45 @@ export default function CourseDetail() {
             </div>
           </div>
         </div>
+
+        {/* ── عنصر التميّز: توثيق الدورة ── */}
+        {docSummary && (() => {
+          const d = docSummary.documentation;
+          const photos = d?.media?.length || 0;
+          const starred = !!d?.starAwarded;
+          const published = d?.status === 'PUBLISHED';
+          const { checks = [] } = docSummary.star || {};
+          const done = checks.filter((c) => c.done).length;
+          return (
+            <article className="overflow-hidden rounded-[20px] border border-accent/40 bg-white shadow-[0_1px_2px_rgba(28,46,48,0.05),0_10px_28px_-16px_rgba(28,46,48,0.22)]"
+              style={{ background: 'linear-gradient(110deg,#fff8ec,#ffffff 60%)' }}>
+              <div className="flex flex-wrap items-center gap-4 px-5 py-4">
+                <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${starred ? 'bg-accent text-white shadow-[0_8px_18px_-8px_rgba(178,146,90,0.9)]' : 'bg-sand/20 text-warning'}`}>
+                  <Star size={24} aria-hidden="true" fill={starred ? 'currentColor' : 'none'} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11.5px] font-extrabold text-warning">عنصر التميّز · اختياري</p>
+                  <h2 className="text-[16px] font-extrabold text-text-main">توثيق الدورة</h2>
+                  <p className="text-[12.5px] text-text-soft">
+                    {starred
+                      ? `نال نجمة التميّز — ${photos} صورة منشورة`
+                      : published
+                        ? 'منشور، ونقص عن معايير النجمة — أكمله لتعود'
+                        : d
+                          ? `مسودة: ${photos} صورة · ${done} من ${checks.length} معايير`
+                          : 'وثّق الدورة بالصور والجلسات وانشرها فتنال نجمة تميّز ودرجات إضافية — ولا يُخصم على من لا يوثّق.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 border-t border-accent/20 bg-sand/5 px-4 py-3">
+                <Link href={`/courses/${id}/documentation`}
+                  className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-[13px] font-bold text-white shadow-[0_8px_18px_-10px_rgba(178,146,90,0.9)] transition hover:brightness-95">
+                  <Star size={15} aria-hidden="true" /> {d ? 'فتح مساحة التوثيق' : 'ابدأ التوثيق'}
+                </Link>
+              </div>
+            </article>
+          );
+        })()}
 
         {/* ── عمودان متساويان: غير المكتملة | المكتملة ── */}
         <div className="grid items-start gap-6 lg:grid-cols-2">
