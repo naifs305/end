@@ -3,7 +3,7 @@ import MainLayout from '../../components/layout/MainLayout';
 import api from '../../lib/axios';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { Search, Pencil, UserPlus } from 'lucide-react';
+import { Search, Pencil, UserPlus, Camera, PenLine, Check, X } from 'lucide-react';
 import { useTranslation } from '../../lib/i18n';
 import Avatar from '../../components/shared/Avatar';
 
@@ -21,7 +21,7 @@ export default function UserManagement() {
   const { t } = useTranslation();
   const [users, setUsers]       = useState([]);
   const [loading, setLoading]   = useState(true);
-  const [filters, setFilters]   = useState({ search: '', role: '', status: '' });
+  const [filters, setFilters]   = useState({ search: '', role: '', status: '', assets: '' });
 
   // إضافة موظف عبر البحث في Active Directory
   const [projects, setProjects] = useState([]);
@@ -121,7 +121,11 @@ export default function UserManagement() {
       const name = `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase();
       return (!q || name.includes(q))
         && (!filters.role   || u.roles?.includes(filters.role))
-        && (!filters.status || (filters.status === 'active' ? u.isActive : !u.isActive));
+        && (!filters.status || (filters.status === 'active' ? u.isActive : !u.isActive))
+        && (!filters.assets
+          || (filters.assets === 'noPhoto' && !u.hasPhoto)
+          || (filters.assets === 'noSignature' && !u.hasSignature)
+          || (filters.assets === 'complete' && u.hasPhoto && u.hasSignature));
     });
   }, [users, filters]);
 
@@ -306,7 +310,32 @@ export default function UserManagement() {
             <option value="active">{t('admin.users.activeOnly')}</option>
             <option value="inactive">{t('admin.users.inactiveOnly')}</option>
           </select>
+          <select value={filters.assets} onChange={(e) => setFilters(p => ({...p, assets: e.target.value}))}
+            aria-label="الصورة والتوقيع"
+            className="rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary">
+            <option value="">الصورة والتوقيع: الكل</option>
+            <option value="noPhoto">لم يرفع صورته</option>
+            <option value="noSignature">لم يرفع توقيعه</option>
+            <option value="complete">رفع الاثنين</option>
+          </select>
         </div>
+
+        {/* ملخص: من بقي عليه رفع صورته أو توقيعه */}
+        {!loading && users.length > 0 && (
+          <div className="flex flex-wrap gap-2 text-[12px] font-bold">
+            {[
+              { k: 'noPhoto', label: 'بلا صورة', n: users.filter((u) => u.isActive && !u.hasPhoto).length, Icon: Camera },
+              { k: 'noSignature', label: 'بلا توقيع', n: users.filter((u) => u.isActive && !u.hasSignature).length, Icon: PenLine },
+            ].map(({ k, label, n, Icon }) => (
+              <button key={k} type="button" onClick={() => setFilters((p) => ({ ...p, assets: p.assets === k ? '' : k }))}
+                aria-pressed={filters.assets === k}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 transition ${filters.assets === k ? 'border-warning bg-sand/20 text-warning' : 'border-border bg-white text-text-soft hover:border-warning/50'}`}>
+                <Icon size={14} aria-hidden="true" /> {label}: {n}
+              </button>
+            ))}
+            <span className="self-center text-[11px] font-normal text-text-soft">(من الحسابات النشطة)</span>
+          </div>
+        )}
 
         {/* القائمة */}
         <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
@@ -351,6 +380,21 @@ export default function UserManagement() {
                       )}
                       {u.mobileNumber && <span>• {u.mobileNumber}</span>}
                     </div>
+                  </div>
+
+                  {/* الصورة والتوقيع: رُفع أم لا */}
+                  <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+                    {[
+                      { ok: u.hasPhoto, label: 'الصورة', Icon: Camera },
+                      { ok: u.hasSignature, label: 'التوقيع', Icon: PenLine },
+                    ].map(({ ok, label, Icon }) => (
+                      <span key={label} title={`${label}: ${ok ? 'مرفوع' : 'لم يُرفع'}`}
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${ok ? 'bg-forest-50 text-primary' : 'bg-burgundy/10 text-danger'}`}>
+                        <Icon size={12} aria-hidden="true" /> {label}
+                        {ok ? <Check size={12} aria-hidden="true" /> : <X size={12} aria-hidden="true" />}
+                        <span className="sr-only">{ok ? 'مرفوع' : 'لم يُرفع'}</span>
+                      </span>
+                    ))}
                   </div>
 
                   <Link href={`/users/${u.id}`}
