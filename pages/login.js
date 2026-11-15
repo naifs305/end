@@ -211,8 +211,10 @@ export default function Login() {
                 <div className="relative mb-8 h-28 w-[360px] max-w-full">
                   <Image src="/logo.svg" alt={t('common.university')} fill className="object-contain" priority />
                 </div>
-                <h1 className="text-3xl font-extrabold leading-relaxed">{t('auth.systemTitle')}</h1>
-                <p className="mt-3 text-base text-white/85">{t('common.university')}</p>
+                <h1 className="text-6xl font-extrabold leading-tight tracking-tight">{t('common.appNameShort')}</h1>
+                <p className="mt-2 text-xl font-bold text-white/90">{t('auth.systemSubtitle')}</p>
+                <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-sm font-bold text-[#E6D9BD]">{t('auth.systemSlogan')}</p>
+                <p className="mt-5 text-base text-white/75">{t('common.university')}</p>
               </div>
             </div>
 
@@ -223,7 +225,9 @@ export default function Login() {
                   <div className="relative mx-auto mb-5 h-24 w-72 max-w-full">
                     <Image src="https://nauss.edu.sa/Style%20Library/ar-sa/Styles/images/home/Logo.svg" alt={t('common.university')} fill className="object-contain" priority />
                   </div>
-                  <h2 className="text-2xl font-extrabold text-primary">{t('auth.systemTitle')}</h2>
+                  <h2 className="text-4xl font-extrabold text-primary">{t('common.appNameShort')}</h2>
+                  <p className="mt-1 text-base font-bold text-text-main">{t('auth.systemSubtitle')}</p>
+                  <p className="mt-1 text-sm font-bold text-warning">{t('auth.systemSlogan')}</p>
                   <p className="mt-2 text-sm text-text-soft">{t('common.university')}</p>
                 </div>
 

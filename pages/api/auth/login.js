@@ -18,5 +18,5 @@ async function handler(req, res) {
 }
 
 // 10 محاولات كل دقيقة لكل IP
-module.exports = withMethods(['POST'], withRateLimit({ maxAttempts: 10, windowMs: 60_000 })(withValidation(loginSchema, handler)));
+module.exports = withMethods(['POST'], withRateLimit({ maxAttempts: 10, windowMs: 60_000, accountField: 'email' })(withValidation(loginSchema, handler)));
 module.exports.default = module.exports;

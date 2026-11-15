@@ -1,7 +1,7 @@
 {
   "common": {
-    "appName": "Training Course Closure Platform",
-    "appNameShort": "Course Closure",
+    "appName": "Itmam | Training Courses Follow-up Platform",
+    "appNameShort": "Itmam",
     "university": "Naif Arab University for Security Sciences",
     "loading": "Loading...",
     "save": "Save",
@@ -402,7 +402,9 @@
   "auth": {
     "loginTitle": "Sign In",
     "loginSubtitle": "Enter your credentials to access the platform",
-    "systemTitle": "Training Course Closure System",
+    "systemTitle": "Itmam | Training Courses Follow-up Platform",
+    "systemSubtitle": "Training Courses Follow-up Platform",
+    "systemSlogan": "Every course… complete",
     "email": "Email",
     "password": "Password",
     "rememberMe": "Remember me",
