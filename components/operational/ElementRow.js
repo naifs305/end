@@ -79,7 +79,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   ];
   const isInterpreterElement = INTERPRETER_KEYS.includes(element?.element?.key);
   const [showInterpreterForm, setShowInterpreterForm] = useState(false);
-  const solfUrl = getSetting('solf.url', process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-nif.vercel.app');
+  const solfUrl = getSetting('solf.url', process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-training.nauss.edu.sa');
 
   // ── نموذج التأمين الطبي ──
   const [showInsuranceForm, setShowInsuranceForm] = useState(false);
