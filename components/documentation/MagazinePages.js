@@ -17,6 +17,7 @@
 // ======================================================================
 import { orientation, ratioOf } from '../../lib/documentation/photoLook';
 import PhotoImg from './PhotoImg';
+import { isOn } from '../../lib/documentation/sections';
 
 const fmtDate = (v, opts = { day: 'numeric', month: 'long', year: 'numeric' }) =>
   (v ? new Date(v).toLocaleDateString('ar-SA-u-ca-gregory-nu-arab', opts) : '');
@@ -581,6 +582,7 @@ function Recommendations({ course, doc, page }) {
  */
 export function buildPages({ course, documentation: doc, edition = 'magazine', qrSvg = null }) {
   const square = doc.format === 'SQUARE';
+  const on = (k) => isOn(doc.sections, k);
   // سعة الصفحة: المربعة أقصر بثلث تقريباً
   const per = square
     ? { timeline: 5, features: 1, trainees: 7, stars: 3, program: 8 }
@@ -606,25 +608,26 @@ export function buildPages({ course, documentation: doc, edition = 'magazine', q
   const withReport = edition !== 'magazine';
 
   push('cover', () => <Cover course={course} doc={doc} cover={cover} edition={edition} />);
-  if (withMagazine && doc.welcome) push('welcome', (p) => <Welcome course={course} doc={doc} page={p} />);
+  if (withMagazine && doc.welcome && on('welcome')) push('welcome', (p) => <Welcome course={course} doc={doc} page={p} />);
 
   if (withMagazine) {
     // صورة التقديم أفقية إن وُجدت (المربعة لا تتسع لها)
-    const introPhoto = square ? null : (rest.find((m) => orientation(m) === 'landscape') || null);
-    const gallery = rest.filter((m) => m !== introPhoto);
-    push('intro', (p) => <Intro course={course} doc={doc} photo={introPhoto} page={p} />);
+    const introPhoto = square || !on('intro') ? null : (rest.find((m) => orientation(m) === 'landscape') || null);
+    // صور الجلسات إن أُخفي قسمها تعود إلى المعرض
+    const gallery = [...rest, ...(on('features') ? [] : features.flatMap((f) => f.photos))].filter((m) => m !== introPhoto);
+    if (on('intro')) push('intro', (p) => <Intro course={course} doc={doc} photo={introPhoto} page={p} />);
     let offset = 0;
-    balanced(sessions, per.timeline).forEach((part, i) => {
+    (on('timeline') ? balanced(sessions, per.timeline) : []).forEach((part, i) => {
       const o = offset; offset += part.length;
       push(`sessions-${i}`, (p) => <Sessions course={course} sessions={part} page={p} part={i + 1} offset={o} />);
     });
-    chunk(features, per.features).forEach((part, i) => push(`feat-${i}`, (p) => <SessionFeatures course={course} items={part} page={p} />));
+    (on('features') ? chunk(features, per.features) : []).forEach((part, i) => push(`feat-${i}`, (p) => <SessionFeatures course={course} items={part} page={p} />));
 
     // المعرض: بطل وصورتان، ثم شبكة أربع، ثم عمود وصورتان — والعموديات
     // الثلاث المتتالية تُصفّ أعمدةً، والبطل أفقيّ، والعمود عموديّ
     const layouts = [{ k: 'hero', size: 3 }, { k: 'grid', size: 4 }, { k: 'side', size: 3 }];
     let i = 0; let g = 0;
-    while (i < gallery.length) {
+    while (on('gallery') && i < gallery.length) {
       let l = layouts[g % layouts.length];
       const next3 = gallery.slice(i, i + 3);
       if (next3.length === 3 && next3.every((m) => orientation(m) === 'portrait')) l = { k: 'trio', size: 3 };
@@ -644,30 +647,30 @@ export function buildPages({ course, documentation: doc, edition = 'magazine', q
       course.numTrainees ? { label: 'متدرباً', value: course.numTrainees } : null,
       { label: 'لقطة موثّقة', value: media.length },
     ].filter(Boolean);
-    push('closing', (p) => <Closing course={course} doc={doc} stats={stats} qrSvg={qrSvg} page={p} />);
+    if (on('closing')) push('closing', (p) => <Closing course={course} doc={doc} stats={stats} qrSvg={qrSvg} page={p} />);
   }
 
   if (withReport) {
     if (withMagazine) push('report-divider', () => <ReportDivider doc={doc} />);
     push('executive', (p) => <Executive course={course} doc={doc} trainees={trainees} sessions={sessions} photosCount={media.length} page={p} withSummary={!square} />);
     if (square) push('summary', (p) => <SummaryPage course={course} doc={doc} trainees={trainees} page={p} />);
-    if (trainees.some((t) => Number.isFinite(t.score))) push('results', (p) => <Results course={course} trainees={trainees} page={p} />);
+    if (on('results') && trainees.some((t) => Number.isFinite(t.score))) push('results', (p) => <Results course={course} trainees={trainees} page={p} />);
     let offset = 0;
-    balanced(sessions, per.program).forEach((part, i) => {
+    (on('program') ? balanced(sessions, per.program) : []).forEach((part, i) => {
       const o = offset; offset += part.length;
       push(`program-${i}`, (p) => <ProgramTable course={course} sessions={part} page={p} part={i + 1} offset={o} />);
     });
     // توزيع متوازن على الصفحات (١٥ متدرباً = ٨ + ٧، لا ١٢ + ٣)
     let start = 0;
-    balanced(trainees, per.trainees).forEach((part, i) => {
+    (on('trainees') ? balanced(trainees, per.trainees) : []).forEach((part, i) => {
       const s0 = start; start += part.length;
       push(`trainees-${i}`, (p) => <TraineesTable course={course} trainees={part} page={p} part={i + 1} startIndex={s0} />);
     });
     const stars = trainees.filter((t) => t.isDistinguished);
-    chunk(stars, per.stars).forEach((part, i) => push(`stars-${i}`, (p) => <Distinguished course={course} list={part} page={p} />));
+    (on('stars') ? chunk(stars, per.stars) : []).forEach((part, i) => push(`stars-${i}`, (p) => <Distinguished course={course} list={part} page={p} />));
     const shots = [cover, ...media.filter((m) => m.id !== cover?.id)].filter(Boolean).slice(0, 4);
-    if (edition === 'report' && shots.length >= 2) push('highlights', (p) => <Highlights course={course} photos={shots} page={p} />);
-    push('recs', (p) => <Recommendations course={course} doc={doc} page={p} />);
+    if (on('highlights') && edition === 'report' && shots.length >= 2) push('highlights', (p) => <Highlights course={course} photos={shots} page={p} />);
+    if (on('recs')) push('recs', (p) => <Recommendations course={course} doc={doc} page={p} />);
   }
 
   push('back', () => <BackCover doc={doc} />);

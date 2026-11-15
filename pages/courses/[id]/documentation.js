@@ -14,14 +14,15 @@ import {
   Star, ImagePlus, Trash2, ArrowRight, ArrowLeft, Check, Circle, Save, Plus, X,
   CalendarDays, MapPin, Users, Send, EyeOff, Image as ImageIcon, ListOrdered, BookOpenText,
   GraduationCap, ClipboardPaste, Camera, BookOpen, FileBarChart2, Layers, Link2, Copy, ExternalLink, QrCode,
-  Pencil, Sparkles, FileUp, Loader2, Square, RectangleVertical, Award, Upload,
+  Pencil, Sparkles, FileUp, Loader2, Square, RectangleVertical, Award, Upload, HardDrive, Eye as EyeIcon,
 } from 'lucide-react';
 import MainLayout from '../../../components/layout/MainLayout';
 import Avatar from '../../../components/shared/Avatar';
 import api from '../../../lib/axios';
-import { isAcceptableImageFile, fileToDocumentationPhoto, fileToAvatarDataUrl, fileToSignatureDataUrl } from '../../../lib/clientImage';
+import { isAcceptableImageFile, fileToDocumentationPhoto, fileToAvatarDataUrl, fileToSignatureDataUrl, bakeDocumentationPhoto } from '../../../lib/clientImage';
 import PhotoEditor from '../../../components/documentation/PhotoEditor';
-import { filterDefsMarkup } from '../../../lib/documentation/photoLook';
+import { filterDefsMarkup, lookOf, cssFilter } from '../../../lib/documentation/photoLook';
+import { MAGAZINE_SECTIONS, REPORT_SECTIONS, isOn } from '../../../lib/documentation/sections';
 import PhotoImg from '../../../components/documentation/PhotoImg';
 
 const FILTER_DEFS = filterDefsMarkup();
@@ -117,6 +118,7 @@ export default function CourseDocumentationPage() {
   const [patronage, setPatronage] = useState('');
   const [logos, setLogos] = useState([]);
   const [logoBusy, setLogoBusy] = useState(false);
+  const [compact, setCompact] = useState({ total: 0, done: 0 });
   const logoRef = useRef(null);
   const fileRef = useRef(null);
   const pdfRef = useRef(null);
@@ -225,6 +227,7 @@ export default function CourseDocumentationPage() {
       setData(d);
       setDirty(false);
       toast.success(on ? '★ نُشر التوثيق ونلت نجمة التميّز' : 'أُلغي النشر');
+      if (on) compactPhotos(d.documentation?.media);
     } catch (e) {
       toast.error(e.response?.data?.message || 'تعذّر تنفيذ الطلب');
     } finally {
@@ -363,6 +366,37 @@ export default function CourseDocumentationPage() {
     } catch (e) {
       toast.error(e.response?.data?.message || 'تعذّر رفع الشعار');
     } finally { setLogoBusy(false); }
+  };
+
+  // ── ضغط الصور بعد النشر: يُثبَّت القصّ والفلتر وتُصغَّر إلى حاجة المجلة ──
+  // المجلة لا تتغيّر شكلاً، والأصل الكبير يُحذف من الخادم فيتوفّر نحو النصف أو أكثر.
+  const compactPhotos = async (list) => {
+    const todo = (list || []).filter((m) => !m.edit?.baked);
+    if (!todo.length) return;
+    setCompact({ total: todo.length, done: 0 });
+    let saved = 0;
+    for (const m of todo) {
+      try {
+        const look = lookOf(m.edit);
+        const out = await bakeDocumentationPhoto(m.fullUrl, look, cssFilter(look));
+        const edit = {
+          ...look, crop: { x: 0, y: 0, w: 1, h: 1 }, baked: true,
+          ...(out.filterBaked ? { filter: 'none', b: 1, c: 1, s: 1 } : {}),
+        };
+        await api.patch(`/documentation/media/${m.id}`, { replace: out, edit });
+        saved += Math.max(0, (m.size || 0) - Math.round((out.full.length * 3) / 4));
+      } catch { /* صورة تعذّر ضغطها تبقى كما هي، وتُعاد المحاولة لاحقاً */ }
+      setCompact((c) => ({ ...c, done: c.done + 1 }));
+    }
+    setCompact({ total: 0, done: 0 });
+    await load();
+    if (saved > 0) toast.success(`ضُغطت الصور ووُفّر نحو ${(saved / 1048576).toFixed(1)} ميجابايت من الخادم`);
+  };
+
+  const sections = doc?.sections || {};
+  const toggleSection = async (key) => {
+    const next = { ...sections, [key]: isOn(sections, key) ? false : true };
+    try { const d = unwrap(await api.put(`/courses/${id}/documentation`, { sections: next })); setData(d); } catch { toast.error('تعذّر الحفظ'); }
   };
 
   const setFormat = async (format) => {
@@ -880,6 +914,47 @@ export default function CourseDocumentationPage() {
                       <ExternalLink size={14} aria-hidden="true" className="mt-1 text-text-soft" />
                     </a>
                   ))}
+                </div>
+                <div className="border-t border-border px-4 py-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-[12px] font-extrabold text-text-main"><EyeIcon size={14} aria-hidden="true" /> الأقسام الظاهرة</p>
+                  {[{ t: 'المجلة', list: MAGAZINE_SECTIONS }, { t: 'التقرير الفني', list: REPORT_SECTIONS }].map((g) => (
+                    <div key={g.t} className="mb-2">
+                      <p className="mb-1 text-[11px] font-bold text-text-soft">{g.t}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {g.list.map((x) => {
+                          const shown = isOn(sections, x.key);
+                          return (
+                            <button key={x.key} type="button" disabled={!editable} onClick={() => toggleSection(x.key)} aria-pressed={shown} title={x.hint || ''}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11.5px] font-bold transition ${shown ? 'border-primary/40 bg-primary-light/60 text-primary' : 'border-dashed border-border text-text-soft line-through decoration-1'}`}>
+                              {shown ? <Check size={12} aria-hidden="true" /> : <X size={12} aria-hidden="true" />} {x.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-border px-4 py-3 text-[11.5px] text-text-soft">
+                  {(() => {
+                    const bytes = media.reduce((a, m) => a + (m.size || 0), 0);
+                    const pending = media.filter((m) => !m.edit?.baked).length;
+                    return (
+                      <>
+                        <p className="flex items-center gap-1.5"><HardDrive size={13} aria-hidden="true" /> حجم صور التوثيق: <b className="text-text-main">{(bytes / 1048576).toFixed(1)} ميجابايت</b></p>
+                        {compact.total > 0 ? (
+                          <p className="mt-1.5 font-bold text-primary">جارٍ ضغط الصور… {compact.done} من {compact.total}</p>
+                        ) : published && pending > 0 && editable ? (
+                          <button type="button" onClick={() => compactPhotos(media)} className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-primary-light px-3 py-1.5 text-[11.5px] font-bold text-primary hover:brightness-95">
+                            <HardDrive size={13} aria-hidden="true" /> ضغط {pending} صورة الآن
+                          </button>
+                        ) : published && media.length > 0 ? (
+                          <p className="mt-1 text-[11px]">الصور مضغوطة بمقاس المجلة — والمجلة كما هي.</p>
+                        ) : (
+                          <p className="mt-1 text-[11px]">تُضغط الصور تلقائياً عند النشر بلا تغيير في شكل المجلة.</p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <p className="border-t border-border px-5 py-2.5 text-[11.5px] text-text-soft">في كل إصدار: طباعة أو حفظ PDF، و«نسخة المطبعة» بهوامش القصّ.</p>
               </div>

@@ -995,6 +995,7 @@ model CourseDocumentation {
   logos         Json?     // شعارات الشركاء بجوار شعار الجامعة [{ preset } أو { key, name }]
   featured      Boolean   @default(false) // «إصدار مميّز» يمنحه المدير في مكتبة الإصدارات
   featuredAt    DateTime?
+  sections      Json?     // الأقسام الظاهرة في المجلة والتقرير { gallery: false, … } — الغائب ظاهر
   publishedAt   DateTime?
   publishedById String?
   starAwarded   Boolean   @default(false)
