@@ -620,6 +620,10 @@ export default function CourseDetail() {
     (el) => CRITICAL_ELEMENTS.has(el.element?.key) && isOverdue(el) && !['APPROVED', 'PENDING_APPROVAL', 'NOT_APPLICABLE'].includes(el.status)
   );
   const settlementOverdue = criticalOverdue.find((el) => el.element?.key === 'settlement');
+  // شهادة إنجاز المترجم: بعد انتهاء الدورة بثلاثة أيام يُذكَّر المنسق بإرسالها للمالية
+  const certificateEl = sortedElements.find((el) => el.element?.key === 'interpreter_certificate');
+  const certificateDue = !!certificateEl && !['APPROVED', 'PENDING_APPROVAL', 'NOT_APPLICABLE'].includes(certificateEl.status)
+    && course.endDate && Date.now() >= new Date(course.endDate).getTime() + 3 * 24 * 60 * 60 * 1000;
 
   return (
     <MainLayout breadcrumb={[{ label: t('nav.courses'), href: '/courses' }, { label: course.name }]}>
@@ -656,6 +660,20 @@ export default function CourseDetail() {
                     );
                   })}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {certificateDue && (
+          <div className="rounded-2xl border border-sand/60 bg-sand/15 p-4 shadow-card">
+            <div className="flex items-start gap-3">
+              <FileCheck size={24} aria-hidden="true" className="shrink-0 text-warning" />
+              <div className="flex-1">
+                <p className="text-sm font-extrabold text-text-main">أرسل شهادة إنجاز المترجم إلى الإدارة المالية</p>
+                <p className="mt-0.5 text-[13px] text-text-soft">
+                  مضت ثلاثة أيام على انتهاء الدورة. أصدر الشهادة من عنصر «{certificateEl.element?.name || 'شهادة إنجاز الترجمة'}» ثم نزّل «رسالة المالية — بقية المستحقات» والشهادة مرفقة بها، لصرف المبلغ المستحق للمترجم.
+                </p>
               </div>
             </div>
           </div>

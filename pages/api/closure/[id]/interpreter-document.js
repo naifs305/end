@@ -36,7 +36,7 @@ const {
 const MAIL_DEFAULTS = {
   'interpreter.transfer.email.to': 'AAlfaifi@nauss.edu.sa',
   'interpreter.legal.email.to': 'Legal@nauss.edu.sa',
-  'interpreter.legal.email.cc': 'NAlshahrani@nauss.edu.sa',
+  'interpreter.legal.email.cc': 'NAlshahrani@nauss.edu.sa, MAlsolami@nauss.edu.sa, OD@nauss.edu.sa',
   'interpreter.finance.email.to': 'finance@nauss.edu.sa',
   'interpreter.finance.email.cc':
     'AAlaraj@nauss.edu.sa, SAlbayoumi@nauss.edu.sa, NAlshahrani@nauss.edu.sa, AAlfaifi@nauss.edu.sa',
@@ -44,7 +44,7 @@ const MAIL_DEFAULTS = {
 
 // ما يتاح من مخرجات لكل عنصر
 const ALLOWED_OUTPUTS = {
-  interpreter_contract: ['document', 'legal-eml', 'finance-eml'],
+  interpreter_contract: ['document', 'legal-eml', 'finance-eml', 'contract-file'],
   interpreter_advance: ['document'],
   interpreter_certificate: ['document', 'finance-eml', 'certificate-file'],
   interpreter_transfer: ['document'],
@@ -128,14 +128,30 @@ async function handler(req, res) {
   const shortName = nameParts.length > 1 ? `${nameParts[0]} ${nameParts[nameParts.length - 1]}` : (nameParts[0] || 'المترجم');
   const certFileName = `شهادة إنجاز - ${shortName}`;
 
-  // ── رسالة الإدارة القانونية ─────────────────────────────────
+  // ── العقد نسخةً مستقلة: المطبوعة والخط مضمّنان (يُحوَّل PDF في المتصفح) ──
+  if (output === 'contract-file') {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(renderInterpreterContract({ course, interpreter, sections, config }, { bare: true, canEdit: false }));
+  }
+
+  // ── رسالة الإدارة القانونية — والعقد مرفق بها ────────────────
   if (output === 'legal-eml') {
     const [to, cc] = await Promise.all([setting('interpreter.legal.email.to'), setting('interpreter.legal.email.cc')]);
+    // PDF إن رسمه المتصفح، وإلا فنسخة العقد المستقلة (تُفتح في أي متصفح وتُطبع كما هي)
+    const contractFileName = `عقد ترجمة - ${shortName}`;
+    const pdf = req.method === 'POST' ? String(req.body?.pdf || '') : '';
+    const attachments = /^data:application\/pdf;base64,[A-Za-z0-9+/=]+$/.test(pdf)
+      ? [{ name: `${contractFileName}.pdf`, content: pdf }]
+      : [{
+        name: `${contractFileName}.html`,
+        content: `data:text/html;base64,${Buffer.from(renderInterpreterContract({ course, interpreter, sections, config }, { bare: true, canEdit: false }), 'utf8').toString('base64')}`,
+      }];
     const eml = buildEmlMessage({
       to,
       cc,
       subject: `طلب مراجعة واعتماد عقد مترجم — ${course.name || 'برنامج تدريبي'} — عقد رقم ${facts.contractNo}`,
       htmlBody: renderLegalReviewEmail({ course, interpreter, config }),
+      attachments: normalizeAttachments(attachments),
     });
     return sendEml(res, { eml, course, prefix: 'interpreter-legal-review' });
   }
@@ -211,7 +227,7 @@ module.exports.default = module.exports;
 module.exports.config = {
   api: {
     responseLimit: '12mb',
-    // الشهادة PDF تصل من المتصفح لتُرفق بالرسالة
-    bodyParser: { sizeLimit: '8mb' },
+    // الشهادة والعقد PDF يصلان من المتصفح ليُرفقا بالرسالة
+    bodyParser: { sizeLimit: '12mb' },
   },
 };

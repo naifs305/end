@@ -10,10 +10,29 @@
 // وتُقرأ في العقد وطلب الصرف ونموذج الاستحقاق والشهادة.
 // =============================================================
 import { useCallback, useEffect, useState } from 'react';
-import { Languages, Save, FileText, Mail, Send, X, Check, ArrowRight, PenLine } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Languages, Save, FileText, Mail, Send, X, Check, ArrowRight, PenLine, AlertTriangle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
-import { singlePageHtmlToPdfDataUrl } from '../../lib/clientDocPdf';
+import { singlePageHtmlToPdfDataUrl, multiPageHtmlToPdfDataUrl } from '../../lib/clientDocPdf';
+
+// ما يُذكَّر به المنسق قبل تنزيل كل رسالة — مرفقات لا تولّدها المنصة
+const MAIL_REMINDERS = {
+  'legal-eml': {
+    title: 'قبل إرسال الرسالة إلى الإدارة القانونية',
+    items: [
+      'أرفق بالرسالة موافقة معالي الرئيس على التعاقد مع المترجم.',
+      'العقد مرفق بالرسالة تلقائياً بصيغة PDF — راجعه قبل الإرسال.',
+    ],
+  },
+  'finance-eml:contract': {
+    title: 'قبل إرسال طلب صرف الدفعة الأولى',
+    items: [
+      'أرفق العقد موقّعاً من الإدارة القانونية ووكيل الجامعة للتدريب والمترجم.',
+      'وأرفق معه موافقة معالي الرئيس على التعاقد.',
+    ],
+  },
+};
 
 const EMPTY = {
   fullName: '', nationalId: '', nationality: '', email: '', mobile: '', address: '',
@@ -57,6 +76,8 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [reminder, setReminder] = useState(null); // { output, title, items }
+  const [preparing, setPreparing] = useState(false);
   const [contractType, setContractType] = useState(null);
 
   const needsPayment = PAYMENT_KEYS.includes(elementKey);
@@ -164,6 +185,15 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
         // طلب بقية المستحقات تُرفق به شهادة الإنجاز PDF، تُرسم في المتصفح
         // بالخط والمطبوعة كما تُطبع. وإن تعذّر الرسم أرفق الخادم نسختها المستقلة.
         let pdf = null;
+        // رسالة الإدارة القانونية يُرفق بها العقد PDF، يُرسم في المتصفح بصفحاته ومطبوعته
+        if (output === 'legal-eml') {
+          try {
+            const file = await api.get(`/closure/${trackingId}/interpreter-document`, {
+              params: { output: 'contract-file' }, responseType: 'text', headers: { Accept: 'text/html' },
+            });
+            pdf = await multiPageHtmlToPdfDataUrl(file.data);
+          } catch { pdf = null; }
+        }
         if (output === 'finance-eml' && isCertificate) {
           try {
             const file = await api.get(`/closure/${trackingId}/interpreter-document`, {
@@ -191,6 +221,8 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
         window.URL.revokeObjectURL(url);
         toast.success(output === 'finance-eml' && isCertificate
           ? 'نُزِّلت الرسالة وشهادة الإنجاز مرفقة بها — افتحها في برنامج البريد وأرسلها'
+          : output === 'legal-eml'
+          ? 'نُزِّلت الرسالة والعقد مرفق بها — أرفق موافقة المعالي ثم أرسلها'
           : 'نُزِّلت الرسالة — افتحها في برنامج البريد وأرسلها');
         return;
       }
@@ -345,7 +377,7 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
             <p className="mb-1 text-sm font-extrabold text-text-main">المخرجات</p>
             <p className="mb-3 text-xs text-text-soft">
               {isContract
-                ? 'المستند يُفتح صفحةً تُعدَّل ثم تُطبع بصيغة PDF. والرسالتان تُفتحان في برنامج البريد جاهزتين بوجهتيهما — أرفق بهما نسخة العقد قبل الإرسال.'
+                ? 'المستند يُفتح صفحةً تُعدَّل ثم تُطبع بصيغة PDF. ورسالة القانونية يُرفق بها العقد تلقائياً، وتُرفق أنت موافقة المعالي. ورسالة الدفعة الأولى يُرفق بها العقد موقّعاً من القانونية والوكيل والمترجم مع موافقة المعالي.'
                 : isCertificate
                 ? 'الشهادة تُفتح صفحةً تُطبع بصيغة PDF، وتحمل توقيع المنسق الإلكتروني. ورسالة المالية تُفتح في برنامج البريد والشهادة مرفقة بها.'
                 : 'يُفتح المخرج جاهزاً، وتبقى المراجعة والإرسال بيدك.'}
@@ -365,7 +397,7 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
               {isContract && (
                 <button
                   type="button"
-                  onClick={() => openOutput('legal-eml')}
+                  onClick={() => setReminder({ output: 'legal-eml', ...MAIL_REMINDERS['legal-eml'] })}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-white px-4 py-2 text-sm font-bold text-primary transition hover:bg-primary-light"
                 >
                   <Mail size={15} aria-hidden="true" /> رسالة الإدارة القانونية
@@ -375,7 +407,9 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
               {(isContract || isCertificate) && (
                 <button
                   type="button"
-                  onClick={() => openOutput('finance-eml')}
+                  onClick={() => (isContract
+                    ? setReminder({ output: 'finance-eml', ...MAIL_REMINDERS['finance-eml:contract'] })
+                    : openOutput('finance-eml'))}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-white px-4 py-2 text-sm font-bold text-primary transition hover:bg-primary-light"
                 >
                   <Mail size={15} aria-hidden="true" />
@@ -470,6 +504,30 @@ export default function InterpreterForm({ trackingId, courseId, elementKey, init
           <Send size={15} aria-hidden="true" /> {submitting ? 'جارٍ التقديم…' : 'تقديم للاعتماد'}
         </button>
         </>)}
+      {reminder && typeof document !== 'undefined' && createPortal(
+        <div dir="rtl" className="fixed inset-0 z-[220] flex items-center justify-center bg-black/45 px-4" role="dialog" aria-modal="true" aria-labelledby="mail-reminder-title">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-white shadow-2xl">
+            <div className="flex items-start gap-3 p-5">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sand/25 text-warning"><AlertTriangle size={22} aria-hidden="true" /></span>
+              <div>
+                <h2 id="mail-reminder-title" className="text-base font-extrabold text-text-main">{reminder.title}</h2>
+                <ul className="mt-2 space-y-1.5 text-sm text-text-main">
+                  {reminder.items.map((x) => <li key={x} className="flex gap-2"><Check size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-primary" />{x}</li>)}
+                </ul>
+              </div>
+            </div>
+            <div className="flex gap-2 border-t border-border px-5 py-3">
+              <button type="button" disabled={preparing}
+                onClick={async () => { setPreparing(true); await openOutput(reminder.output); setPreparing(false); setReminder(null); }}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-60">
+                {preparing ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> جارٍ تجهيز الرسالة…</> : <><Mail size={16} aria-hidden="true" /> فهمت، نزّل الرسالة</>}
+              </button>
+              <button type="button" disabled={preparing} onClick={() => setReminder(null)} className="rounded-xl border border-border px-5 py-2.5 text-sm font-bold text-text-soft hover:bg-background">إلغاء</button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
       </div>
     </div>
   );
