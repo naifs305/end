@@ -19,6 +19,7 @@ import {
   Languages,
   NotebookPen,
   LibraryBig,
+  Building2,
 } from 'lucide-react';
 import { isAdminRole, canAccessKpis, canViewReportsOnly } from '../../lib/roles';
 
@@ -67,6 +68,8 @@ export function buildNavSections(activeRole, t) {
   // التقارير الميدانية مفتوحة للجميع: يطّلع الزملاء على الملاحظات ويعلّقون
   reports.push(item('/field-reports', NotebookPen, t('nav.fieldReports')));
   if (isOversight) reports.push(item('/executive-report', FileText, t('nav.executiveReport')));
+  // أداء الإدارات: من تقييمات المنسقين لصعوبات الإقفال
+  if (isOversight) reports.push(item('/departments', Building2, t('nav.departments')));
   if (isOversight) reports.push(item('/audit', FileSearch, t('nav.audit')));
   push('reportsFollowup', t('navSections.reportsFollowup'), reports);
 

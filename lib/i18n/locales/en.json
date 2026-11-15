@@ -394,6 +394,7 @@
     "interpreters": "Interpreters",
     "fieldReports": "Field reports",
     "library": "Publications library",
+    "departments": "Departments performance",
     "jobs": "Scheduled Jobs",
     "audit": "Audit Log",
     "profile": "Profile",
@@ -848,12 +849,14 @@
       "badges": "Badges",
       "ideas": "Initiatives",
       "challenge": "Monthly Challenge",
-      "pledge": "My Pledge"
+      "pledge": "My Pledge",
+      "documentation": "Documentation"
     },
     "bannerBadges": "Earn excellence badges",
     "bannerIdeas": "Submit your ideas and get credit",
     "bannerChallenge": "A monthly team challenge",
     "bannerPledge": "Commit to your personal goals",
+    "bannerDocumentation": "Published course magazines",
     "badgeTypes": {
       "COMMITTED": "Committed",
       "PRECISE": "Precise",

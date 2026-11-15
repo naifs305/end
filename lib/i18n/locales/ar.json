@@ -394,6 +394,7 @@
     "interpreters": "المترجمون",
     "fieldReports": "التقارير الميدانية",
     "library": "مكتبة الإصدارات",
+    "departments": "أداء الإدارات",
     "jobs": "المهام المجدولة",
     "audit": "سجل التدقيق",
     "profile": "الملف الشخصي",
@@ -848,12 +849,14 @@
       "badges": "الشارات",
       "ideas": "المبادرات",
       "challenge": "تحدي الشهر",
-      "pledge": "تعهدي"
+      "pledge": "تعهدي",
+      "documentation": "التوثيق"
     },
     "bannerBadges": "اكسب شارات التميز",
     "bannerIdeas": "قدّم أفكارك واحصل على الائتمان",
     "bannerChallenge": "تحدٍّ جماعي شهري",
     "bannerPledge": "التزم بأهدافك الشخصية",
+    "bannerDocumentation": "مجلات الدورات المنشورة",
     "badgeTypes": {
       "COMMITTED": "الملتزم",
       "PRECISE": "الدقيق",

@@ -14,6 +14,7 @@ import {
   HeartPulse,
   FileText,
   Languages,
+  UserRound,
 } from 'lucide-react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
@@ -22,6 +23,7 @@ import { useTranslation } from '../../lib/i18n';
 import { useSettings } from '../../lib/hooks/useSettings';
 import CourseReportForm from './CourseReportForm';
 import InterpreterForm from './InterpreterForm';
+import ExternalTrainerForm from './ExternalTrainerForm';
 import BlockerPanel from './BlockerPanel';
 
 // ======================================================================
@@ -79,6 +81,10 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   ];
   const isInterpreterElement = INTERPRETER_KEYS.includes(element?.element?.key);
   const [showInterpreterForm, setShowInterpreterForm] = useState(false);
+  // عنصر «مدرب خارجي»: نموذج بياناته ورسائله الثلاث
+  const isTrainerElement = element?.element?.key === 'external_trainer';
+  const [showTrainerForm, setShowTrainerForm] = useState(false);
+  const [trainerReadOnly, setTrainerReadOnly] = useState(false);
   const solfUrl = getSetting('solf.url', process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-training.nauss.edu.sa');
 
   // ── نموذج التأمين الطبي ──
@@ -338,6 +344,15 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
                 <HeartPulse size={14} aria-hidden="true" />
                 {element.status === 'RETURNED' ? t('element.resubmit') : t('element.submitInsurance')}
               </button>
+            ) : isTrainerElement ? (
+              <button
+                onClick={() => { setTrainerReadOnly(false); setShowTrainerForm(true); }}
+                disabled={loading}
+                className={BTN.primary}
+              >
+                <UserRound size={14} aria-hidden="true" />
+                {element.status === 'RETURNED' ? t('element.resubmit') : 'بيانات المدرب ورسائله'}
+              </button>
             ) : isInterpreterElement ? (
               <button
                 onClick={() => { setInterpreterReadOnly(false); setShowInterpreterForm(true); }}
@@ -488,6 +503,12 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             </div>
           )}
         </div>
+      )}
+
+      {isTrainerElement && !(canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status)) && element.status !== 'NOT_APPLICABLE' && (
+        <button type="button" onClick={() => { setTrainerReadOnly(true); setShowTrainerForm(true); }} className={BTN.primary}>
+          <UserRound size={14} aria-hidden="true" /> عرض بيانات المدرب والرسائل
+        </button>
       )}
 
       {canViewInterpreter && (
@@ -706,6 +727,16 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               onSuccess={onUpdate}
               readOnly={interpreterReadOnly}
             />
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── نموذج المدرب الخارجي ─────────────────────────────────── */}
+      {isTrainerElement && showTrainerForm && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
+          <div className="my-8 w-full max-w-3xl">
+            <ExternalTrainerForm trackingId={element.id} onClose={() => setShowTrainerForm(false)} onSuccess={onUpdate} readOnly={trainerReadOnly} />
           </div>
         </div>,
         document.body

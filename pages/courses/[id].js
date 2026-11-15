@@ -27,6 +27,7 @@ import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
 import MainLayout from '../../components/layout/MainLayout';
 import ElementRow from '../../components/operational/ElementRow';
+import ClosureReviewCard from '../../components/operational/ClosureReviewCard';
 import CourseNotesReportForm from '../../components/operational/CourseNotesReportForm';
 import toast from 'react-hot-toast';
 import { useTranslation } from '../../lib/i18n';
@@ -781,6 +782,9 @@ export default function CourseDetail() {
             </div>
           </div>
         </div>
+
+        {/* ── تقييم صعوبات الإقفال: يظهر بعد إقفال الدورة ── */}
+        {['CLOSED', 'ARCHIVED'].includes(course.status) && <ClosureReviewCard courseId={id} />}
 
         {/* ── عنصر التميّز: توثيق الدورة ── */}
         {docSummary && (() => {
