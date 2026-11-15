@@ -84,7 +84,7 @@ module.exports = {
         },
       },
       animation: {
-        'fade-in': 'fadeIn .25s ease both',
+        'fade-in': 'fadeIn .25s ease backwards', // لا both: انظر styles/globals.css
         'slide-up': 'slideUp .3s ease both',
         'pop-in': 'popIn .18s ease both',
       },

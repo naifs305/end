@@ -223,7 +223,7 @@ export default function Login() {
               <div className="w-full max-w-md">
                 <div className="mb-8 text-center lg:hidden">
                   <div className="relative mx-auto mb-5 h-24 w-72 max-w-full">
-                    <Image src="https://nauss.edu.sa/Style%20Library/ar-sa/Styles/images/home/Logo.svg" alt={t('common.university')} fill className="object-contain" priority />
+                    <Image src="/brand/nauss-logo-gold.png" alt={t('common.university')} fill className="object-contain" priority />
                   </div>
                   <h2 className="text-4xl font-extrabold text-primary">{t('common.appNameShort')}</h2>
                   <p className="mt-1 text-base font-bold text-text-main">{t('auth.systemSubtitle')}</p>

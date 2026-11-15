@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -20,6 +21,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   Star,
+  Trash2,
 } from 'lucide-react';
 import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
@@ -247,6 +249,8 @@ export default function CourseDetail() {
   const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
   const isManager = activeRole === 'MANAGER';
   const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const intl = locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory';
   const fmt = (date) => (date ? new Date(date).toLocaleDateString(intl, { day: 'numeric', month: 'short', year: 'numeric' }) : '-');
@@ -684,13 +688,22 @@ export default function CourseDetail() {
                 >
                   <FileText size={14} aria-hidden="true" /> {t('courseDetail.generalReport')}
                 </button>
-                {(isManager || isSupervisor) && (
-                  <button
-                    onClick={() => router.push(`/courses/${id}/edit`)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-text-soft transition hover:border-primary hover:text-primary"
-                  >
-                    <Pencil size={14} aria-hidden="true" /> {t('common.edit')}
-                  </button>
+                {/* التعديل والحذف بصلاحية الخادم نفسها: المدير، والمشرف، ومنسق الدورة في مرحلة الإعداد */}
+                {(isManager || isSupervisor || (course.primaryEmployeeId === user?.id && course.status === 'PREPARATION')) && (
+                  <>
+                    <button
+                      onClick={() => router.push(`/courses/${id}/edit`)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-text-soft transition hover:border-primary hover:text-primary"
+                    >
+                      <Pencil size={14} aria-hidden="true" /> {t('common.edit')}
+                    </button>
+                    <button
+                      onClick={() => setDeleteOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-text-soft transition hover:border-danger hover:bg-burgundy/5 hover:text-danger"
+                    >
+                      <Trash2 size={14} aria-hidden="true" /> {t('common.delete')}
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={() => router.back()}
@@ -1096,6 +1109,44 @@ export default function CourseDetail() {
             </div>
           </div>
         </div>
+      )}
+      {/* ══ تأكيد حذف الدورة ══ */}
+      {deleteOpen && typeof document !== 'undefined' && createPortal(
+        <div dir="rtl" className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 px-4" onClick={(e) => { if (e.target === e.currentTarget && !deleting) setDeleteOpen(false); }}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="del-title">
+            <div className="space-y-3 p-5 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-burgundy/10 text-danger">
+                <Trash2 size={26} aria-hidden="true" />
+              </div>
+              <h2 id="del-title" className="text-base font-extrabold text-text-main">{t('course.delete.title')}</h2>
+              <p className="text-sm text-text-soft">{t('course.delete.confirmText', { name: course.name })}</p>
+              <p className="rounded-xl border border-burgundy/20 bg-burgundy/5 px-3 py-2 text-xs font-bold text-danger">{t('course.delete.irreversible')}</p>
+            </div>
+            <div className="flex gap-2 border-t border-border px-5 py-3">
+              <button
+                onClick={async () => {
+                  setDeleting(true);
+                  try {
+                    await api.delete(`/courses/${id}`);
+                    toast.success(t('course.delete.success'));
+                    router.replace('/courses');
+                  } catch (e) {
+                    toast.error(e?.response?.data?.message || t('course.delete.failed'));
+                    setDeleting(false);
+                  }
+                }}
+                disabled={deleting}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-danger py-2.5 text-sm font-bold text-white hover:bg-danger/90 disabled:opacity-50"
+              >
+                {deleting ? '...' : (<><Trash2 size={16} aria-hidden="true" /> {t('course.delete.confirm')}</>)}
+              </button>
+              <button onClick={() => setDeleteOpen(false)} disabled={deleting} className="rounded-xl border border-border px-5 py-2.5 text-sm font-bold text-text-soft hover:bg-background">
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </MainLayout>
   );
