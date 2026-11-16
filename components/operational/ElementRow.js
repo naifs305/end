@@ -6,7 +6,6 @@ import {
   RotateCcw,
   Undo2,
   Bell,
-  CheckCircle2,
   Check,
   CornerUpLeft,
   X,
@@ -14,6 +13,9 @@ import {
   AlertTriangle,
   HeartPulse,
   FileText,
+  Languages,
+  UserRound,
+  Map as MapIcon,
 } from 'lucide-react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
@@ -21,7 +23,33 @@ import useAuth from '../../context/AuthContext';
 import { useTranslation } from '../../lib/i18n';
 import { useSettings } from '../../lib/hooks/useSettings';
 import CourseReportForm from './CourseReportForm';
-import ReasonModal from './ReasonModal';
+import InterpreterForm from './InterpreterForm';
+import ExternalTrainerForm from './ExternalTrainerForm';
+import TravelGuideForm, { PLANNER_URL } from './TravelGuideForm';
+import BlockerPanel from './BlockerPanel';
+import CertReviewPanel from './CertReviewPanel';
+
+// ======================================================================
+// مقياس الأزرار — مظهر واحد لكل رتبة، فلا تتنافس الألوان داخل البطاقة
+// ----------------------------------------------------------------------
+// رئيسي واحد في البطاقة (الفعل المطلوب الآن)، وما سواه ثانوي أو خفيف.
+// والأحمر للرفض وحده، فيبقى له وقعه.
+// ======================================================================
+// تصميم «حلقة الوقت»: الأزرار في ذيل البطاقة. الفعل الرئيسي حبّة ممتلئة
+// تتقدّم السطر، وما سواه روابط هادئة بلا إطار تتبعه.
+const BTN_PILL =
+  'order-first inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-5 py-2.5 text-[13px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50';
+const BTN_LINK =
+  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-[13px] font-bold transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50';
+
+const BTN = {
+  primary:   `${BTN_PILL} bg-primary shadow-[0_8px_18px_-10px_rgba(46,96,102,0.85)] hover:bg-primary-dark`,
+  approve:   `${BTN_PILL} bg-primary shadow-[0_8px_18px_-10px_rgba(46,96,102,0.85)] hover:bg-primary-dark`,
+  secondary: `${BTN_LINK} text-text-soft hover:text-primary`,
+  warn:      `${BTN_LINK} text-warning`,
+  danger:    `${BTN_LINK} text-danger`,
+  ghost:     'inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-bold text-text-soft transition hover:text-primary disabled:opacity-50',
+};
 
 // ======================================================================
 // مكون صف عنصر الإقفال
@@ -48,7 +76,24 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const isClosingReport = element?.element?.key === 'closing_report';
   const isCourseReport = isOpeningReport || isClosingReport;
   const [showReportForm, setShowReportForm] = useState(false);
-  const solfUrl = getSetting('solf.url', process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-nif.vercel.app');
+
+  // عناصر مترجم الدورة: «تقديم» يفتح نموذج المترجم ثم المستند ثم التقديم
+  const INTERPRETER_KEYS = [
+    'interpreter_contract', 'interpreter_transfer',
+    'interpreter_advance', 'interpreter_certificate',
+  ];
+  const isInterpreterElement = INTERPRETER_KEYS.includes(element?.element?.key);
+  const [showInterpreterForm, setShowInterpreterForm] = useState(false);
+  // عنصر «مدرب خارجي»: نموذج بياناته ورسائله الثلاث
+  const isTrainerElement = element?.element?.key === 'external_trainer';
+  const [showTrainerForm, setShowTrainerForm] = useState(false);
+  const [trainerReadOnly, setTrainerReadOnly] = useState(false);
+  // عنصر «دليل السفر التعريفي»: رابط الدليل أو طلب تصميم دليل جديد
+  const isTravelGuide = element?.element?.key === 'travel_guide';
+  const [showGuideForm, setShowGuideForm] = useState(false);
+  const [guideReadOnly, setGuideReadOnly] = useState(false);
+  const [guideMode, setGuideMode] = useState(null); // 'existing' | 'request' | null للاطلاع
+  const solfUrl = getSetting('solf.url', process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-training.nauss.edu.sa');
 
   // ── نموذج التأمين الطبي ──
   const [showInsuranceForm, setShowInsuranceForm] = useState(false);
@@ -97,6 +142,11 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const isEmployee = activeRole === 'EMPLOYEE';
   const isCoordinator = user?.id && user.id === element?.course?.primaryEmployeeId;
   const canExecute = isEmployee || isCoordinator;
+  // إصدار الشهادات: لا يُقدَّم قبل أن يؤكد منسق آخر مراجعتها
+  const isCertificates = element?.element?.key === 'certificates';
+  const certReview = element?.formData?.certReview;
+  const certConfirmed = certReview?.status === 'CONFIRMED';
+  const isCertReviewer = !!user?.id && certReview?.reviewerId === user.id;
   const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
   const isManager = activeRole === 'MANAGER';
   const [volunteering, setVolunteering] = useState(false);
@@ -202,21 +252,6 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
     }
   };
 
-  const [showManualClose, setShowManualClose] = useState(false);
-  const doManualClose = async (notes) => {
-    setLoading(true);
-    try {
-      await api.post(`/closure/${element.id}/manual-financial-close`, { notes });
-      toast.success(t('element.toast.manualClosed'));
-      setShowManualClose(false);
-      onUpdate();
-    } catch (err) {
-      toast.error(err.response?.data?.message || t('element.toast.manualCloseFailed'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const openSolfForCourse = () => {
     const params = new URLSearchParams({
       courseId: element.courseId,
@@ -286,41 +321,85 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
     }
   };
 
+  // بطاقة المترجم تُفتح للاطلاع في كل حالاتها: قبل التقديم لمن لا ينفّذ،
+  // وبعد التقديم أو الاعتماد للجميع — فيُرى العقد ورسائل القانونية والمالية.
+  const [interpreterReadOnly, setInterpreterReadOnly] = useState(false);
+  const canFillInterpreter = canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status);
+  const canViewInterpreter = isInterpreterElement && !canFillInterpreter && element.status !== 'NOT_APPLICABLE';
+
   const Spinner = () => <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />;
 
   // ======================================================================
   // العرض
   // ======================================================================
   return (
-    <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
+    <div className="flex w-full max-w-full flex-wrap items-center gap-x-1 gap-y-2">
       {/* زر منصة السلف */}
       {canExecute && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
         <button
           type="button"
           onClick={openSolfForCourse}
-          className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-xl border border-primary/30 bg-white px-3 py-2 text-xs font-bold text-primary shadow-sm hover:bg-primary-light"
+          className={BTN.secondary}
         >
           <ExternalLink size={14} aria-hidden="true" /> {t('element.solfPlatform')}
         </button>
       )}
 
       {canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status) && (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="contents">
+          <div className="contents">
             {isMedicalInsurance ? (
               <button
                 onClick={() => setShowInsuranceForm((v) => !v)}
                 disabled={loading}
-                className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-primary-dark disabled:opacity-50"
+                className={BTN.primary}
               >
                 <HeartPulse size={14} aria-hidden="true" />
                 {element.status === 'RETURNED' ? t('element.resubmit') : t('element.submitInsurance')}
+              </button>
+            ) : isTravelGuide ? (
+              <>
+                {/* إجراءان: تقديم الدليل الموجود، أو طلب تصميم دليل جديد للمدينة */}
+                <button
+                  onClick={() => { setGuideReadOnly(false); setGuideMode('existing'); setShowGuideForm(true); }}
+                  disabled={loading}
+                  className={BTN.primary}
+                >
+                  <Send size={14} aria-hidden="true" />
+                  {element.status === 'RETURNED' ? t('element.resubmit') : 'تقديم الدليل'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setGuideReadOnly(false); setGuideMode('request'); setShowGuideForm(true); }}
+                  disabled={loading}
+                  className={BTN.secondary}
+                >
+                  <MapIcon size={14} aria-hidden="true" /> طلب دليل
+                </button>
+              </>
+            ) : isTrainerElement ? (
+              <button
+                onClick={() => { setTrainerReadOnly(false); setShowTrainerForm(true); }}
+                disabled={loading}
+                className={BTN.primary}
+              >
+                <UserRound size={14} aria-hidden="true" />
+                {element.status === 'RETURNED' ? t('element.resubmit') : 'بيانات المدرب ورسائله'}
+              </button>
+            ) : isInterpreterElement ? (
+              <button
+                onClick={() => { setInterpreterReadOnly(false); setShowInterpreterForm(true); }}
+                disabled={loading}
+                className={BTN.primary}
+              >
+                <Languages size={14} aria-hidden="true" />
+                {element.status === 'RETURNED' ? t('element.resubmit') : t('element.submit')}
               </button>
             ) : isCourseReport ? (
               <button
                 onClick={() => setShowReportForm(true)}
                 disabled={loading}
-                className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-primary-dark disabled:opacity-50"
+                className={BTN.primary}
               >
                 <FileText size={14} aria-hidden="true" />
                 {element.status === 'RETURNED' ? t('element.resubmit') : element.formData ? t('element.completeDraft') : t('element.submit')}
@@ -328,10 +407,9 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             ) : (
               <button
                 onClick={handleSubmit}
-                disabled={loading}
-                className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold shadow-sm transition disabled:opacity-50 ${
-                  isFinancialElement ? 'border border-sand/50 bg-white text-warning hover:bg-sand/10' : 'bg-primary text-white hover:bg-primary-dark'
-                }`}
+                disabled={loading || (isCertificates && !certConfirmed)}
+                title={isCertificates && !certConfirmed ? 'يُقدَّم بعد أن يؤكد المنسق المراجِع مراجعة الشهادات' : undefined}
+                className={isFinancialElement ? `order-first ${BTN.warn} border border-sand/60 bg-white` : BTN.primary}
               >
                 {loading ? (
                   <><Spinner /> {t('element.uploading')}</>
@@ -346,14 +424,19 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             )}
 
             {isOverdue && (
-              <button type="button" onClick={() => setShowDelayReason((v) => !v)} className="text-xs text-text-soft underline hover:text-primary">
+              <button type="button" onClick={() => setShowDelayReason((v) => !v)} className={BTN.ghost}>
                 {showDelayReason ? t('element.hideDelayReason') : `+ ${t('element.addDelayReason')}`}
               </button>
             )}
           </div>
 
+          {/* بلاغ العائق — يُرفع والمنسق منتظر، لا بعد فوات الموعد */}
+          <div className="contents">
+            <BlockerPanel element={element} canAct={canExecute} onUpdate={onUpdate} />
+          </div>
+
           {showDelayReason && (
-            <div className="w-full rounded-xl border border-sand/40 bg-sand/10 p-2">
+            <div className="order-last w-full rounded-xl border border-sand/40 bg-sand/10 p-2">
               <textarea
                 value={delayReason}
                 onChange={(e) => setDelayReason(e.target.value)}
@@ -368,7 +451,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
 
           {/* ── نموذج التأمين الطبي ── */}
           {isMedicalInsurance && showInsuranceForm && (
-            <div className="w-full space-y-3 rounded-xl border border-primary/20 bg-primary-light p-4">
+            <div className="order-last w-full space-y-3 rounded-xl border border-primary/20 bg-primary-light p-4">
               <p className="flex items-center gap-2 text-sm font-extrabold text-primary">
                 <HeartPulse size={16} aria-hidden="true" /> {t('element.insurance.title')}
               </p>
@@ -456,12 +539,47 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
         </div>
       )}
 
+      {/* مراجعة الشهادات بعين ثانية: للمنسق وللمراجِع المسند */}
+      {isCertificates && element.status !== 'NOT_APPLICABLE' && (canExecute || isCertReviewer) && (
+        <CertReviewPanel trackingId={element.id} onChange={onUpdate} />
+      )}
+
+      {/* منصة أدلة السفر: ظاهرة في بطاقة العنصر دائماً */}
+      {isTravelGuide && element.status !== 'NOT_APPLICABLE' && (
+        <a href={PLANNER_URL} target="_blank" rel="noopener noreferrer" className={BTN.secondary}>
+          <ExternalLink size={14} aria-hidden="true" /> منصة أدلة السفر
+        </a>
+      )}
+
+      {isTravelGuide && !(canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status)) && element.status !== 'NOT_APPLICABLE' && (
+        <button type="button" onClick={() => { setGuideReadOnly(true); setGuideMode(null); setShowGuideForm(true); }} className={BTN.primary}>
+          <MapIcon size={14} aria-hidden="true" /> عرض دليل السفر
+        </button>
+      )}
+
+      {isTrainerElement && !(canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status)) && element.status !== 'NOT_APPLICABLE' && (
+        <button type="button" onClick={() => { setTrainerReadOnly(true); setShowTrainerForm(true); }} className={BTN.primary}>
+          <UserRound size={14} aria-hidden="true" /> عرض بيانات المدرب والرسائل
+        </button>
+      )}
+
+      {canViewInterpreter && (
+        <button
+          type="button"
+          onClick={() => { setInterpreterReadOnly(true); setShowInterpreterForm(true); }}
+          className={BTN.primary}
+        >
+          <Languages size={14} aria-hidden="true" />
+          {element.element.key === 'interpreter_contract' ? 'عرض العقد والرسائل' : 'عرض المستند'}
+        </button>
+      )}
+
       {canVolunteerReport && (
         <button
           type="button"
           onClick={handleVolunteerReport}
           disabled={volunteering}
-          className="whitespace-nowrap rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent shadow-sm hover:bg-accent hover:text-white disabled:opacity-50"
+          className={BTN.secondary}
           title={t('element.volunteerReportHint')}
         >
           {volunteering ? '...' : t('element.volunteerReport')}
@@ -469,50 +587,27 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       )}
 
       {canExecute && element.status === 'PENDING_APPROVAL' && (
-        <div className="flex flex-wrap gap-2">
+        <div className="contents">
           <button
             onClick={handleWithdraw}
             disabled={loading || reminding}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-xs font-bold text-warning transition hover:bg-sand/20 disabled:opacity-50"
+            className={BTN.warn}
           >
             <Undo2 size={14} aria-hidden="true" /> {t('element.withdraw')}
           </button>
           <button
             onClick={handleRemind}
             disabled={loading || reminding}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-primary bg-white px-3 py-2 text-xs font-bold text-primary hover:bg-primary-light disabled:opacity-50"
+            className={BTN.secondary}
           >
             {reminding ? (<><Spinner /> {t('element.sending')}</>) : (<><Bell size={14} aria-hidden="true" /> {t('element.remindSupervisor')}</>)}
           </button>
         </div>
       )}
 
-      {/* أزرار المعتمد */}
-      {isApprover && isFinancialElement && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
-        <button
-          type="button"
-          onClick={() => setShowManualClose(true)}
-          disabled={loading}
-          className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-xl border border-accent/40 bg-forest-50 px-3 py-2 text-xs font-bold text-accent shadow-sm hover:bg-accent hover:text-white disabled:opacity-50"
-        >
-          <CheckCircle2 size={14} aria-hidden="true" /> {t('element.manualClose')}
-        </button>
-      )}
-
-      <ReasonModal
-        open={showManualClose}
-        title={t('element.manualClose')}
-        label={t('element.toast.manualClosePrompt')}
-        initialValue={t('element.toast.manualCloseDefault')}
-        tone="primary"
-        loading={loading}
-        onConfirm={doManualClose}
-        onCancel={() => setShowManualClose(false)}
-      />
-
       {/* عرض بيانات التأمين للمعتمد */}
       {isApprover && isMedicalInsurance && element.status === 'PENDING_APPROVAL' && element.formData && (
-        <div className="mb-1 w-full space-y-1.5 rounded-xl border border-primary/20 bg-primary-light px-4 py-3">
+        <div className="order-last mb-1 w-full space-y-1.5 rounded-xl border border-primary/20 bg-primary-light px-4 py-3">
           <p className="inline-flex items-center gap-1.5 text-xs font-extrabold text-primary">
             <HeartPulse size={14} aria-hidden="true" /> {t('element.insurance.submittedTitle')}
           </p>
@@ -546,12 +641,12 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       )}
 
       {isApprover && element.status === 'PENDING_APPROVAL' && (
-        <div className="flex w-full flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
+        <div className="contents">
+          <div className="contents">
             <button
               onClick={handleApprove}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+              className={BTN.approve}
             >
               <Check size={14} aria-hidden="true" /> {t('element.approve')}
             </button>
@@ -559,7 +654,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               type="button"
               onClick={() => { setShowReturnForm((v) => !v); setShowRejectForm(false); }}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-warning px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+              className={BTN.warn}
             >
               <CornerUpLeft size={14} aria-hidden="true" /> {t('element.returnToEmployee')}
             </button>
@@ -567,14 +662,14 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               type="button"
               onClick={() => { setShowRejectForm((v) => !v); setShowReturnForm(false); }}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-danger px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+              className={BTN.danger}
             >
               <X size={14} aria-hidden="true" /> {t('element.reject')}
             </button>
           </div>
 
           {showReturnForm && (
-            <div className="rounded-xl border border-sand/40 bg-sand/10 p-2">
+            <div className="order-last w-full rounded-xl border border-sand/40 bg-sand/10 p-2">
               <p className="mb-1 text-xs font-bold text-warning">{t('element.returnReasonLabel')}</p>
               <textarea
                 value={returnReason}
@@ -596,7 +691,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
           )}
 
           {showRejectForm && (
-            <div className="rounded-xl border border-burgundy/20 bg-burgundy/5 p-2">
+            <div className="order-last w-full rounded-xl border border-burgundy/20 bg-burgundy/5 p-2">
               <p className="mb-1 text-xs font-bold text-danger">{t('element.rejectReasonLabel')}</p>
               <textarea
                 value={rejectReason}
@@ -621,17 +716,17 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
 
       {/* تمديد الموعد — مدير فقط */}
       {isManager && !['APPROVED', 'NOT_APPLICABLE'].includes(element.status) && (
-        <div className="flex flex-col gap-2">
+        <div className="contents">
           <button
             type="button"
             onClick={() => setShowExtendForm((v) => !v)}
-            className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-xl border border-primary/40 bg-primary-light/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-light"
+            className={BTN.secondary}
           >
             {showExtendForm ? t('common.close') : (<><Clock size={14} aria-hidden="true" /> {t('element.grantExtension')}</>)}
           </button>
 
           {showExtendForm && (
-            <div className="rounded-xl border border-primary/20 bg-primary-light/30 p-3">
+            <div className="order-last w-full rounded-xl border border-primary/20 bg-primary-light/30 p-3">
               <p className="mb-2 text-xs font-bold text-primary">{t('element.grantExtensionTitle')}</p>
               <div className="flex flex-wrap gap-2">
                 <div>
@@ -669,6 +764,44 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             </div>
           )}
         </div>
+      )}
+
+      {/* ── نموذج مترجم الدورة ────────────────────────────────────── */}
+      {isInterpreterElement && showInterpreterForm && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
+          <div className="my-8 w-full max-w-3xl">
+            <InterpreterForm
+              trackingId={element.id}
+              courseId={element.courseId || element.course?.id}
+              elementKey={element.element.key}
+              initialFormData={element.formData || null}
+              onClose={() => setShowInterpreterForm(false)}
+              onSuccess={onUpdate}
+              readOnly={interpreterReadOnly}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── نموذج دليل السفر التعريفي ─────────────────────────────── */}
+      {isTravelGuide && showGuideForm && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
+          <div className="my-8 w-full max-w-2xl">
+            <TravelGuideForm trackingId={element.id} onClose={() => setShowGuideForm(false)} onSuccess={onUpdate} readOnly={guideReadOnly} mode={guideMode} />
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── نموذج المدرب الخارجي ─────────────────────────────────── */}
+      {isTrainerElement && showTrainerForm && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
+          <div className="my-8 w-full max-w-3xl">
+            <ExternalTrainerForm trackingId={element.id} onClose={() => setShowTrainerForm(false)} onSuccess={onUpdate} readOnly={trainerReadOnly} />
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* ── نموذج تقرير الافتتاح/الاختتام ─────────────────────────── */}

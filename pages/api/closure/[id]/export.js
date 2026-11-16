@@ -10,6 +10,8 @@
 const { withMethods, withAuth } = require('../../../../lib/server/http');
 const svc = require('../../../../lib/modules/closure/closure.service');
 const permissions = require('../../../../lib/services/permissions');
+const documentation = require('../../../../lib/modules/documentation/documentation.service');
+const { publicOrigin } = require('../../../../lib/server/origin');
 const { renderOpeningReport } = require('../../../../lib/reports/openingReport');
 const { renderClosingReport } = require('../../../../lib/reports/closingReport');
 
@@ -40,11 +42,12 @@ async function handler(req, res) {
     });
   } else {
     // closing_report أو report (التوافق الخلفي)
+    const slug = await documentation.publishedSlug(element.course.id).catch(() => null);
     html = renderClosingReport({
       course: element.course,
       element,
       data,
-    });
+    }, { magazineUrl: slug ? `${publicOrigin(req)}/m/${slug}` : null });
   }
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');

@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   ChevronDown,
   Users,
+  Languages,
   CheckCircle2,
   FileText,
   FileCheck,
@@ -58,6 +59,8 @@ const ELEMENT_ICON = {
   supervisor_compensation: User, trainer_compensation: GraduationCap, revenues: BarChart3,
   materials: Package, certificates: Award, pre_test: Pencil, post_test: CheckCircle2,
   trainee_registration: Users, registration_message: Mail, reaction_evaluation: Star, medical_insurance: HeartPulse,
+  interpreter_contract: Languages, interpreter_transfer: Languages,
+  interpreter_advance: Languages, interpreter_certificate: Languages,
 };
 
 const STATUS_COURSE_CLS = {

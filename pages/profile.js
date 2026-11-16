@@ -4,7 +4,8 @@ import MainLayout from '../components/layout/MainLayout';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
-import { isAcceptableImageFile, normalizeImageFile } from '../lib/clientImage';
+import { isAcceptableImageFile, fileToAvatarDataUrl } from '../lib/clientImage';
+import SignatureEditor from '../components/shared/SignatureEditor';
 import { Upload, Trash2, Save, KeyRound, Mail, MailCheck, User, ShieldCheck } from 'lucide-react';
 import { useTranslation } from '../lib/i18n';
 
@@ -31,6 +32,7 @@ export default function Profile() {
     extensionNumber: '',
   });
   const [profileImage, setProfileImage] = useState(null);
+  const [sigFile, setSigFile] = useState(null);
   const [signatureImage, setSignatureImage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -126,10 +128,13 @@ export default function Profile() {
     }
 
     try {
-      const normalized = await normalizeImageFile(file);
-      const dataUrl = await readFileAsDataUrl(normalized);
-      if (field === 'profileImage') setProfileImage(dataUrl);
-      else setSignatureImage(dataUrl);
+      if (field === 'profileImage') {
+        // الصورة الشخصية تُصغَّر لتظهر في البطاقات دون أن تُثقلها
+        setProfileImage(await fileToAvatarDataUrl(file));
+      } else {
+        // التوقيع يمر بمحرّر القص وإزالة الخلفية قبل اعتماده
+        setSigFile(file);
+      }
     } catch {
       toast.error(t('profile.imageReadFailed'));
     }
@@ -526,6 +531,13 @@ export default function Profile() {
           </>
         )}
       </div>
+      {sigFile && (
+        <SignatureEditor
+          file={sigFile}
+          onCancel={() => setSigFile(null)}
+          onSave={(dataUrl) => { setSigFile(null); setSignatureImage(dataUrl); }}
+        />
+      )}
     </MainLayout>
   );
 }

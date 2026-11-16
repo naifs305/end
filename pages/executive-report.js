@@ -208,6 +208,8 @@ export default function ExecutiveReportPage() {
           ['Pending Approval',    data.elements.pending],
           ['Not Started',         data.elements.notStarted],
           ['Returned',            data.elements.returned],
+          ['Rejected',            data.elements.rejected || 0],
+          ['Not Applicable',      data.elements.notApplicable || 0],
         ],
         styles: { fontSize: 10, cellPadding: 3 },
         headStyles: { fillColor: [37, 60, 50], textColor: [255,255,255], fontStyle: 'bold' },
@@ -289,7 +291,7 @@ export default function ExecutiveReportPage() {
         doc.setFontSize(8);
         doc.setTextColor(150);
         doc.text(`Page ${i} of ${pageCount}`, pageW - 14, 290, { align: 'right' });
-        doc.text('NAUSS — Training Closure Platform', 14, 290);
+        doc.text('NAUSS — Itmam | Training Courses Follow-up Platform', 14, 290);
       }
 
       doc.save(`executive-report-${year}-${String(month).padStart(2,'0')}.pdf`);
@@ -427,6 +429,9 @@ export default function ExecutiveReportPage() {
                 <ProgressBar label={t('elementStatus.PENDING_APPROVAL')} value={data.elements.pending}    total={data.elements.total} color="#C3B39F" />
                 <ProgressBar label={t('elementStatus.NOT_STARTED')} value={data.elements.notStarted} total={data.elements.total} color="#9DA3A1" />
                 <ProgressBar label={t('elementStatus.RETURNED')}  value={data.elements.returned}   total={data.elements.total} color="#633646" />
+                {/* بقية الحالات حتى يساوي مجموع الأشرطة الإجمالي */}
+                <ProgressBar label={t('elementStatus.REJECTED')}  value={data.elements.rejected || 0} total={data.elements.total} color="#A04A4A" />
+                <ProgressBar label={t('elementStatus.NOT_APPLICABLE')} value={data.elements.notApplicable || 0} total={data.elements.total} color="#D5D9D8" />
               </div>
               {data.elements.pending > 0 && (
                 <div className="mt-3 flex items-center gap-2 rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-xs text-warning">

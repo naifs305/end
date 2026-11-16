@@ -15,6 +15,12 @@ import {
   FolderKanban,
   ListChecks,
   Settings,
+  SlidersHorizontal,
+  Languages,
+  NotebookPen,
+  LibraryBig,
+  Building2,
+  Compass,
 } from 'lucide-react';
 import { isAdminRole, canAccessKpis, canViewReportsOnly } from '../../lib/roles';
 
@@ -54,18 +60,25 @@ export function buildNavSections(activeRole, t) {
   const operations = [item('/courses', BookOpen, t('nav.courses'))];
   if (isOversight) operations.push(item('/approvals', ClipboardCheck, t('nav.approvals')));
   operations.push(item('/archive', Archive, t('nav.archive')));
+  // مساعد التنفيذ مفتوح للجميع: صعوبات الزملاء وحلولهم حسب الإدارة ومقر التنفيذ
+  operations.push(item('/assistant', Compass, t('nav.assistant')));
   push('operations', t('navSections.operations'), operations);
 
   // ── 3. الأداء والتقارير ──
   const reports = [];
   if (canViewKpis) reports.push(item('/kpis', Gauge, t('nav.kpis')));
   reports.push(item('/reports', BarChart3, t('nav.reports')));
+  // التقارير الميدانية مفتوحة للجميع: يطّلع الزملاء على الملاحظات ويعلّقون
+  reports.push(item('/field-reports', NotebookPen, t('nav.fieldReports')));
   if (isOversight) reports.push(item('/executive-report', FileText, t('nav.executiveReport')));
+  // أداء الإدارات: من تقييمات المنسقين لصعوبات الإقفال
+  if (isOversight) reports.push(item('/departments', Building2, t('nav.departments')));
   if (isOversight) reports.push(item('/audit', FileSearch, t('nav.audit')));
   push('reportsFollowup', t('navSections.reportsFollowup'), reports);
 
   // ── 4. التحفيز ──
-  push('engagement', t('navSections.engagement'), [item('/motivation', Award, t('nav.motivation'))]);
+  // مكتبة الإصدارات مفتوحة للجميع: مجلات التوثيق المنشورة، والمميّزة في صدارتها
+  push('engagement', t('navSections.engagement'), [item('/motivation', Award, t('nav.motivation')), item('/library', LibraryBig, t('nav.library'))]);
 
   // ── 5. الاتصال ──
   push('communication', t('navSections.communication'), [
@@ -79,6 +92,8 @@ export function buildNavSections(activeRole, t) {
       item('/users', Users, t('nav.users')),
       item('/projects', FolderKanban, t('nav.projects')),
       item('/closure-elements', ListChecks, t('nav.closureElements')),
+      item('/interpreters', Languages, t('nav.interpreters')),
+      item('/settings', SlidersHorizontal, t('nav.settings')),
       item('/jobs', Settings, t('nav.jobs')),
     ]);
   }

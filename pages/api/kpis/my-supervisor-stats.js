@@ -77,7 +77,7 @@ async function handler(req, res) {
       executionAt: true,
       element: { select: { name: true, key: true } },
       course: { select: { id: true, name: true } },
-      executedBy: { select: { firstName: true, lastName: true } },
+      executor: { select: { firstName: true, lastName: true } },
     },
   });
 
@@ -86,7 +86,7 @@ async function handler(req, res) {
     const ageHours = p.executionAt
       ? (now.getTime() - new Date(p.executionAt).getTime()) / 3600000
       : 0;
-    return { ...p, ageHours: Math.round(ageHours * 10) / 10 };
+    return { ...p, executedBy: p.executor, ageHours: Math.round(ageHours * 10) / 10 };
   }).sort((a, b) => b.ageHours - a.ageHours);
 
   const urgent   = pendingWithAge.filter(p => p.ageHours >= 72);   // +3 أيام

@@ -27,7 +27,7 @@ export default function Sidebar({ collapsed = false }) {
           }`}
         >
           <Image
-            src={collapsed ? '/channels4_profile.jpg' : 'https://nauss.edu.sa/Style%20Library/ar-sa/Styles/images/home/Logo.svg'}
+            src={collapsed ? '/channels4_profile.jpg' : '/brand/nauss-logo-gold.png'}
             alt={t('common.university')}
             fill
             className="object-contain"

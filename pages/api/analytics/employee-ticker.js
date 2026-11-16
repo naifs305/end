@@ -1,6 +1,7 @@
 // GET /api/analytics/employee-ticker
 const prisma = require('../../../lib/db/prisma');
 const { withAuth, withMethods } = require('../../../lib/middleware/auth');
+const { computeElementDeadlines } = require('../../../lib/shared/deadlines');
 
 // ── رسائل تحفيزية حسب درجة الأداء ──
 const PERF_MSGS = {
@@ -54,7 +55,10 @@ async function handler(req, res) {
         ],
         status: { notIn: ['CLOSED', 'ARCHIVED'] },
       },
-      select: { id: true, name: true, startDate: true, endDate: true, status: true },
+      select: {
+        id: true, name: true, startDate: true, endDate: true, status: true,
+        lateEntryStatus: true, entryBaselineAt: true,
+      },
     });
     const activeCourseIds = activeCourses.map(c => c.id);
     const courseMap = Object.fromEntries(activeCourses.map(c => [c.id, c]));
@@ -68,7 +72,15 @@ async function handler(req, res) {
           },
           select: {
             id: true, courseId: true, status: true,
-            element: { select: { name: true, deadlineRefPoint: true, deadlineMaxHours: true, elementType: true } },
+            executionAt: true, extensionHours: true,
+            element: {
+              select: {
+                name: true, elementType: true,
+                deadlineRefPoint: true, deadlineIdealHours: true,
+                deadlineMaxHours: true, isDeadlineWorkingDays: true,
+              },
+            },
+            blockers: { select: { raisedAt: true, resolvedAt: true, status: true, isCredited: true } },
           },
           take: 100,
         })
@@ -112,11 +124,13 @@ async function handler(req, res) {
     // العناصر المتأخرة وتلك التي تقترب مواعيدها
     const overdueEls = [], upcomingEls = [];
     for (const el of pendingElements) {
-      if (!el.element?.deadlineMaxHours) continue;
       const course = courseMap[el.courseId];
       if (!course) continue;
-      const ref = el.element.deadlineRefPoint === 'START' ? new Date(course.startDate) : new Date(course.endDate);
-      const hoursLeft = (new Date(ref.getTime() + el.element.deadlineMaxHours * MS) - now) / MS;
+      const d = computeElementDeadlines(el, course, now);
+      if (!d.hasDeadline || d.excludedFromTiming) continue;
+      // العنصر الموقوف ببلاغ عائق قائم لا يُعدّ متأخراً — صاحبه أبلغ
+      if (d.hasOpenBlocker) continue;
+      const hoursLeft = (d.maxDeadline.getTime() - now.getTime()) / MS;
       if (hoursLeft < 0)  overdueEls.push({ ...el, hoursLeft });
       else if (hoursLeft < 48) upcomingEls.push({ ...el, hoursLeft });
     }
@@ -214,6 +228,17 @@ async function handler(req, res) {
       });
     }
 
+    // تقارير الزملاء الميدانية الجديدة — ليطّلع عليها الجميع
+    try {
+      const fieldReports = require('../../../lib/modules/fieldReports/fieldReports.service');
+      items.unshift(...(await fieldReports.tickerItems(userId, now)));
+    } catch { /* شريط الأخبار لا يتعطّل بسببها */ }
+    // مجلات التوثيق الصادرة حديثاً — يحتفي بها الجميع
+    try {
+      const documentation = require('../../../lib/modules/documentation/documentation.service');
+      items.unshift(...(await documentation.tickerItems(now)));
+    } catch { /* كذلك */ }
+
     // ١١. رسالة مخصصة حسب الوقت واليوم
     items.push({ id: 'greeting', icon: '👋', tone: 'primary', text: greeting(name, hour) });
     const wMsg = weekdayMsg(dayOfWeek);
@@ -222,10 +247,13 @@ async function handler(req, res) {
     // ── بناء لوحة العناصر بالأولوية ──
     const pendingWithPriority = pendingElements.map(el => {
       const course = courseMap[el.courseId] || {};
+      // المواعيد من المصدر الواحد: تراعي أيام العمل والتمديد وبلاغات
+      // العوائق. كانت تُحسب هنا حسبةً خاصة تتجاهل الثلاثة، فيرى المنسق
+      // "متأخر" وهو ليس متأخراً — وتتجاهل التمديد الذي منحه المدير.
       let urgency = 0, hoursLeft = null;
-      if (el.element?.deadlineMaxHours != null) {
-        const ref = el.element.deadlineRefPoint === 'START' ? new Date(course.startDate) : new Date(course.endDate);
-        hoursLeft = (new Date(ref.getTime() + el.element.deadlineMaxHours * MS) - now) / MS;
+      const d = computeElementDeadlines(el, course, now);
+      if (d.hasDeadline && !d.excludedFromTiming) {
+        hoursLeft = (d.maxDeadline.getTime() - now.getTime()) / MS;
         if (hoursLeft < 0) urgency = 2;
         else if (hoursLeft < 24) urgency = 1;
       }
@@ -238,6 +266,9 @@ async function handler(req, res) {
         courseId:    el.courseId,
         urgency,
         hoursLeft:   hoursLeft != null ? Math.round(hoursLeft) : null,
+        // العنصر الموقوف ببلاغ عائق لا يُعرض متأخراً — المنسق أبلغ
+        hasOpenBlocker: d.hasOpenBlocker,
+        isPaused:       d.hasOpenBlocker,
       };
     }).sort((a, b) => {
       const pa = (a.urgency*100) + (a.status==='RETURNED'?50:0) + (a.isCritical?30:0) + (a.urgency===1?20:0);

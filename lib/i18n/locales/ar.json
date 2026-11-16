@@ -1,7 +1,7 @@
 {
   "common": {
-    "appName": "منصة إقفال الدورات التدريبية",
-    "appNameShort": "إقفال الدورات",
+    "appName": "إتمام | منصة متابعة الدورات التدريبية",
+    "appNameShort": "إتمام",
     "university": "جامعة نايف العربية للعلوم الأمنية",
     "loading": "جاري التحميل...",
     "save": "حفظ",
@@ -118,7 +118,7 @@
       "loadUsersFailed": "تعذر جلب قائمة الموظفين"
     },
     "delete": {
-      "title": "حذف الدورة",
+      "title": "هل أنت متأكد من حذف الدورة؟",
       "confirmText": "سيتم حذف الدورة \"{name}\" وجميع بياناتها نهائياً.",
       "irreversible": "هذا الإجراء لا يمكن التراجع عنه",
       "confirm": "نعم، احذف",
@@ -174,6 +174,13 @@
       "requiresPreTestDesc": "تقديم الاختبار القبلي للمتدربين",
       "requiresPostTest": "يشتمل على اختبار بعدي",
       "requiresPostTestDesc": "تقديم الاختبار البعدي للمتدربين",
+      "requiresInterpreter": "الدورة بها مترجم",
+      "requiresInterpreterDesc": "يفتح عناصر المترجم بحسب نوع التعاقد معه",
+      "interpreterContractType": "نوع التعاقد مع المترجم",
+      "interpreterContractTypeDesc": "لكل نوع عنصره ومستنده: العقد قبل البداية، والمستحقات بعد الانتهاء",
+      "interpreterTypeContract": "مترجم بعقد",
+      "interpreterTypeTransfer": "مترجم بتحويل",
+      "interpreterTypeAdvance": "مترجم بسلفة",
       "readyCreate": "البيانات مكتملة — جاهز للإنشاء",
       "readySave": "جاهز للحفظ",
       "completeRequired": "أكمل الحقول المطلوبة",
@@ -187,7 +194,8 @@
       "loadFailed": "تعذر تحميل بيانات الدورة",
       "loadProjectsFailed": "تعذر تحميل المشاريع",
       "dateError": "تاريخ النهاية يجب أن يكون بعد تاريخ البداية",
-      "cityPlaceholder": "مثال: الرياض"
+      "cityPlaceholder": "مثال: الرياض",
+      "requiresAdvanceWithSettlementDesc": "الدورة بها سلفة مؤقتة — ويُفتح معها عنصر تسوية السلفة تلقائياً"
     }
   },
   "courseDetail": {
@@ -383,14 +391,22 @@
     "projects": "المشاريع",
     "users": "المستخدمون",
     "closureElements": "عناصر الإقفال",
+    "interpreters": "المترجمون",
+    "fieldReports": "التقارير الميدانية",
+    "library": "مكتبة الإصدارات",
+    "departments": "أداء الإدارات",
     "jobs": "المهام المجدولة",
     "audit": "سجل التدقيق",
-    "profile": "الملف الشخصي"
+    "profile": "الملف الشخصي",
+    "settings": "إعدادات التشغيل",
+    "assistant": "مساعد التنفيذ"
   },
   "auth": {
     "loginTitle": "تسجيل الدخول",
     "loginSubtitle": "ادخل بياناتك للوصول إلى المنصة",
-    "systemTitle": "نظام إقفال الدورات التدريبية",
+    "systemTitle": "إتمام | منصة متابعة الدورات التدريبية",
+    "systemSubtitle": "منصة متابعة الدورات التدريبية",
+    "systemSlogan": "كل دورة… مكتملة",
     "email": "البريد الإلكتروني",
     "password": "كلمة المرور",
     "rememberMe": "تذكرني",
@@ -776,7 +792,12 @@
         "ELEMENT_EXTENSION_GRANTED": "تمديد موعد",
         "KPI_SNAPSHOTS_CALCULATED": "احتساب مؤشرات الأداء",
         "KPI_NOTE_ADDED": "ملاحظة أداء",
-        "ASSIGNMENT_REGISTER_UPDATED": "تحديث سجل الإسناد"
+        "ASSIGNMENT_REGISTER_UPDATED": "تحديث سجل الإسناد",
+        "USER_PROJECT_CHANGED": "نقل منسق بين المشاريع",
+        "INTERPRETER_DATA_ADDED": "إدخال بيانات مترجم",
+        "INTERPRETER_DATA_UPDATED": "تعديل بيانات مترجم",
+        "INTERPRETER_DOCUMENT_TEXT_SAVED": "حفظ نص مستند مترجم",
+        "KPI_SNAPSHOT_PROJECTS_BACKFILLED": "استرجاع مشاريع الأشهر الماضية"
       }
     }
   },
@@ -829,12 +850,14 @@
       "badges": "الشارات",
       "ideas": "المبادرات",
       "challenge": "تحدي الشهر",
-      "pledge": "تعهدي"
+      "pledge": "تعهدي",
+      "documentation": "التوثيق"
     },
     "bannerBadges": "اكسب شارات التميز",
     "bannerIdeas": "قدّم أفكارك واحصل على الائتمان",
     "bannerChallenge": "تحدٍّ جماعي شهري",
     "bannerPledge": "التزم بأهدافك الشخصية",
+    "bannerDocumentation": "مجلات الدورات المنشورة",
     "badgeTypes": {
       "COMMITTED": "الملتزم",
       "PRECISE": "الدقيق",
@@ -1283,8 +1306,8 @@
   },
   "kpi": {
     "title": "مؤشرات الأداء",
-    "subtitleEmployee": "تقييمك الشخصي — 6 مؤشرات مرتبطة بمواعيد إقفال دوراتك",
-    "subtitleTeam": "قياس أداء الفريق بـ 6 مؤشرات ذكية مرتبطة بمواعيد الإقفال",
+    "subtitleEmployee": "تقييمك الشخصي — أربعة محاور: الالتزام بالمواعيد، وإقفال الدورات، والجودة، والتميّز",
+    "subtitleTeam": "قياس أداء الفريق بأربعة محاور، والترتيب بمتوسط آخر ثلاثة أشهر",
     "monthly": "شهري",
     "yearly": "سنوي",
     "currentMonth": "الشهر الحالي",
@@ -1320,7 +1343,7 @@
     "noProject": "بدون مشروع",
     "noCoursesInPeriod": "لا توجد دورات في نطاق هذه الفترة — لا تُحسَب مؤشرات لهذا الشهر.",
     "radarTitle": "خريطة المؤشرات",
-    "sixIndicatorsDetail": "تفصيل المؤشرات الست",
+    "sixIndicatorsDetail": "تفصيل المحاور الأربعة",
     "sixIndicatorsThisMonth": "تفصيل المؤشرات الست — نتيجتك هذا الشهر",
     "autoInsights": "رؤى تلقائية",
     "guidanceAndNotes": "التوجيهات والملاحظات",
@@ -1339,16 +1362,16 @@
     "levelLabel": "مستوى",
     "indicators": {
       "productivityScore": {
-        "label": "الإنتاجية",
-        "tip": "نسبة إتمام عناصر الإقفال المطلوبة"
+        "label": "إقفال الدورات",
+        "tip": "إقفال الدورة كاملة في موعدها — ٢٠٪"
       },
       "timelinessScore": {
-        "label": "التوقيت",
-        "tip": "الالتزام بمواعيد تقديم العناصر"
+        "label": "الالتزام بالمواعيد",
+        "tip": "تقديم العناصر في مواعيدها — ٦٠٪ من الدرجة"
       },
       "qualityScore": {
-        "label": "الجودة",
-        "tip": "نسبة القبول من أول مرة بدون إعادة"
+        "label": "جودة التنفيذ",
+        "tip": "القبول من أول تقديم — ١٠٪"
       },
       "criticalScore": {
         "label": "العناصر الحرجة",
@@ -1361,6 +1384,10 @@
       "disciplineScore": {
         "label": "الانضباط",
         "tip": "غياب التأخر والركود"
+      },
+      "excellenceScore": {
+        "label": "التميّز والتعاون",
+        "tip": "التوثيق ومراجعة شهادات الزملاء والتقارير — ١٠٪"
       }
     },
     "encourage": {
@@ -1740,6 +1767,19 @@
       "nameRequired": "اسم العنصر مطلوب",
       "invalidConditionField": "حقل الشرط غير صالح لعنصر مشروط",
       "noDataToUpdate": "لا توجد بيانات لتحديثها"
+    },
+    "interpreter": {
+      "nameRequired": "اسم المترجم مطلوب رباعياً كما في الهوية",
+      "nationalIdInvalid": "رقم الهوية الوطنية يتكوّن من عشرة أرقام",
+      "emailInvalid": "البريد الإلكتروني غير صحيح",
+      "mobileInvalid": "رقم الجوال غير صحيح",
+      "addressRequired": "عنوان المترجم مطلوب",
+      "amountInvalid": "قيمة المستحق غير صحيحة",
+      "ibanInvalid": "رقم الحساب الدولي (IBAN) غير صحيح",
+      "notEnabled": "هذه الدورة غير مُفعَّل فيها مترجم",
+      "dataMissing": "أدخل بيانات المترجم أولاً",
+      "dataIncomplete": "بيانات المترجم ناقصة لإصدار هذا المستند",
+      "notInterpreterElement": "هذا العنصر ليس من مستندات المترجم"
     },
     "fieldReports": {
       "notFound": "التقرير غير موجود",

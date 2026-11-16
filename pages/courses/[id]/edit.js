@@ -13,6 +13,13 @@ function fmtDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+// أنواع التعاقد مع مترجم الدورة — كلٌّ يفتح عنصر الإقفال الخاص به
+const INTERPRETER_TYPES = [
+  { value: 'CONTRACT', key: 'interpreterTypeContract' },
+  { value: 'TRANSFER', key: 'interpreterTypeTransfer' },
+  { value: 'ADVANCE',  key: 'interpreterTypeAdvance'  },
+];
+
 const DateInput = forwardRef(function DateInput({ startDate, endDate, onClick, onClear }, ref) {
   const { t } = useTranslation();
   return (
@@ -103,6 +110,8 @@ export default function EditCoursePage() {
   const [dateOpen, setDateOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // عنصر «مدرب خارجي» اختياري: يُفعَّل من هنا أو من صفحة الدورة
+  const [trainer, setTrainer] = useState(null); // { trackingId, enabled, initial, locked }
 
   useEffect(() => {
     if (!id) return;
@@ -123,14 +132,18 @@ export default function EditCoursePage() {
           numTrainees: c.numTrainees != null ? String(c.numTrainees) : '',
           operationalProjectId: c.operationalProjectId || c.operationalProject?.id || '',
           requiresAdvance: !!c.requiresAdvance,
-          requiresAdvanceSettlement: !!c.requiresAdvanceSettlement,
           requiresRevenue: !!c.requiresRevenue,
           materialsIssued: !!c.materialsIssued,
           requiresSupervisorCompensation: !!c.requiresSupervisorCompensation,
           requiresTrainerCompensation: !!c.requiresTrainerCompensation,
           requiresPreTest: !!c.requiresPreTest,
           requiresPostTest: !!c.requiresPostTest,
+          requiresInterpreter: !!c.requiresInterpreter,
+          interpreterContractType: c.interpreterContractType || '',
         });
+        const tr = (c.closureElements || []).find((el) => el.element?.key === 'external_trainer');
+        const on = !!tr && tr.status !== 'NOT_APPLICABLE';
+        setTrainer(tr ? { trackingId: tr.id, enabled: on, initial: on, locked: ['APPROVED', 'PENDING_APPROVAL'].includes(tr.status) } : null);
       })
       .catch(() => toast.error(t('course.form.loadFailed')))
       .finally(() => setLoading(false));
@@ -140,7 +153,9 @@ export default function EditCoursePage() {
 
   const canSubmit = useMemo(
     () =>
-      form && form.name.trim() && form.operationalProjectId && form.locationType && form.city.trim() && form.startDate && form.endDate && form.numTrainees && Number(form.numTrainees) > 0,
+      form && form.name.trim() && form.operationalProjectId && form.locationType && form.city.trim() && form.startDate && form.endDate && form.numTrainees && Number(form.numTrainees) > 0
+      // مترجم بلا نوع تعاقد يعني عنصراً لا يُفتح — فنمنع الحفظ ناقصاً
+      && (!form.requiresInterpreter || !!form.interpreterContractType),
     [form]
   );
 
@@ -168,14 +183,18 @@ export default function EditCoursePage() {
         operationalProjectId: form.operationalProjectId,
         courseType: form.locationType === 'INTERNAL' ? 'internal' : form.locationType === 'REMOTE' ? 'remote' : 'external',
         requiresAdvance: form.requiresAdvance,
-        requiresAdvanceSettlement: form.requiresAdvanceSettlement,
         requiresRevenue: form.requiresRevenue,
         materialsIssued: form.materialsIssued,
         requiresSupervisorCompensation: form.requiresSupervisorCompensation,
         requiresTrainerCompensation: form.requiresTrainerCompensation,
         requiresPreTest: form.requiresPreTest,
         requiresPostTest: form.requiresPostTest,
+        requiresInterpreter: form.requiresInterpreter,
+        interpreterContractType: form.requiresInterpreter ? form.interpreterContractType : null,
       });
+      if (trainer && trainer.enabled !== trainer.initial) {
+        await api.post(`/courses/${id}/toggle-element`, { trackingId: trainer.trackingId, enabled: trainer.enabled });
+      }
       toast.success(t('course.form.updatedSuccess'));
       router.push(`/courses/${id}`);
     } catch (err) {
@@ -287,15 +306,63 @@ export default function EditCoursePage() {
             </h2>
             <p className="mb-4 text-xs text-text-soft">{t('course.form.opSettingsDescEdit')}</p>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <Toggle label={t('course.form.requiresAdvance')} desc={t('course.form.requiresAdvanceDesc')} checked={form.requiresAdvance} onChange={(v) => set('requiresAdvance', v)} />
-              <Toggle label={t('course.form.requiresAdvanceSettlement')} desc={t('course.form.requiresAdvanceSettlementDesc')} critical checked={form.requiresAdvanceSettlement} onChange={(v) => set('requiresAdvanceSettlement', v)} />
+              {/* التسوية تتبع السلفة حتماً، فلا تُعرض خياراً مستقلاً يُنسى */}
+              <Toggle
+                label={t('course.form.requiresAdvance')}
+                desc={t('course.form.requiresAdvanceWithSettlementDesc')}
+                checked={form.requiresAdvance}
+                onChange={(v) => set('requiresAdvance', v)}
+              />
               <Toggle label={t('course.form.requiresRevenue')} desc={t('course.form.requiresRevenueDesc')} checked={form.requiresRevenue} onChange={(v) => set('requiresRevenue', v)} />
               <Toggle label={t('course.form.materialsIssued')} desc={t('course.form.materialsIssuedDesc')} checked={form.materialsIssued} onChange={(v) => set('materialsIssued', v)} />
               <Toggle label={t('course.form.requiresSupervisorCompensation')} desc={t('course.form.requiresSupervisorCompensationDesc')} critical checked={form.requiresSupervisorCompensation} onChange={(v) => set('requiresSupervisorCompensation', v)} />
-              <Toggle label={t('course.form.requiresTrainerCompensation')} desc={t('course.form.requiresTrainerCompensationDesc')} critical checked={form.requiresTrainerCompensation} onChange={(v) => set('requiresTrainerCompensation', v)} />
               <Toggle label={t('course.form.requiresPreTest')} desc={t('course.form.requiresPreTestDesc')} checked={form.requiresPreTest} onChange={(v) => set('requiresPreTest', v)} />
               <Toggle label={t('course.form.requiresPostTest')} desc={t('course.form.requiresPostTestDesc')} checked={form.requiresPostTest} onChange={(v) => set('requiresPostTest', v)} />
+              <Toggle
+                label={t('course.form.requiresInterpreter')}
+                desc={t('course.form.requiresInterpreterDesc')}
+                checked={form.requiresInterpreter}
+                onChange={(v) => {
+                  set('requiresInterpreter', v);
+                  if (!v) set('interpreterContractType', '');
+                }}
+              />
+              {trainer && (
+                <Toggle
+                  label="مدرب خارجي"
+                  desc={trainer.locked ? 'مُقدَّم للاعتماد أو معتمد — لا يُلغى' : 'يفتح عنصر المدرب: التذاكر والاستقبال والإسكان'}
+                  checked={trainer.enabled}
+                  onChange={(v) => { if (!trainer.locked) setTrainer((x) => ({ ...x, enabled: v })); }}
+                />
+              )}
             </div>
+
+            {form.requiresInterpreter && (
+              <div className="mt-4 rounded-xl border border-primary/15 bg-primary-light/40 p-4">
+                <p className="mb-1 text-sm font-extrabold text-text-main">{t('course.form.interpreterContractType')}</p>
+                <p className="mb-3 text-xs text-text-soft">{t('course.form.interpreterContractTypeDesc')}</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {INTERPRETER_TYPES.map((opt) => {
+                    const active = form.interpreterContractType === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => set('interpreterContractType', opt.value)}
+                        aria-pressed={active}
+                        className={`rounded-xl border px-3 py-2.5 text-sm font-bold transition ${
+                          active
+                            ? 'border-primary bg-primary text-white shadow-card'
+                            : 'border-border bg-white text-text-main hover:border-primary/40'
+                        }`}
+                      >
+                        {t(`course.form.${opt.key}`)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="sticky bottom-4 z-10">

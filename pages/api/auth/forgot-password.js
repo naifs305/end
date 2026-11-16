@@ -14,5 +14,5 @@ async function handler(req, res) {
 
 // 5 محاولات كل 15 دقيقة لكل IP — المحدد في الذاكرة لكل instance (best-effort)؛
 // مخزن موزّع تحسين مستقبلي
-module.exports = withMethods(['POST'], withRateLimit({ maxAttempts: 5, windowMs: 15 * 60_000 })(handler));
+module.exports = withMethods(['POST'], withRateLimit({ maxAttempts: 5, windowMs: 15 * 60_000, accountField: 'email' })(handler));
 module.exports.default = module.exports;

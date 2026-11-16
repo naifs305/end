@@ -87,7 +87,7 @@ export default function Register() {
               <div className="flex items-center gap-4">
                 <div className="relative h-20 w-20 overflow-hidden rounded-2xl bg-white/95 p-3 shadow-lg">
                   <Image
-                    src="https://nauss.edu.sa/Style%20Library/ar-sa/Styles/images/home/Logo.svg"
+                    src="/brand/nauss-logo-gold.png"
                     alt={t('common.university')}
                     fill
                     className="object-contain p-3"
@@ -129,7 +129,7 @@ export default function Register() {
                 <div className="mb-6 text-center lg:hidden">
                   <div className="relative mx-auto mb-4 h-20 w-20 overflow-hidden rounded-2xl border border-border bg-white shadow-soft sm:h-24 sm:w-24">
                     <Image
-                      src="https://nauss.edu.sa/Style%20Library/ar-sa/Styles/images/home/Logo.svg"
+                      src="/brand/nauss-logo-gold.png"
                       alt={t('common.university')}
                       fill
                       className="object-contain p-3"

@@ -1,7 +1,7 @@
 {
   "common": {
-    "appName": "Training Course Closure Platform",
-    "appNameShort": "Course Closure",
+    "appName": "Itmam | Training Courses Follow-up Platform",
+    "appNameShort": "Itmam",
     "university": "Naif Arab University for Security Sciences",
     "loading": "Loading...",
     "save": "Save",
@@ -174,6 +174,13 @@
       "requiresPreTestDesc": "Administer the pre-test to trainees",
       "requiresPostTest": "Includes a post-test",
       "requiresPostTestDesc": "Administer the post-test to trainees",
+      "requiresInterpreter": "Course has an interpreter",
+      "requiresInterpreterDesc": "Opens the interpreter elements based on the contracting type",
+      "interpreterContractType": "Interpreter contracting type",
+      "interpreterContractTypeDesc": "Each type has its own element and document",
+      "interpreterTypeContract": "Under contract",
+      "interpreterTypeTransfer": "By bank transfer",
+      "interpreterTypeAdvance": "From the advance",
       "readyCreate": "Data complete — ready to create",
       "readySave": "Ready to save",
       "completeRequired": "Complete the required fields",
@@ -187,7 +194,8 @@
       "loadFailed": "Failed to load course data",
       "loadProjectsFailed": "Failed to load projects",
       "dateError": "End date must be after the start date",
-      "cityPlaceholder": "e.g. Riyadh"
+      "cityPlaceholder": "e.g. Riyadh",
+      "requiresAdvanceWithSettlementDesc": "The course has a temporary advance — its settlement element opens with it automatically"
     }
   },
   "courseDetail": {
@@ -383,14 +391,22 @@
     "projects": "Projects",
     "users": "Users",
     "closureElements": "Closure Elements",
+    "interpreters": "Interpreters",
+    "fieldReports": "Field reports",
+    "library": "Publications library",
+    "departments": "Departments performance",
     "jobs": "Scheduled Jobs",
     "audit": "Audit Log",
-    "profile": "Profile"
+    "profile": "Profile",
+    "settings": "Operational settings",
+    "assistant": "Execution Assistant"
   },
   "auth": {
     "loginTitle": "Sign In",
     "loginSubtitle": "Enter your credentials to access the platform",
-    "systemTitle": "Training Course Closure System",
+    "systemTitle": "Itmam | Training Courses Follow-up Platform",
+    "systemSubtitle": "Training Courses Follow-up Platform",
+    "systemSlogan": "Every course… complete",
     "email": "Email",
     "password": "Password",
     "rememberMe": "Remember me",
@@ -776,7 +792,12 @@
         "ELEMENT_EXTENSION_GRANTED": "Deadline extended",
         "KPI_SNAPSHOTS_CALCULATED": "KPIs calculated",
         "KPI_NOTE_ADDED": "Performance note",
-        "ASSIGNMENT_REGISTER_UPDATED": "Assignment register updated"
+        "ASSIGNMENT_REGISTER_UPDATED": "Assignment register updated",
+        "USER_PROJECT_CHANGED": "Coordinator moved between projects",
+        "INTERPRETER_DATA_ADDED": "Interpreter details added",
+        "INTERPRETER_DATA_UPDATED": "Interpreter details updated",
+        "INTERPRETER_DOCUMENT_TEXT_SAVED": "Interpreter document text saved",
+        "KPI_SNAPSHOT_PROJECTS_BACKFILLED": "Past-month projects restored"
       }
     }
   },
@@ -829,12 +850,14 @@
       "badges": "Badges",
       "ideas": "Initiatives",
       "challenge": "Monthly Challenge",
-      "pledge": "My Pledge"
+      "pledge": "My Pledge",
+      "documentation": "Documentation"
     },
     "bannerBadges": "Earn excellence badges",
     "bannerIdeas": "Submit your ideas and get credit",
     "bannerChallenge": "A monthly team challenge",
     "bannerPledge": "Commit to your personal goals",
+    "bannerDocumentation": "Published course magazines",
     "badgeTypes": {
       "COMMITTED": "Committed",
       "PRECISE": "Precise",
@@ -1283,8 +1306,8 @@
   },
   "kpi": {
     "title": "Performance Indicators",
-    "subtitleEmployee": "Your personal evaluation — 6 indicators tied to your course closure deadlines",
-    "subtitleTeam": "Measuring team performance with 6 smart indicators tied to closure deadlines",
+    "subtitleEmployee": "Your personal evaluation — four axes: punctuality, course closure, quality and excellence",
+    "subtitleTeam": "Team performance on four axes, ranked by the last three months",
     "monthly": "Monthly",
     "yearly": "Yearly",
     "currentMonth": "Current month",
@@ -1320,7 +1343,7 @@
     "noProject": "No project",
     "noCoursesInPeriod": "No courses fall within this period — no indicators are calculated for this month.",
     "radarTitle": "Indicator map",
-    "sixIndicatorsDetail": "Six indicators breakdown",
+    "sixIndicatorsDetail": "Four axes in detail",
     "sixIndicatorsThisMonth": "Six indicators breakdown — your score this month",
     "autoInsights": "Automatic insights",
     "guidanceAndNotes": "Guidance and notes",
@@ -1339,16 +1362,16 @@
     "levelLabel": "Level",
     "indicators": {
       "productivityScore": {
-        "label": "Productivity",
-        "tip": "Completion rate of the required closure elements"
+        "label": "Course closure",
+        "tip": "Closing the whole course on time — 20%"
       },
       "timelinessScore": {
-        "label": "Timeliness",
-        "tip": "Adherence to element submission deadlines"
+        "label": "Punctuality",
+        "tip": "Submitting elements on time — 60% of the score"
       },
       "qualityScore": {
-        "label": "Quality",
-        "tip": "First-time acceptance rate without rework"
+        "label": "Execution quality",
+        "tip": "Accepted on first submission — 10%"
       },
       "criticalScore": {
         "label": "Critical elements",
@@ -1361,6 +1384,10 @@
       "disciplineScore": {
         "label": "Discipline",
         "tip": "Absence of delays and stagnation"
+      },
+      "excellenceScore": {
+        "label": "Excellence & collaboration",
+        "tip": "Documentation, peer certificate reviews and reports — 10%"
       }
     },
     "encourage": {
@@ -1740,6 +1767,19 @@
       "nameRequired": "Element name is required",
       "invalidConditionField": "Invalid condition field for a conditional element",
       "noDataToUpdate": "There is no data to update"
+    },
+    "interpreter": {
+      "nameRequired": "The interpreter's full name is required",
+      "nationalIdInvalid": "The national ID must be ten digits",
+      "emailInvalid": "Invalid email address",
+      "mobileInvalid": "Invalid mobile number",
+      "addressRequired": "The interpreter's address is required",
+      "amountInvalid": "Invalid entitlement amount",
+      "ibanInvalid": "Invalid IBAN",
+      "notEnabled": "This course has no interpreter enabled",
+      "dataMissing": "Enter the interpreter's details first",
+      "dataIncomplete": "The interpreter's details are incomplete for this document",
+      "notInterpreterElement": "This element is not an interpreter document"
     },
     "fieldReports": {
       "notFound": "Report not found",

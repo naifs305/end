@@ -31,8 +31,13 @@ async function handler(req, res) {
     prisma.courseClosureTracking.count({ where: { status: 'PENDING_APPROVAL', course: courseWhere } }),
     prisma.course.count({ where: { ...courseWhere, endDate: { lt: new Date() }, status: { notIn: ['CLOSED','ARCHIVED'] } } }),
     prisma.employeeKpiSnapshot.findMany({
-      where: { periodType: 'MONTHLY', periodLabel },
-      include: { user: { select: { id:true, firstName:true, lastName:true, operationalProject:{ select:{ name:true } } } } },
+      // مدير الإدارة لا يُقيَّم منسقاً فلا يدخل ترتيب الأداء
+      where: { periodType: 'MONTHLY', periodLabel, user: { NOT: { roles: { has: 'MANAGER' } } } },
+      include: {
+        user: { select: { id:true, firstName:true, lastName:true, operationalProject:{ select:{ name:true } } } },
+        // مشروع اللقطة — أداء الشهر يُنسب لمشروعه لا لانتماء المنسق اليوم
+        operationalProject: { select: { name: true } },
+      },
       orderBy: { finalScore: 'desc' },
     }),
     prisma.courseClosureTracking.findMany({
@@ -53,7 +58,11 @@ async function handler(req, res) {
   const pendingEl  = elementStats.PENDING_APPROVAL || 0;
   const notStarted = elementStats.NOT_STARTED      || 0;
   const returnedEl = elementStats.RETURNED         || 0;
-  const completionRate = totalEl > 0 ? Math.round((approvedEl / totalEl) * 100) : 0;
+  const rejectedEl = elementStats.REJECTED         || 0;
+  const notApplicableEl = elementStats.NOT_APPLICABLE || 0;
+  // نسبة الإنجاز من العناصر المنطبقة وحدها — «لا ينطبق» لا يُحسب على أحد
+  const applicableEl = totalEl - notApplicableEl;
+  const completionRate = applicableEl > 0 ? Math.round((approvedEl / applicableEl) * 100) : 0;
 
   // ── KPI ───────────────────────────────────────────────────
   const activeSnaps = kpiSnapshots.filter(s => s.isSubjectToEvaluation !== false);
@@ -68,14 +77,14 @@ async function handler(req, res) {
 
   const top3 = activeSnaps.slice(0, 3).map(s => ({
     name:  `${s.user?.firstName} ${s.user?.lastName}`,
-    project: s.user?.operationalProject?.name || '-',
+    project: (s.operationalProject?.name || s.user?.operationalProject?.name || '-'),
     score: Number(s.finalScore || 0).toFixed(1),
     level: s.performanceLevelLabel || s.performanceLevel,
   }));
 
   const needsAttention = activeSnaps.filter(s => Number(s.finalScore) < 60).map(s => ({
     name:  `${s.user?.firstName} ${s.user?.lastName}`,
-    project: s.user?.operationalProject?.name || '-',
+    project: (s.operationalProject?.name || s.user?.operationalProject?.name || '-'),
     score: Number(s.finalScore || 0).toFixed(1),
   }));
 
@@ -86,7 +95,7 @@ async function handler(req, res) {
   return ok(res, {
     period:      { year, month, label: periodLabel, start: start.toISOString(), end: end.toISOString() },
     courses:     { total: totalCourses, newThisPeriod: newCourses, closedThisPeriod: closedInPeriod, overdueNotClosed },
-    elements:    { total: totalEl, approved: approvedEl, pending: pendingEl, notStarted, returned: returnedEl, completionRate },
+    elements:    { total: totalEl, approved: approvedEl, pending: pendingEl, notStarted, returned: returnedEl, rejected: rejectedEl, notApplicable: notApplicableEl, applicable: applicableEl, completionRate },
     kpi:         { avgScore: avgScore.toFixed(1), activeEmployees: activeSnaps.length, levelCounts, top3, needsAttention },
     team:        { employees, supervisors },
     generatedAt: new Date().toISOString(),

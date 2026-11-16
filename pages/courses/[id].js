@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
+import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import {
   AlertTriangle,
   FileText,
@@ -14,16 +16,24 @@ import {
   Pencil,
   ArrowLeft,
   Undo2,
+  Clock,
+  CalendarClock,
+  ThumbsUp,
+  ThumbsDown,
+  Star,
+  Trash2,
 } from 'lucide-react';
 import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
 import MainLayout from '../../components/layout/MainLayout';
 import ElementRow from '../../components/operational/ElementRow';
+import ClosureReviewCard from '../../components/operational/ClosureReviewCard';
 import CourseNotesReportForm from '../../components/operational/CourseNotesReportForm';
 import toast from 'react-hot-toast';
 import { useTranslation } from '../../lib/i18n';
 import { useOptions } from '../../lib/hooks/useOptions';
 import ReasonModal from '../../components/operational/ReasonModal';
+import TimeRing, { ringFor, RING_TONE } from '../../components/operational/TimeRing';
 
 // ── أنماط الحالات (التسميات من الترجمة) ───────────────────────────────
 const STATUS_META = {
@@ -50,7 +60,13 @@ const ELEMENT_ORDER = {
   opening_report: 6, reaction_evaluation: 7, post_test: 8, certificates: 9,
   closing_report: 10, report: 10, supervisor_compensation: 11, trainer_compensation: 12,
   revenues: 13, materials: 14, settlement: 15,
+  // مترجم الدورة: العقد مبكّر مع التجهيز، والمستحقات والشهادة بعد الانتهاء
+  interpreter_contract: 4.5,
+  interpreter_transfer: 12.5,
+  interpreter_advance: 12.6,
+  interpreter_certificate: 12.7,
 };
+
 
 const CRITICAL_ELEMENTS = new Set(['opening_report', 'closing_report', 'settlement']);
 const CRITICAL_ICON = { opening_report: FileText, closing_report: FileCheck, settlement: Coins };
@@ -87,6 +103,138 @@ function YesNo({ value }) {
   return value ? <Check size={14} className="text-accent" aria-hidden="true" /> : <Minus size={14} className="text-text-soft/50" aria-hidden="true" />;
 }
 
+// ======================================================================
+// بطاقة الإدخال المتأخر
+// ----------------------------------------------------------------------
+// التأخير قاسته المنصة بنفسها، فلا نقاش فيه. والمعروض للقرار هو
+// المبرر وحده — والدورة مضافة في كل حال.
+// ======================================================================
+function LateEntryCard({ course, isManager, onDecided }) {
+  const [busy, setBusy] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [note, setNote] = useState('');
+
+  const days = Math.max(0, Math.round((course.lateEntryHours || 0) / 24));
+  const status = course.lateEntryStatus;
+
+  async function decide(accept) {
+    if (!accept && note.trim().length < 5) {
+      toast.error('اكتب سبب الرفض');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/courses/${course.id}/late-entry-decision`, { accept, note: note.trim() });
+      toast.success(accept ? 'قُبل المبرر — لا ملاحظة على المنسق' : 'رُفض المبرر — سُجّلت نقطة');
+      setRejectOpen(false);
+      setNote('');
+      onDecided?.();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذّر حفظ القرار');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const tone = status === 'ACCEPTED'
+    ? 'border-accent/30 bg-accent/5'
+    : status === 'REJECTED'
+      ? 'border-burgundy/30 bg-burgundy/5'
+      : 'border-sand/50 bg-sand/10';
+
+  return (
+    <div className={`rounded-2xl border p-4 shadow-card ${tone}`}>
+      <div className="flex items-start gap-3">
+        <CalendarClock size={22} aria-hidden="true" className="shrink-0 text-warning" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-extrabold text-text-main">
+            أُدخلت هذه الدورة متأخرة بـ{days} يوم
+            {status === 'ACCEPTED' && <span className="text-accent"> — قُبل المبرر</span>}
+            {status === 'REJECTED' && <span className="text-danger"> — رُفض المبرر</span>}
+            {status === 'PENDING' && <span className="text-warning"> — بانتظار قرار المدير</span>}
+          </p>
+
+          {course.lateEntryReason && (
+            <p className="mt-1.5 text-xs leading-relaxed text-text-main">
+              <span className="font-bold text-text-soft">مبرر المنسق:</span> {course.lateEntryReason}
+            </p>
+          )}
+
+          {course.lateEntryDecisionNote && (
+            <p className="mt-1 text-xs leading-relaxed text-text-soft">
+              <span className="font-bold">قرار المدير:</span> {course.lateEntryDecisionNote}
+            </p>
+          )}
+
+          {status === 'ACCEPTED' && (
+            <p className="mt-2 text-[11px] text-accent">
+              العناصر التي فات موعدها قبل الإدخال لا تُحتسب في توقيت المنسق.
+            </p>
+          )}
+          {status === 'REJECTED' && (
+            <p className="mt-2 text-[11px] text-danger">
+              المواعيد محتسبة من تواريخ الدورة الأصلية، ونقطة متدرّجة على الانضباط.
+            </p>
+          )}
+
+          {isManager && status === 'PENDING' && (
+            <div className="mt-3">
+              {!rejectOpen ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => decide(true)}
+                    disabled={busy}
+                    className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    <ThumbsUp size={14} aria-hidden="true" /> قبول المبرر
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRejectOpen(true)}
+                    disabled={busy}
+                    className="flex items-center gap-1.5 rounded-xl border border-burgundy/30 bg-white px-3 py-2 text-xs font-bold text-danger transition hover:bg-burgundy/5 disabled:opacity-50"
+                  >
+                    <ThumbsDown size={14} aria-hidden="true" /> رفض وتسجيل نقطة
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={2}
+                    maxLength={600}
+                    placeholder="سبب رفض المبرر — يصل المنسق"
+                    className="w-full resize-none rounded-lg border border-sand/40 bg-white p-2 text-xs text-text-main outline-none focus:border-primary"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => decide(false)}
+                      disabled={busy}
+                      className="rounded-xl bg-danger px-3 py-2 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                    >
+                      تأكيد الرفض
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setRejectOpen(false); setNote(''); }}
+                      className="rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-text-soft"
+                    >
+                      إلغاء
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CourseDetail() {
   const router = useRouter();
   const { id } = router.query;
@@ -102,6 +250,8 @@ export default function CourseDetail() {
   const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
   const isManager = activeRole === 'MANAGER';
   const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const intl = locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory';
   const fmt = (date) => (date ? new Date(date).toLocaleDateString(intl, { day: 'numeric', month: 'short', year: 'numeric' }) : '-');
@@ -163,6 +313,15 @@ export default function CourseDetail() {
     }
   };
 
+  // ── عنصر التميّز: توثيق الدورة (اختياري، لا يدخل في الإقفال) ──
+  const [docSummary, setDocSummary] = useState(null);
+  useEffect(() => {
+    if (!id) return;
+    api.get(`/courses/${id}/documentation`)
+      .then((res) => setDocSummary(res?.data?.data ?? res?.data))
+      .catch(() => setDocSummary(null));
+  }, [id]);
+
   const sortedElements = useMemo(() => {
     if (!course?.closureElements) return [];
     return [...course.closureElements].sort((a, b) => (ELEMENT_ORDER[a.element?.key] ?? 999) - (ELEMENT_ORDER[b.element?.key] ?? 999));
@@ -179,22 +338,17 @@ export default function CourseDetail() {
     return Math.round((done / rel.length) * 100);
   }, [sortedElements]);
 
-  const calcDeadline = (el) => {
-    const e = el.element;
-    if (!e?.deadlineRefPoint || e.deadlineMaxHours == null || !course) return null;
-    const ref = e.deadlineRefPoint === 'START' ? new Date(course.startDate) : new Date(course.endDate);
-    return new Date(ref.getTime() + (e.deadlineMaxHours + (el.extensionHours || 0)) * 3600000);
-  };
-  const calcIdealDeadline = (el) => {
-    const e = el.element;
-    if (!e?.deadlineRefPoint || e.deadlineIdealHours == null || !course) return null;
-    const ref = e.deadlineRefPoint === 'START' ? new Date(course.startDate) : new Date(course.endDate);
-    return new Date(ref.getTime() + e.deadlineIdealHours * 3600000);
-  };
+  // المواعيد تأتي محسوبة من الخادم (lib/shared/deadlines) ولا تُحسب هنا.
+  // كانت الشاشة تحسبها بنفسها فتتجاهل أيام العمل وبلاغات العوائق،
+  // فيرى المنسق موعداً ويُحاسَب على آخر.
+  const calcDeadline = (el) => (el.deadlines?.maxDeadline ? new Date(el.deadlines.maxDeadline) : null);
+  const calcIdealDeadline = (el) => (el.deadlines?.idealDeadline ? new Date(el.deadlines.idealDeadline) : null);
+  const isPaused = (el) => !!el.deadlines?.hasOpenBlocker;
   const isOverdue = (el) => {
     if (['APPROVED', 'NOT_APPLICABLE', 'PENDING_APPROVAL'].includes(el.status)) return false;
-    const dl = calcDeadline(el);
-    return dl && new Date() > dl;
+    // الموقوف ببلاغ عائق قائم ليس متأخراً — صاحبه أبلغ قبل الموعد
+    if (isPaused(el)) return false;
+    return !!el.deadlines?.isOverdue;
   };
   const supervisorWaitHours = (el) => {
     if (el.status !== 'PENDING_APPROVAL' || !el.executionAt) return null;
@@ -282,170 +436,165 @@ export default function CourseDetail() {
   const renderAction = (el) => {
     if (isReportKey(el.element.key) && ['PENDING_APPROVAL', 'APPROVED'].includes(el.status)) {
       return (
-        <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => handleReportDownload(el.id)} className="inline-flex items-center gap-1 text-xs font-bold text-primary transition hover:text-primary-dark">
-            <Printer size={14} aria-hidden="true" /> {t('courseDetail.print')}
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-2 [&:not(:first-child)]:mt-2">
+          <button onClick={() => handleReportDownload(el.id)} className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-[13px] font-bold text-white shadow-[0_8px_18px_-10px_rgba(46,96,102,0.85)] transition hover:bg-primary-dark">
+            <Printer size={15} aria-hidden="true" /> {t('courseDetail.print')}
           </button>
-          <button onClick={() => handleReportEmlDownload(el.id, el.element.key)} className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:bg-primary-dark">
-            <Mail size={14} aria-hidden="true" /> EML
+          <button onClick={() => handleReportEmlDownload(el.id, el.element.key)} className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-text-soft transition hover:bg-white hover:text-primary">
+            <Mail size={15} aria-hidden="true" /> رسالة بريد
           </button>
         </div>
       );
     }
+
     return null;
   };
 
+  // ── بطاقة العنصر: تصميم «حلقة الوقت» ──────────────────────────────
+  // الحلقة تقول كم بقي، والسطران تحت الاسم يقولان الحالة والموعد، وما سوى
+  // ذلك ملاحظة قصيرة عند الحاجة. والأزرار كلها في ذيل البطاقة.
+  const TIMING = {
+    100: { label: 'قبل المثالي', cls: 'text-primary' },
+    70: { label: 'بين المثالي والأقصى', cls: 'text-warning' },
+    20: { label: 'بعد الأقصى', cls: 'text-danger' },
+  };
+
+  const Note = ({ tone = 'soft', icon: Icon, children }) => {
+    const tones = {
+      soft: 'bg-background text-text-main',
+      warn: 'bg-sand/15 text-text-main',
+      bad: 'bg-burgundy/5 text-text-main',
+      brand: 'bg-primary-light/60 text-text-main',
+    };
+    return (
+      <div className={`flex items-start gap-2 rounded-xl px-3 py-2 text-[12px] leading-relaxed ${tones[tone]}`}>
+        {Icon && <Icon size={14} aria-hidden="true" className="mt-0.5 shrink-0 text-text-soft" />}
+        <div className="min-w-0">{children}</div>
+      </div>
+    );
+  };
+
   const renderElementCard = (el) => {
-    const meta = EL_STATUS_META[el.status] || EL_STATUS_META.NOT_STARTED;
     const deadline = calcDeadline(el);
-    const idealDl = calcIdealDeadline(el);
     const overdue = isOverdue(el);
     const waitH = supervisorWaitHours(el);
     const hasExt = (el.extensionHours || 0) > 0;
+    const ring = ringFor({ ...el, course });
+    const toneColor = RING_TONE[ring.tone];
 
     const isCritical = CRITICAL_ELEMENTS.has(el.element?.key);
-    const CritIcon = CRITICAL_ICON[el.element?.key];
     const isRedAlert = isCritical && overdue && !['APPROVED', 'PENDING_APPROVAL'].includes(el.status);
     const isSettlement = el.element?.key === 'settlement';
-    const palette =
-      el.status === 'APPROVED'
-        ? { bg: 'linear-gradient(135deg,#F0F8F4 0%,#FFFFFF 60%)', border: '#5D8A70', glow: 'rgba(93,138,112,0.16)' }
-        : el.status === 'PENDING_APPROVAL'
-        ? { bg: 'linear-gradient(135deg,#EEF5F2 0%,#FFFFFF 62%)', border: '#253C32', glow: 'rgba(37,60,50,0.14)' }
-        : overdue || isRedAlert
-        ? { bg: 'linear-gradient(135deg,#FFF5EF 0%,#FFFFFF 62%)', border: '#633646', glow: 'rgba(99,54,70,0.14)' }
-        : { bg: 'linear-gradient(135deg,#FBF8F2 0%,#FFFFFF 62%)', border: '#C3B39F', glow: 'rgba(195,179,159,0.18)' };
+    const isDone = ['PENDING_APPROVAL', 'APPROVED'].includes(el.status);
+    const timing = isDone ? TIMING[el.deadlines?.timeScore] : null;
 
     const waitDuration = waitH != null ? (waitH < 24 ? t('courseDetail.hours', { n: waitH }) : t('courseDetail.days', { n: Math.floor(waitH / 24) })) : '';
+    const showDeadline = deadline && !isDone && el.status !== 'NOT_APPLICABLE';
+    const statusText = overdue ? t('courseDetail.overdue') : isPaused(el) ? 'الساعة متوقفة' : elStatusLabel(el.status);
 
     return (
-      <div
+      <article
         key={el.id}
-        className={`min-h-[128px] overflow-visible rounded-2xl border transition hover:-translate-y-0.5 ${isRedAlert ? 'border-danger shadow-[0_0_0_2px_rgba(99,54,70,0.15)]' : 'border-border'}`}
-        style={{ borderInlineStart: `5px solid ${isRedAlert ? '#633646' : palette.border}`, background: palette.bg, boxShadow: `0 10px 24px ${palette.glow}` }}
+        className={`overflow-hidden rounded-[20px] border bg-white shadow-[0_1px_2px_rgba(28,46,48,0.05),0_10px_28px_-16px_rgba(28,46,48,0.22)] ${
+          isRedAlert ? 'border-danger/40' : 'border-border'
+        }`}
       >
         {isRedAlert && (
-          <div className={`flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold text-white ${isSettlement ? 'bg-danger' : 'bg-burgundy/80'}`}>
-            <AlertTriangle size={14} aria-hidden="true" className="animate-pulse" />
+          <div className={`flex items-center gap-2 px-5 py-1.5 text-[11px] font-bold text-white ${isSettlement ? 'bg-danger' : 'bg-burgundy/80'}`}>
+            <AlertTriangle size={14} aria-hidden="true" />
             <span>{t('courseDetail.alertBanner', { level: isSettlement ? t('courseDetail.alertCritical') : t('courseDetail.alertUrgent'), label: criticalLabel(el.element?.key) })}</span>
-            {isSettlement && <span className="ms-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px]">{t('courseDetail.needsImmediate')}</span>}
           </div>
         )}
 
-        {isCritical && !isRedAlert && !['APPROVED', 'NOT_APPLICABLE'].includes(el.status) && (
-          <div className={`flex items-center gap-1.5 px-4 py-1.5 text-[10px] font-bold ${isSettlement ? 'border-b border-burgundy/15 bg-burgundy/8 text-danger' : 'border-b border-sand/20 bg-sand/10 text-warning'}`}>
-            {CritIcon && <CritIcon size={12} aria-hidden="true" />}
-            <span>{t('courseDetail.criticalElement')} — {criticalLabel(el.element?.key)}</span>
+        {/* ── الجسم: الحلقة ثم الاسم وسطرا الحالة والموعد ── */}
+        <div className="grid grid-cols-[76px_minmax(0,1fr)] items-center gap-4 px-5 pb-4 pt-5">
+          <TimeRing ring={ring} />
+          <div className="min-w-0 space-y-1">
+            <h4 className="text-[16px] font-extrabold leading-snug text-text-main">{el.element.name}</h4>
+
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-bold" style={{ color: toneColor }}>
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: toneColor }} aria-hidden="true" />
+              <span>{statusText}</span>
+              {isCritical && !isDone && el.status !== 'NOT_APPLICABLE' && (
+                <span className="font-normal text-text-soft">· {t('courseDetail.criticalElement')}</span>
+              )}
+              {hasExt && <span className="font-normal text-primary">· {t('courseDetail.extensionBadge', { hours: el.extensionHours })}</span>}
+              {el.deadlines?.excludedFromTiming && <span className="font-normal text-text-soft">· غير محتسب</span>}
+            </p>
+
+            {showDeadline && (
+              <p className="text-[13px] text-text-soft">
+                {t('courseDetail.max')} <span className={`font-bold ${overdue ? 'text-danger' : 'text-text-main'}`}>{fmt(deadline)}</span>
+                {el.element?.isDeadlineWorkingDays ? <span className="text-[12px]"> · {t('courseDetail.workingDays')}</span> : null}
+              </p>
+            )}
+
+            {isDone && (
+              <p className="text-[13px] text-text-soft">
+                {el.status === 'APPROVED' ? (
+                  <>
+                    {el.decider ? `اعتمده ${el.decider.firstName} ${el.decider.lastName}` : t('courseDetail.approvedAt')}
+                    {el.decisionAt && <>{' · '}<span className="font-bold text-text-main">{fmt(el.decisionAt)}</span></>}
+                  </>
+                ) : waitH !== null ? (
+                  <>{t('courseDetail.waitingSince', { duration: waitDuration })}</>
+                ) : null}
+                {timing && <span className={`font-bold ${timing.cls}`}> · {timing.label}</span>}
+              </p>
+            )}
           </div>
-        )}
+        </div>
 
-        <div className="space-y-2.5 p-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <h4 className="text-[15px] font-extrabold leading-snug text-text-main">{el.element.name}</h4>
-              <Badge label={elStatusLabel(el.status)} cls={meta.cls} small />
-              {overdue && !isRedAlert && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-burgundy/20 bg-burgundy/10 px-2 py-0.5 text-[10px] font-bold text-danger">
-                  <AlertTriangle size={11} aria-hidden="true" /> {t('courseDetail.overdue')}
-                </span>
-              )}
-              {hasExt && (
-                <span className="inline-flex rounded-full border border-primary/20 bg-primary-light px-2 py-0.5 text-[10px] font-bold text-primary">
-                  {t('courseDetail.extensionBadge', { hours: el.extensionHours })}
-                </span>
-              )}
-            </div>
-            <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1.5 sm:w-[360px] sm:max-w-[62%]">
-              <ElementRow element={{ ...el, course }} activeRole={activeRole} isOverdue={overdue} onUpdate={fetchCourse} />
-              {renderAction(el)}
-            </div>
-          </div>
-
-          {deadline && !['APPROVED', 'NOT_APPLICABLE'].includes(el.status) && (
-            <div className="flex flex-wrap gap-2 rounded-xl border border-white/70 bg-white/70 px-2.5 py-1.5 text-[11px]">
-              {idealDl && (
-                <span className="text-text-soft">
-                  {t('courseDetail.ideal')}: <span className="font-bold text-accent">{fmt(idealDl)}</span>
-                </span>
-              )}
-              <span className={`font-bold ${overdue ? 'text-danger' : 'text-text-main'}`}>
-                {t('courseDetail.max')}: {fmt(deadline)}
-                {el.element?.isDeadlineWorkingDays ? ` ${t('courseDetail.workingDays')}` : ''}
-              </span>
-            </div>
-          )}
-
-          {waitH !== null && (
-            <div className={`flex w-fit items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11px] ${waitH > 48 ? 'border border-sand/40 bg-sand/20 text-warning' : 'border border-border bg-background text-text-soft'}`}>
-              <Hourglass size={12} aria-hidden="true" />
-              <span>{t('courseDetail.waitingSince', { duration: waitDuration })}</span>
-              {waitH > 48 && <span className="font-extrabold">{t('courseDetail.deservesFollowup')}</span>}
-            </div>
-          )}
-
-          {el.executionAt && (
-            <div className="flex flex-wrap gap-3 text-[11px] text-text-soft">
-              <span className="inline-flex items-center gap-1">
-                <Upload size={12} aria-hidden="true" /> {t('courseDetail.uploadedAt')}: <strong className="text-primary">{fmtFull(el.executionAt)}</strong>
-              </span>
-              {el.executor && (
-                <span>
-                  {t('courseDetail.by')}: <strong className="text-text-main">{el.executor.firstName} {el.executor.lastName}</strong>
-                </span>
-              )}
-            </div>
-          )}
-
-          {el.delayReason && (
-            <div className="rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-[11px]">
-              <span className="font-bold text-warning">{t('courseDetail.justification')}: </span>
-              <span className="text-text-main">{el.delayReason}</span>
-            </div>
-          )}
-
-          {hasExt && el.extensionReason && (
-            <div className="rounded-xl border border-primary/20 bg-primary-light/50 px-3 py-2 text-[11px]">
-              <span className="font-bold text-primary">{t('courseDetail.extensionBadge', { hours: el.extensionHours })}: </span>
-              <span className="text-text-main">{el.extensionReason}</span>
-              {el.extensionGrantedAt && <span className="ms-2 text-text-soft">— {fmt(el.extensionGrantedAt)}</span>}
-            </div>
-          )}
-
-          {el.status === 'APPROVED' && el.decisionAt && (
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-accent">
-              <Check size={13} aria-hidden="true" />
-              <span>{t('courseDetail.approvedAt')}: {fmtFull(el.decisionAt)}</span>
-              {el.decider && <span className="font-normal text-text-soft">— {el.decider.firstName} {el.decider.lastName}</span>}
-            </div>
-          )}
-
-          {/* رقم المعاملة من منصة السلف */}
-          {['advance_req', 'settlement'].includes(el.element?.key) && el.formData?.referenceNumber && (
-            <div className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary-light/40 px-2.5 py-1.5 text-[11px] font-bold text-primary w-fit">
-              <span>🔗</span>
-              <span>رقم المعاملة في منصة السلف:</span>
-              <span className="font-extrabold">{el.formData.referenceNumber}</span>
-            </div>
-          )}
-
-          {/* إعادة */}
+        {/* ── ملاحظات قصيرة عند الحاجة ── */}
+        <div className="space-y-2 px-5 empty:hidden [&:not(:empty)]:pb-4">
           {el.status === 'RETURNED' && (
-            <div className="rounded-xl border border-sand/40 bg-sand/10 px-3 py-2 text-[11px]">
-              <p className="mb-0.5 font-bold text-warning">{t('courseDetail.returnReasonView')}</p>
-              <p className="text-text-main">{el.rejectionReason || el.notes || t('courseDetail.notSpecified')}</p>
-              {el.decisionAt && <p className="mt-1 text-text-soft">{fmtFull(el.decisionAt)}</p>}
-            </div>
+            <Note tone="warn" icon={Undo2}>
+              <span className="font-bold text-warning">{t('courseDetail.returnReasonView')} </span>
+              {el.rejectionReason || el.notes || t('courseDetail.notSpecified')}
+            </Note>
           )}
-
           {el.status === 'REJECTED' && (
-            <div className="rounded-xl border border-burgundy/20 bg-burgundy/5 px-3 py-2 text-[11px]">
-              <p className="mb-0.5 font-bold text-danger">{t('courseDetail.rejectReasonView')}</p>
-              <p className="text-text-main">{el.rejectionReason || el.notes || t('courseDetail.notSpecified')}</p>
-              {el.decisionAt && <p className="mt-1 text-text-soft">{fmtFull(el.decisionAt)}</p>}
-            </div>
+            <Note tone="bad" icon={AlertTriangle}>
+              <span className="font-bold text-danger">{t('courseDetail.rejectReasonView')} </span>
+              {el.rejectionReason || el.notes || t('courseDetail.notSpecified')}
+            </Note>
+          )}
+          {waitH !== null && waitH > 48 && (
+            <Note tone="warn" icon={Hourglass}>
+              <span className="font-bold text-warning">{t('courseDetail.deservesFollowup')}</span>
+            </Note>
+          )}
+          {el.executionAt && (
+            <Note icon={Upload}>
+              {t('courseDetail.uploadedAt')} <span className="font-bold">{fmtFull(el.executionAt)}</span>
+              {el.executor && <> · {el.executor.firstName} {el.executor.lastName}</>}
+            </Note>
+          )}
+          {el.delayReason && (
+            <Note tone="warn" icon={FileText}>
+              <span className="font-bold text-warning">{t('courseDetail.justification')}: </span>
+              {el.delayReason}
+            </Note>
+          )}
+          {hasExt && el.extensionReason && (
+            <Note tone="brand" icon={CalendarClock}>
+              <span className="font-bold text-primary">{t('courseDetail.extensionBadge', { hours: el.extensionHours })}: </span>
+              {el.extensionReason}
+            </Note>
+          )}
+          {['advance_req', 'settlement'].includes(el.element?.key) && el.formData?.referenceNumber && (
+            <Note tone="brand" icon={Coins}>
+              رقم المعاملة في منصة السلف: <span className="font-bold">{el.formData.referenceNumber}</span>
+            </Note>
           )}
         </div>
-      </div>
+
+        {/* ── ذيل البطاقة: الأزرار. يختفي إن لم يكن فيه فعل ── */}
+        <div className="border-t border-border bg-background px-4 py-3 [&:not(:has(button,textarea,input))]:hidden">
+          <ElementRow element={{ ...el, course }} activeRole={activeRole} isOverdue={overdue} onUpdate={fetchCourse} />
+          {renderAction(el)}
+        </div>
+      </article>
     );
   };
 
@@ -472,10 +621,23 @@ export default function CourseDetail() {
     (el) => CRITICAL_ELEMENTS.has(el.element?.key) && isOverdue(el) && !['APPROVED', 'PENDING_APPROVAL', 'NOT_APPLICABLE'].includes(el.status)
   );
   const settlementOverdue = criticalOverdue.find((el) => el.element?.key === 'settlement');
+  // شهادة إنجاز المترجم: بعد انتهاء الدورة بثلاثة أيام يُذكَّر المنسق بإرسالها للمالية
+  const certificateEl = sortedElements.find((el) => el.element?.key === 'interpreter_certificate');
+  const certificateDue = !!certificateEl && !['APPROVED', 'PENDING_APPROVAL', 'NOT_APPLICABLE'].includes(certificateEl.status)
+    && course.endDate && Date.now() >= new Date(course.endDate).getTime() + 3 * 24 * 60 * 60 * 1000;
 
   return (
     <MainLayout breadcrumb={[{ label: t('nav.courses'), href: '/courses' }, { label: course.name }]}>
       <div className="space-y-4">
+        {/* الإدخال المتأخر — مسجّل آلياً، وقراره للمدير */}
+        {course.isLateEntry && (
+          <LateEntryCard
+            course={course}
+            isManager={activeRole === 'MANAGER'}
+            onDecided={fetchCourse}
+          />
+        )}
+
         {/* بانر الإنذارات الحرجة */}
         {criticalOverdue.length > 0 && (
           <div className={`rounded-2xl border p-4 shadow-card ${settlementOverdue ? 'border-danger/40 bg-danger/5' : 'border-burgundy/30 bg-burgundy/5'}`}>
@@ -499,6 +661,20 @@ export default function CourseDetail() {
                     );
                   })}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {certificateDue && (
+          <div className="rounded-2xl border border-sand/60 bg-sand/15 p-4 shadow-card">
+            <div className="flex items-start gap-3">
+              <FileCheck size={24} aria-hidden="true" className="shrink-0 text-warning" />
+              <div className="flex-1">
+                <p className="text-sm font-extrabold text-text-main">أرسل شهادة إنجاز المترجم إلى الإدارة المالية</p>
+                <p className="mt-0.5 text-[13px] text-text-soft">
+                  مضت ثلاثة أيام على انتهاء الدورة. أصدر الشهادة من عنصر «{certificateEl.element?.name || 'شهادة إنجاز الترجمة'}» ثم نزّل «رسالة المالية — بقية المستحقات» والشهادة مرفقة بها، لصرف المبلغ المستحق للمترجم.
+                </p>
               </div>
             </div>
           </div>
@@ -531,13 +707,22 @@ export default function CourseDetail() {
                 >
                   <FileText size={14} aria-hidden="true" /> {t('courseDetail.generalReport')}
                 </button>
-                {(isManager || isSupervisor) && (
-                  <button
-                    onClick={() => router.push(`/courses/${id}/edit`)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-text-soft transition hover:border-primary hover:text-primary"
-                  >
-                    <Pencil size={14} aria-hidden="true" /> {t('common.edit')}
-                  </button>
+                {/* التعديل والحذف بصلاحية الخادم نفسها: المدير، والمشرف، ومنسق الدورة في مرحلة الإعداد */}
+                {(isManager || isSupervisor || (course.primaryEmployeeId === user?.id && course.status === 'PREPARATION')) && (
+                  <>
+                    <button
+                      onClick={() => router.push(`/courses/${id}/edit`)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-text-soft transition hover:border-primary hover:text-primary"
+                    >
+                      <Pencil size={14} aria-hidden="true" /> {t('common.edit')}
+                    </button>
+                    <button
+                      onClick={() => setDeleteOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-text-soft transition hover:border-danger hover:bg-burgundy/5 hover:text-danger"
+                    >
+                      <Trash2 size={14} aria-hidden="true" /> {t('common.delete')}
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={() => router.back()}
@@ -598,32 +783,79 @@ export default function CourseDetail() {
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div>
-                <h2 className="font-extrabold text-text-main">{t('courseDetail.incompleteElements')}</h2>
-                <p className="mt-0.5 text-[11px] text-text-soft">{t('courseDetail.bySequence')}</p>
-              </div>
-              <span className="flex h-7 w-7 items-center justify-center rounded-full border border-sand/40 bg-sand/20 text-sm font-extrabold text-warning">{activeElements.length}</span>
-            </div>
-            <div className="space-y-2 p-3">
-              {activeElements.length > 0 ? activeElements.map((el) => renderElementCard(el)) : <p className="py-8 text-center text-sm text-text-soft">{t('courseDetail.noIncomplete')}</p>}
-            </div>
-          </div>
+        {/* ── تقييم صعوبات الإقفال: يظهر بعد إقفال الدورة ── */}
+        {['CLOSED', 'ARCHIVED'].includes(course.status) && <ClosureReviewCard courseId={id} />}
 
-          <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div>
-                <h2 className="font-extrabold text-text-main">{t('courseDetail.completedElements')}</h2>
-                <p className="mt-0.5 text-[11px] text-text-soft">{t('courseDetail.submittedOrApproved')}</p>
+        {/* ── عنصر التميّز: توثيق الدورة ── */}
+        {docSummary && (() => {
+          const d = docSummary.documentation;
+          const photos = d?.media?.length || 0;
+          const starred = !!d?.starAwarded;
+          const published = d?.status === 'PUBLISHED';
+          const { checks = [] } = docSummary.star || {};
+          const done = checks.filter((c) => c.done).length;
+          return (
+            <article className="overflow-hidden rounded-[20px] border border-accent/40 bg-white shadow-[0_1px_2px_rgba(28,46,48,0.05),0_10px_28px_-16px_rgba(28,46,48,0.22)]"
+              style={{ background: 'linear-gradient(110deg,#fff8ec,#ffffff 60%)' }}>
+              <div className="flex flex-wrap items-center gap-4 px-5 py-4">
+                <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${starred ? 'bg-accent text-white shadow-[0_8px_18px_-8px_rgba(178,146,90,0.9)]' : 'bg-sand/20 text-warning'}`}>
+                  <Star size={24} aria-hidden="true" fill={starred ? 'currentColor' : 'none'} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11.5px] font-extrabold text-warning">عنصر التميّز · اختياري</p>
+                  <h2 className="text-[16px] font-extrabold text-text-main">توثيق الدورة</h2>
+                  <p className="text-[12.5px] text-text-soft">
+                    {starred
+                      ? `نال نجمة التميّز — ${photos} صورة منشورة`
+                      : published
+                        ? 'منشور، ونقص عن معايير النجمة — أكمله لتعود'
+                        : d
+                          ? `مسودة: ${photos} صورة · ${done} من ${checks.length} معايير`
+                          : 'وثّق الدورة بالصور والجلسات وانشرها فتنال نجمة تميّز ودرجات إضافية — ولا يُخصم على من لا يوثّق.'}
+                  </p>
+                </div>
               </div>
-              <span className="flex h-7 w-7 items-center justify-center rounded-full border border-accent/20 bg-forest-50 text-sm font-extrabold text-accent">{completedElements.length}</span>
+              <div className="flex items-center gap-1 border-t border-accent/20 bg-sand/5 px-4 py-3">
+                <Link href={`/courses/${id}/documentation`}
+                  className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-[13px] font-bold text-white shadow-[0_8px_18px_-10px_rgba(178,146,90,0.9)] transition hover:brightness-95">
+                  <Star size={15} aria-hidden="true" /> {d ? 'فتح مساحة التوثيق' : 'ابدأ التوثيق'}
+                </Link>
+                {published && d?.slug && (
+                  <a href={`/m/${d.slug}`} target="_blank" rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-warning hover:bg-white">
+                    تصفّح المجلة
+                  </a>
+                )}
+              </div>
+            </article>
+          );
+        })()}
+
+        {/* ── عمودان متساويان: غير المكتملة | المكتملة ── */}
+        <div className="grid items-start gap-6 lg:grid-cols-2">
+          <section aria-labelledby="h-incomplete">
+            <div className="mb-3 flex items-center gap-2.5 px-1">
+              <h2 id="h-incomplete" className="text-lg font-extrabold text-text-main">{t('courseDetail.incompleteElements')}</h2>
+              <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-sand/20 px-2 text-sm font-extrabold text-warning">{activeElements.length}</span>
             </div>
-            <div className="space-y-2 p-3">
-              {completedElements.length > 0 ? completedElements.map((el) => renderElementCard(el)) : <p className="py-8 text-center text-sm text-text-soft">{t('courseDetail.noCompleted')}</p>}
+            <div className="space-y-4">
+              {activeElements.length > 0 ? activeElements.map((el) => renderElementCard(el)) : (
+                <p className="rounded-[20px] border border-dashed border-border bg-white py-10 text-center text-sm text-text-soft">{t('courseDetail.noIncomplete')}</p>
+              )}
             </div>
-          </div>
+          </section>
+
+          <section aria-labelledby="h-completed">
+            <div className="mb-3 flex items-center gap-2.5 px-1">
+              <h2 id="h-completed" className="text-lg font-extrabold text-text-main">{t('courseDetail.completedElements')}</h2>
+              <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-forest-50 px-2 text-sm font-extrabold text-primary">{completedElements.length}</span>
+            </div>
+            <div className="space-y-4">
+              {completedElements.length > 0 ? completedElements.map((el) => renderElementCard(el)) : (
+                <p className="rounded-[20px] border border-dashed border-border bg-white py-10 text-center text-sm text-text-soft">{t('courseDetail.noCompleted')}</p>
+              )}
+            </div>
+          </section>
         </div>
 
         {notApplicableElements.length > 0 && (
@@ -731,10 +963,10 @@ export default function CourseDetail() {
                     <div key={el.id} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2">
                       <div className="min-w-0">
                         <span className="text-sm font-bold text-text-main block truncate">{el.element.name}</span>
-                        <span className="text-[10px] text-text-soft">{el.executedBy?.firstName} {el.executedBy?.lastName}</span>
+                        <span className="text-[10px] text-text-soft">{(el.executor || el.executedBy)?.firstName} {(el.executor || el.executedBy)?.lastName}</span>
                       </div>
                       <button
-                        onClick={() => setMsgModal({ trackingId: el.id, elementName: el.element.name, employeeName: `${el.executedBy?.firstName} ${el.executedBy?.lastName}` })}
+                        onClick={() => setMsgModal({ trackingId: el.id, elementName: el.element.name, employeeName: `${(el.executor || el.executedBy)?.firstName || ""} ${(el.executor || el.executedBy)?.lastName || ""}`.trim() })}
                         className="shrink-0 rounded-lg border border-primary/20 bg-primary/5 px-2 py-1 text-[11px] font-bold text-primary hover:bg-primary/10">
                         📩 راسله
                       </button>
@@ -899,6 +1131,44 @@ export default function CourseDetail() {
             </div>
           </div>
         </div>
+      )}
+      {/* ══ تأكيد حذف الدورة ══ */}
+      {deleteOpen && typeof document !== 'undefined' && createPortal(
+        <div dir="rtl" className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 px-4" onClick={(e) => { if (e.target === e.currentTarget && !deleting) setDeleteOpen(false); }}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="del-title">
+            <div className="space-y-3 p-5 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-burgundy/10 text-danger">
+                <Trash2 size={26} aria-hidden="true" />
+              </div>
+              <h2 id="del-title" className="text-base font-extrabold text-text-main">{t('course.delete.title')}</h2>
+              <p className="text-sm text-text-soft">{t('course.delete.confirmText', { name: course.name })}</p>
+              <p className="rounded-xl border border-burgundy/20 bg-burgundy/5 px-3 py-2 text-xs font-bold text-danger">{t('course.delete.irreversible')}</p>
+            </div>
+            <div className="flex gap-2 border-t border-border px-5 py-3">
+              <button
+                onClick={async () => {
+                  setDeleting(true);
+                  try {
+                    await api.delete(`/courses/${id}`);
+                    toast.success(t('course.delete.success'));
+                    router.replace('/courses');
+                  } catch (e) {
+                    toast.error(e?.response?.data?.message || t('course.delete.failed'));
+                    setDeleting(false);
+                  }
+                }}
+                disabled={deleting}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-danger py-2.5 text-sm font-bold text-white hover:bg-danger/90 disabled:opacity-50"
+              >
+                {deleting ? '...' : (<><Trash2 size={16} aria-hidden="true" /> {t('course.delete.confirm')}</>)}
+              </button>
+              <button onClick={() => setDeleteOpen(false)} disabled={deleting} className="rounded-xl border border-border px-5 py-2.5 text-sm font-bold text-text-soft hover:bg-background">
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </MainLayout>
   );

@@ -59,7 +59,7 @@ export default function MobileNav({ open, onClose }) {
         <div className="flex h-[76px] items-center justify-between border-b border-white/40 bg-white/40 px-4">
           <div className="relative h-11 w-40">
             <Image
-              src="https://nauss.edu.sa/Style%20Library/ar-sa/Styles/images/home/Logo.svg"
+              src="/brand/nauss-logo-gold.png"
               alt={t('common.university')}
               fill
               className="object-contain"

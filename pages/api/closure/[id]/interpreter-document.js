@@ -1,0 +1,233 @@
+// =============================================================
+// GET /api/closure/[id]/interpreter-document?output=...
+// -------------------------------------------------------------
+// يُخرج مستندات المترجم ورسائلها. العنصر يحدد المتاح منها، فلا
+// يختار المنسق من قائمة ولا يُخطئ في الوجهة:
+//
+//   interpreter_contract    → document    عقد ترجمة (صفحة تُعدَّل وتُطبع)
+//                             legal-eml   رسالة مراجعة قانونية
+//                             finance-eml طلب صرف الدفعة الأولى
+//   interpreter_advance     → document    نموذج استحقاق
+//   interpreter_certificate → document    شهادة إنجاز
+//                             finance-eml طلب صرف بقية المستحقات، والشهادة مرفقة بها
+//                             certificate-file  الشهادة نسخةً مستقلة (تُحوَّل PDF في المتصفح)
+//   interpreter_transfer    → document    رسالة طلب صرف بالتحويل
+//
+// وعناوين الجهات كلها من إعدادات المنصة لا من الكود.
+// =============================================================
+const { withMethods, withAuth } = require('../../../../lib/server/http');
+const svc = require('../../../../lib/modules/closure/closure.service');
+const interpreterSvc = require('../../../../lib/modules/courses/interpreter.service');
+const permissions = require('../../../../lib/services/permissions');
+const configService = require('../../../../lib/modules/config/config.service');
+const { buildEmlMessage, normalizeAttachments, sanitizeFilename } = require('../../../../lib/email/eml');
+const {
+  CONTRACT_DEFAULTS,
+  contractFacts,
+  renderInterpreterContract,
+  renderInterpreterEntitlement,
+  renderInterpreterCertificate,
+  renderInterpreterTransferEmail,
+  renderLegalReviewEmail,
+  renderFinancePaymentEmail,
+} = require('../../../../lib/reports/interpreterDocs');
+
+// الوجهات الافتراضية — تُغيَّر من شاشة «إعدادات التشغيل»
+const MAIL_DEFAULTS = {
+  'interpreter.transfer.email.to': 'AAlfaifi@nauss.edu.sa',
+  'interpreter.legal.email.to': 'Legal@nauss.edu.sa',
+  'interpreter.legal.email.cc': 'NAlshahrani@nauss.edu.sa, MAlsolami@nauss.edu.sa, OD@nauss.edu.sa',
+  'interpreter.finance.email.to': 'finance@nauss.edu.sa',
+  'interpreter.finance.email.cc':
+    'AAlaraj@nauss.edu.sa, SAlbayoumi@nauss.edu.sa, NAlshahrani@nauss.edu.sa, AAlfaifi@nauss.edu.sa',
+};
+
+// ما يتاح من مخرجات لكل عنصر
+const ALLOWED_OUTPUTS = {
+  interpreter_contract: ['document', 'legal-eml', 'finance-eml', 'contract-file'],
+  interpreter_advance: ['document'],
+  interpreter_certificate: ['document', 'finance-eml', 'certificate-file'],
+  interpreter_transfer: ['document'],
+};
+
+const setting = (key) => configService.getSetting(key, MAIL_DEFAULTS[key]);
+
+function sendEml(res, { eml, course, prefix }) {
+  const safeName = sanitizeFilename(course.name || 'course', 'course');
+  res.setHeader('Content-Type', 'message/rfc822; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${prefix}-${safeName}.eml"`);
+  return res.status(200).send(eml);
+}
+
+async function handler(req, res) {
+  const { id } = req.query;
+  const output = String(req.query.output || 'document');
+
+  const element = await svc.getElementDetails(id);
+
+  if (!element) {
+    return res.status(404).json({ message: 'العنصر غير موجود', code: 'serverErrors.closureElements.notFound' });
+  }
+
+  const canView = await permissions.canViewCourse(req.user, req.activeRole, element.course);
+  if (!canView) {
+    return res.status(403).json({ message: 'غير مصرح لك بعرض هذا المستند', code: 'serverErrors.closure.viewReportForbidden' });
+  }
+
+  const key = element.element?.key;
+  if (!svc.INTERPRETER_ELEMENT_KEYS.includes(key)) {
+    return res.status(400).json({ message: 'هذا العنصر ليس من مستندات المترجم', code: 'serverErrors.interpreter.notInterpreterElement' });
+  }
+
+  if (!(ALLOWED_OUTPUTS[key] || []).includes(output)) {
+    return res.status(400).json({ message: 'هذا المخرج غير متاح لهذا العنصر', code: 'serverErrors.interpreter.outputNotAllowed' });
+  }
+
+  const course = element.course;
+  const interpreter = course?.interpreter;
+
+  if (!interpreter) {
+    return res.status(400).json({
+      message: 'أدخل بيانات المترجم أولاً — المستند يُبنى منها',
+      code: 'serverErrors.interpreter.dataMissing',
+    });
+  }
+
+  // مستند مالي بخانة ناقصة لا قيمة له — نقول ما ينقص بدل إخراجه ناقصاً
+  const missing = interpreterSvc.missingForDocument(
+    output === 'finance-eml' ? 'interpreter_transfer' : key,
+    interpreter,
+  );
+  if (missing.length) {
+    return res.status(400).json({
+      message: `أكمل بيانات المترجم أولاً: ${missing.join('، ')}`,
+      code: 'serverErrors.interpreter.dataIncomplete',
+    });
+  }
+
+  // بيانات الطرف الأول من الإعدادات لا من الكود
+  const [rep, repTitle, repEmail, bufferDays] = await Promise.all([
+    configService.getSetting('interpreter.contract.rep', CONTRACT_DEFAULTS.rep),
+    configService.getSetting('interpreter.contract.repTitle', CONTRACT_DEFAULTS.repTitle),
+    configService.getSetting('interpreter.contract.email', CONTRACT_DEFAULTS.email),
+    configService.getSetting('interpreter.contract.bufferDays', String(CONTRACT_DEFAULTS.bufferDays)),
+  ]);
+  const config = { rep, repTitle, email: repEmail, bufferDays: Number(bufferDays) };
+  const facts = contractFacts({ course, interpreter, config });
+  const sections = (element.formData && element.formData.documentSections) || {};
+  // الشهادة تُؤرَّخ بيوم تقديم العنصر، وقبله بيوم إصدارها
+  const issuedAt = element.executionAt || new Date();
+
+  // ── الشهادة نسخةً مستقلة: المطبوعة والخط مضمّنان، بلا شريط أدوات ──
+  if (output === 'certificate-file') {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(renderInterpreterCertificate({ course, interpreter, sections }, { bare: true, issuedAt }));
+  }
+  // اسم المترجم ثنائياً (الأول والأخير) — لاسم مرفق الشهادة
+  const nameParts = String(interpreter.fullName || '').trim().split(/\s+/).filter(Boolean);
+  const shortName = nameParts.length > 1 ? `${nameParts[0]} ${nameParts[nameParts.length - 1]}` : (nameParts[0] || 'المترجم');
+  const certFileName = `شهادة إنجاز - ${shortName}`;
+
+  // ── العقد نسخةً مستقلة: المطبوعة والخط مضمّنان (يُحوَّل PDF في المتصفح) ──
+  if (output === 'contract-file') {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(renderInterpreterContract({ course, interpreter, sections, config }, { bare: true, canEdit: false }));
+  }
+
+  // ── رسالة الإدارة القانونية — والعقد مرفق بها ────────────────
+  if (output === 'legal-eml') {
+    const [to, cc] = await Promise.all([setting('interpreter.legal.email.to'), setting('interpreter.legal.email.cc')]);
+    // PDF إن رسمه المتصفح، وإلا فنسخة العقد المستقلة (تُفتح في أي متصفح وتُطبع كما هي)
+    const contractFileName = `عقد ترجمة - ${shortName}`;
+    const pdf = req.method === 'POST' ? String(req.body?.pdf || '') : '';
+    const attachments = /^data:application\/pdf;base64,[A-Za-z0-9+/=]+$/.test(pdf)
+      ? [{ name: `${contractFileName}.pdf`, content: pdf }]
+      : [{
+        name: `${contractFileName}.html`,
+        content: `data:text/html;base64,${Buffer.from(renderInterpreterContract({ course, interpreter, sections, config }, { bare: true, canEdit: false }), 'utf8').toString('base64')}`,
+      }];
+    const eml = buildEmlMessage({
+      to,
+      cc,
+      subject: `طلب مراجعة واعتماد عقد مترجم — ${course.name || 'برنامج تدريبي'} — عقد رقم ${facts.contractNo}`,
+      htmlBody: renderLegalReviewEmail({ course, interpreter, config }),
+      attachments: normalizeAttachments(attachments),
+    });
+    return sendEml(res, { eml, course, prefix: 'interpreter-legal-review' });
+  }
+
+  // ── رسالة الإدارة المالية ───────────────────────────────────
+  if (output === 'finance-eml') {
+    const stage = key === 'interpreter_contract' ? 'FIRST' : 'FINAL';
+    const [to, cc] = await Promise.all([setting('interpreter.finance.email.to'), setting('interpreter.finance.email.cc')]);
+    const subject = stage === 'FIRST'
+      ? `طلب صرف الدفعة الأولى لمترجم — ${course.name || 'برنامج تدريبي'}`
+      : `طلب صرف بقية مستحقات مترجم وفق شهادة الإنجاز — ${course.name || 'برنامج تدريبي'}`;
+
+    // طلب بقية المستحقات يُرسل ومعه شهادة الإنجاز: PDF إن حوّلها المتصفح،
+    // وإلا فنسختها المستقلة (تُفتح في أي متصفح وتُطبع كما هي)
+    const attachments = [];
+    if (stage === 'FINAL') {
+      const pdf = req.method === 'POST' ? String(req.body?.pdf || '') : '';
+      if (/^data:application\/pdf;base64,[A-Za-z0-9+/=]+$/.test(pdf)) {
+        attachments.push({ name: `${certFileName}.pdf`, content: pdf });
+      } else {
+        const certHtml = renderInterpreterCertificate({ course, interpreter, sections }, { bare: true, issuedAt });
+        attachments.push({
+          name: `${certFileName}.html`,
+          content: `data:text/html;base64,${Buffer.from(certHtml, 'utf8').toString('base64')}`,
+        });
+      }
+    }
+
+    const eml = buildEmlMessage({
+      to,
+      cc,
+      subject,
+      htmlBody: renderFinancePaymentEmail({ course, interpreter, stage, config }),
+      attachments: normalizeAttachments(attachments),
+    });
+    return sendEml(res, {
+      eml, course, prefix: stage === 'FIRST' ? 'interpreter-finance-first' : 'interpreter-finance-final',
+    });
+  }
+
+  // ── مترجم بتحويل: رسالة بريد جاهزة، لا مستند مطبوع ─────────
+  if (key === 'interpreter_transfer') {
+    const to = await setting('interpreter.transfer.email.to');
+    const eml = buildEmlMessage({
+      to,
+      subject: `طلب صرف مستحقات مترجم — ${course.name || 'برنامج تدريبي'}`,
+      htmlBody: renderInterpreterTransferEmail({ course, interpreter }),
+    });
+    return sendEml(res, { eml, course, prefix: 'interpreter-transfer' });
+  }
+
+  // ── المستندات المطبوعة: صفحة A4 تُعدَّل ثم تُطبع بصيغة PDF ──
+  const canEdit = await permissions.canSubmitElement(req.user, req.activeRole, course);
+  const payload = { course, interpreter, sections, config };
+  const options = { trackingId: id, canEdit, issuedAt };
+
+  let html;
+  if (key === 'interpreter_contract') {
+    html = renderInterpreterContract(payload, options);
+  } else if (key === 'interpreter_advance') {
+    html = renderInterpreterEntitlement(payload, options);
+  } else {
+    html = renderInterpreterCertificate(payload, options);
+  }
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  return res.status(200).send(html);
+}
+
+module.exports = withMethods(['GET', 'POST'], withAuth(handler));
+module.exports.default = module.exports;
+
+module.exports.config = {
+  api: {
+    responseLimit: '12mb',
+    // الشهادة والعقد PDF يصلان من المتصفح ليُرفقا بالرسالة
+    bodyParser: { sizeLimit: '12mb' },
+  },
+};

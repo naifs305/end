@@ -27,7 +27,7 @@ async function handler(req, res) {
     where: { id: trackingId },
     include: {
       element:    { select: { name: true } },
-      executedBy: { select: { id: true, firstName: true, lastName: true } },
+      executor:   { select: { id: true, firstName: true, lastName: true } },
     },
   });
 
@@ -67,7 +67,7 @@ async function handler(req, res) {
       trackingId,
       elementName: tracking.element?.name,
       employeeId,
-      employeeName: `${tracking.executedBy?.firstName} ${tracking.executedBy?.lastName}`,
+      employeeName: `${tracking.executor?.firstName} ${tracking.executor?.lastName}`,
       messageType,
       message: message.trim(),
     },

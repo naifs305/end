@@ -67,6 +67,15 @@ function fmtRelative(t, locale, v) {
   return new Date(v).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+// اسم المشروع كما سُجّل على لقطة تلك الفترة — لا انتماء المنسق اليوم.
+// فالمنسق الذي نُقل يبقى أداؤه الماضي منسوباً لمشروعه الذي كان فيه.
+function projectOf(snap) {
+  return snap?.projectName
+    || snap?.operationalProject?.name
+    || snap?.user?.operationalProject?.name
+    || null;
+}
+
 function initials(firstName, lastName) {
   return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
 }
@@ -89,15 +98,70 @@ const LEVEL_CFG = {
 
 const LEVEL_ORDER = ['OUTSTANDING', 'VERY_GOOD', 'GOOD', 'NEEDS_IMPROVEMENT', 'WEAK'];
 
-// المؤشرات الست — التسميات والتلميحات من الترجمة (kpi.indicators.<key>)
+// المحاور الأربعة (النموذج الثاني) — التسميات والتلميحات من الترجمة (kpi.indicators.<key>)
 const IND_CFG = [
-  { key: 'productivityScore', Icon: Package, weight: 25 },
-  { key: 'timelinessScore',   Icon: Clock,   weight: 20 },
-  { key: 'qualityScore',      Icon: Star,    weight: 20 },
-  { key: 'criticalScore',     Icon: Target,  weight: 20 },
-  { key: 'speedScore',        Icon: Zap,     weight: 10 },
-  { key: 'disciplineScore',   Icon: Shield,  weight: 5  },
+  { key: 'timelinessScore',   Icon: Clock,   weight: 60 },
+  { key: 'productivityScore', Icon: Package, weight: 20 },
+  { key: 'qualityScore',      Icon: Star,    weight: 10 },
+  { key: 'excellenceScore',   Icon: Target,  weight: 10 },
 ];
+
+// ما خسر فيه المنسق نقاطاً — من تفصيل اللقطة
+const LOST_STATUS = {
+  withinMax: 'بعد الموعد المثالي وقبل الأقصى',
+  late: 'بعد الموعد الأقصى',
+  missing: 'لم يُقدَّم وفات موعده الأقصى',
+  lateEntry: 'إدخال الدورة متأخراً بمبرر غير مقبول',
+  closedLate: 'أُقفلت بعد موعد إقفالها',
+  open: 'لم تُقفل وفات موعد إقفالها',
+};
+const AXIS_NAME = { punctuality: 'الالتزام بالمواعيد', quality: 'جودة التنفيذ', closure: 'إقفال الدورات' };
+
+/** «لماذا درجتي هكذا؟» — العناصر والدورات التي نقصت بها الدرجة */
+function WhyMyScore({ snap }) {
+  const [open, setOpen] = useState(false);
+  const b = snap?.breakdown;
+  if (!b) return null;
+  const lost = b.lost || [];
+  const ex = b.excellenceParts || {};
+  return (
+    <div className="border-t border-border/60">
+      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between px-5 py-3 transition hover:bg-background/60">
+        <span className="text-xs font-extrabold text-text-soft">🔎 لماذا درجتي هكذا؟ {lost.length ? `(${lost.length})` : ''}</span>
+        <span className="text-[10px] text-text-soft">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="space-y-3 px-5 pb-5 text-xs">
+          {b.smallSample && <p className="rounded-xl bg-sand/15 px-3 py-2 text-warning">عيّنة صغيرة هذا الشهر — الترتيب يعتمد متوسط آخر ثلاثة أشهر.</p>}
+          {snap.rollingScore != null && <p className="text-text-main">متوسط آخر ثلاثة أشهر: <b>{Number(snap.rollingScore).toFixed(1)}%</b></p>}
+          {lost.length === 0 ? (
+            <p className="text-accent">لم تنقص درجتك في أي عنصر أو دورة هذا الشهر.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {lost.map((l, i) => (
+                <li key={i} className="flex items-start justify-between gap-3 rounded-xl border border-border bg-background/40 px-3 py-2">
+                  <span className="min-w-0">
+                    <span className="font-bold text-text-main">{l.element || l.courseName || AXIS_NAME[l.axis]}</span>
+                    {l.element && l.courseName && <span className="text-text-soft"> — {l.courseName}</span>}
+                    <span className="block text-[11px] text-text-soft">
+                      {AXIS_NAME[l.axis]} · {l.axis === 'quality'
+                        ? (l.rejected ? 'رُفض' : `أُعيد ${l.returned} مرة`)
+                        : LOST_STATUS[l.status] || ''}{l.lateDays ? ` · تأخير ${l.lateDays} يوم` : ''}{l.critical ? ' · عنصر حرج (وزنه مضاعف)' : ''}
+                    </span>
+                  </span>
+                  <span className={`shrink-0 font-extrabold ${scoreColor(Math.max(0, l.score)).text}`}>{l.score < 0 ? l.score : `${l.score}%`}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-text-soft">
+            التميّز والتعاون: نجمة توثيق {ex.documentationStars || 0} · مراجعة شهادات زملاء {ex.certReviews || 0} · تقارير {ex.fieldReports || 0} · تقييم صعوبات الإقفال {ex.closureReviewShare || 0}%
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const INSIGHT_ICON = { positive: CheckCircle2, warning: AlertTriangle, critical: AlertCircle, info: Info };
 const INSIGHT_BG   = {
@@ -167,8 +231,10 @@ function Tip({ text }) {
 
 // ─── IndicatorBar ─────────────────────────────────────────────────────────────
 
-function IndicatorBar({ ind, val, showWeight = false, noData = false }) {
+function IndicatorBar({ ind, val, showWeight = false, noData: noDataProp = false }) {
   const { t } = useTranslation();
+  // محور بلا بيانات هذا الشهر (لا عناصر مستحقة أو لا دورات حان إقفالها) يُعرض «—»
+  const noData = noDataProp || val === null || val === undefined;
   const v   = Math.min(100, Math.max(0, Number(val) || 0));
   const clr = scoreColor(v);
   const Icon = ind.Icon;
@@ -489,7 +555,7 @@ function EmployeeCard({ snap, selected, onSelect }) {
   const lcfg   = LEVEL_CFG[level] || LEVEL_CFG.GOOD;
   const noData = !snap.isSubjectToEvaluation;
   const name   = `${snap.user?.firstName || ''} ${snap.user?.lastName || ''}`.trim();
-  const proj   = snap.user?.operationalProject?.name || '—';
+  const proj   = projectOf(snap) || '—';
   const ini    = initials(snap.user?.firstName, snap.user?.lastName);
 
   return (
@@ -526,17 +592,18 @@ function EmployeeCard({ snap, selected, onSelect }) {
           <div className="flex-1 min-w-0 space-y-1.5">
             {IND_CFG.slice(0, 3).map(ind => {
               const v = Math.min(100, Math.max(0, Number(snap[ind.key]) || 0));
+              const axisEmpty = noData || snap[ind.key] === null || snap[ind.key] === undefined;
               const Icon = ind.Icon;
               return (
                 <div key={ind.key}>
                   <div className="mb-0.5 flex items-center justify-between text-[10px]">
                     <span className="flex items-center gap-1 text-text-soft"><Icon size={12} aria-hidden="true" /> {t(`kpi.indicators.${ind.key}.label`)}</span>
-                    <span className={`font-bold ${scoreColor(v).text}`}>{noData ? '—' : `${Math.round(v)}%`}</span>
+                    <span className={`font-bold ${scoreColor(v).text}`}>{axisEmpty ? '—' : `${Math.round(v)}%`}</span>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-forest-50">
                     <div
                       className={`h-full rounded-full transition-all duration-700 ${scoreColor(v).bar}`}
-                      style={{ width: noData ? '0%' : `${v}%` }}
+                      style={{ width: axisEmpty ? '0%' : `${v}%` }}
                     />
                   </div>
                 </div>
@@ -547,6 +614,11 @@ function EmployeeCard({ snap, selected, onSelect }) {
 
         {/* الشارات السفلية */}
         <div className="flex items-center justify-between border-t border-border pt-2.5">
+          {snap.rollingScore != null && (
+            <span title="الترتيب بمتوسط آخر ثلاثة أشهر" className="rounded-full bg-sand/20 px-2 py-0.5 text-[10px] font-bold text-text-main">
+              متوسط ٣ أشهر {Number(snap.rollingScore).toFixed(0)}%
+            </span>
+          )}
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
             {t('kpi.coursesCount', { count: snap.actualCoursesCount ?? 0 })}
           </span>
@@ -574,40 +646,28 @@ function HowScoreWorks({ snap }) {
 
   const CALC_DETAIL = [
     {
-      key: 'productivityScore', icon: '📦', label: 'الإنتاجية', weight: 25,
-      formula: 'عدد العناصر المُقدَّمة ÷ عدد العناصر المطلوبة × 100',
-      detail:  'يقيس مدى إتمام الموظف لجميع عناصر الإقفال المطلوبة منه. كل عنصر لم يُقدَّم يخفّض الدرجة.',
-      good: '≥ 90% تعني إتمام معظم العناصر في الوقت المطلوب.',
+      key: 'timelinessScore', icon: '🕐', label: 'الالتزام بالمواعيد', weight: 60,
+      formula: 'لكل عنصر مستحق: في المثالي ١٠٠ · حتى الأقصى ٨٠ · ثم تنقص ١٠ عن كل يوم تأخير',
+      detail:  'يقيس تقديم عناصر الإقفال في مواعيدها. العنصر الحرج (التقارير، المستحقات، التسوية، التأمين، الشهادات) وزنه مضاعف. لا يُحتسب العنصر الموقوف أو المعفى، ولا مدة بلاغ العائق، والتمديد يُزيح الموعد.',
+      good: 'التقديم قبل الموعد المثالي يعطي الدرجة كاملة.',
     },
     {
-      key: 'timelinessScore', icon: '🕐', label: 'التوقيت', weight: 20,
-      formula: 'مرجّح: ✓ قبل المثالي = 100% · ⏱ بعد المثالي = 70% · ⚠ بعد الأقصى = 20% أو أقل',
-      detail:  'يقيس الالتزام بمواعيد تقديم العناصر. لكل عنصر موعد مثالي وموعد أقصى — التقديم مبكراً يمنح الدرجة الكاملة.',
-      good: 'تقديم العناصر قبل الموعد المثالي يعطي 100% في هذا المؤشر.',
+      key: 'productivityScore', icon: '📦', label: 'إقفال الدورات', weight: 20,
+      formula: 'لكل دورة حان موعد إقفالها: أُقفلت في موعدها ١٠٠ · ثم تنقص ١٠ عن كل يوم',
+      detail:  'موعد إقفال الدورة هو أبعد موعد أقصى بين عناصرها: بلا سلفة نحو ٥ أيام عمل بعد نهايتها، وبسلفة ١٠ أيام عمل (تسوية السلفة).',
+      good: 'إقفال الدورة كاملة في موعدها يعطي الدرجة كاملة.',
     },
     {
-      key: 'qualityScore', icon: '⭐', label: 'الجودة', weight: 20,
-      formula: 'عدد العناصر المقبولة من أول مرة ÷ إجمالي العناصر المُقدَّمة × 100',
-      detail:  'يقيس جودة التقديم — العناصر التي تُعاد تعكس حاجة للتعديل وتخفّض الدرجة. الإعادة مرتان = تأثير أكبر.',
-      good: 'تجنّب الإعادة تماماً يعني 100% في الجودة.',
+      key: 'qualityScore', icon: '⭐', label: 'جودة التنفيذ', weight: 10,
+      formula: 'المقبول من أول تقديم ١٠٠ · أُعيد مرة ٦٠ · مرتين فأكثر ٣٠ · رُفض صفر',
+      detail:  'يقيس دقة التقديم: كل إعادة أو رفض يدل على حاجة للتصحيح.',
+      good: 'مراجعة العنصر قبل تقديمه تجنّب الإعادة.',
     },
     {
-      key: 'criticalScore', icon: '🎯', label: 'العناصر الحرجة', weight: 20,
-      formula: 'أداء التقارير (الافتتاح، الاختتام، التقييم) والمستحقات والتسويات المالية',
-      detail:  'يركّز على العناصر الأكثر أهمية: تقارير الدورة، الإيرادات، المستحقات، والتسوية. تأخيرها أو إعادتها يخفّض الدرجة بشكل أكبر.',
-      good: 'إتمام التقارير في موعدها يضمن درجة عالية في هذا المؤشر.',
-    },
-    {
-      key: 'speedScore', icon: '⚡', label: 'الاستجابة', weight: 10,
-      formula: 'متوسط الوقت بين إعادة العنصر وإعادة تقديمه — كلما قلّ كان أفضل',
-      detail:  'يقيس سرعة الاستجابة بعد أن يُعيد المشرف عنصراً. الرد خلال 24 ساعة = ممتاز، أكثر من 72 ساعة = يؤثر سلباً.',
-      good: 'إعادة التقديم خلال يوم عمل واحد يعطي الدرجة القصوى.',
-    },
-    {
-      key: 'disciplineScore', icon: '🛡️', label: 'الانضباط', weight: 5,
-      formula: 'غياب العناصر الراكدة (لم تُحرَّك لأكثر من 7 أيام) وغياب التأخر المتكرر',
-      detail:  'يقيس انتظام العمل ومتابعة المهام. وجود عناصر معلّقة لفترة طويلة دون تحريك يخفّض هذا المؤشر.',
-      good: 'متابعة جميع العناصر بانتظام يحافظ على انضباط عالٍ.',
+      key: 'excellenceScore', icon: '🏅', label: 'التميّز والتعاون', weight: 10,
+      formula: 'نجمة التوثيق +٤٠ · مراجعة شهادات زميل +٢٥ · تقرير +١٠ · تقييم صعوبات الإقفال حتى +٣٠ (الحد ١٠٠)',
+      detail:  'يقدّر الجهد الإضافي ومساعدة الزملاء، ولا يُخصم على من لم يفعل.',
+      good: 'وثّق دورتك، وراجع شهادات زملائك، وقيّم صعوبات الإقفال.',
     },
   ];
 
@@ -630,7 +690,7 @@ function HowScoreWorks({ snap }) {
           <div className="rounded-xl bg-primary/5 border border-primary/15 px-4 py-3">
             <p className="text-xs font-extrabold text-primary mb-1">صيغة الدرجة الكلية:</p>
             <p className="text-[11px] text-text-main font-mono leading-relaxed">
-              الدرجة = (الإنتاجية×25%) + (التوقيت×20%) + (الجودة×20%) + (الحرجة×20%) + (الاستجابة×10%) + (الانضباط×5%)
+              الدرجة = (الالتزام×60%) + (الإقفال×20%) + (الجودة×10%) + (التميّز×10%) — وما لا بيانات له يوزَّع وزنه على غيره، ويُرتَّب المنسقون بمتوسط آخر ثلاثة أشهر
             </p>
           </div>
 
@@ -673,8 +733,8 @@ function HowScoreWorks({ snap }) {
                 { range: '90-100%', label: 'متميز',       color: 'bg-forest-50 text-primary border-primary/20' },
                 { range: '80-89%',  label: 'جيد جداً',    color: 'bg-primary-light text-primary border-primary/10' },
                 { range: '70-79%',  label: 'جيد',         color: 'bg-background text-text-main border-border' },
-                { range: '50-69%',  label: 'يحتاج تحسين', color: 'bg-sand/20 text-warning border-sand/40' },
-                { range: '0-49%',   label: 'ضعيف',        color: 'bg-burgundy/10 text-danger border-burgundy/20' },
+                { range: '60-69%',  label: 'يحتاج تحسين', color: 'bg-sand/20 text-warning border-sand/40' },
+                { range: '0-59%',   label: 'ضعيف',        color: 'bg-burgundy/10 text-danger border-burgundy/20' },
               ].map(lv => (
                 <div key={lv.range} className={`rounded-lg border px-2 py-1.5 text-center ${lv.color}`}>
                   <p className="text-[9px] font-bold">{lv.label}</p>
@@ -740,7 +800,7 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
           <CircleGauge score={score} size={56} />
           <div className="min-w-0">
             <h3 className="font-extrabold text-text-main">{name}</h3>
-            <p className="text-xs text-text-soft truncate">{snap.user?.operationalProject?.name} — {snap.periodLabel}</p>
+            <p className="text-xs text-text-soft truncate">{projectOf(snap)} — {snap.periodLabel}</p>
           </div>
           <LevelBadge level={level} size="lg" />
         </div>
@@ -785,6 +845,9 @@ function DetailsPanel({ snap, isManager, onClose, onNoteAdded }) {
             </div>
           </div>
         </div>
+
+        {/* أسباب الدرجة */}
+        {snap.breakdown && <div className="overflow-hidden rounded-xl border border-border bg-white"><WhyMyScore snap={snap} /></div>}
 
         {/* الاتجاه الزمني */}
         {trend && <TrendSparkline trend={trend} />}
@@ -924,7 +987,7 @@ function EmployeePersonalView({ snap, month, year }) {
                 <LevelBadge level={level} noData={noData} size="lg" />
               </div>
               <p className="mb-3 text-xs text-text-soft">
-                {s.user?.operationalProject?.name || t('kpi.noProject')} · {monthName(locale, month, year)} {year}
+                {projectOf(s) || t('kpi.noProject')} · {monthName(locale, month, year)} {year}
               </p>
               {!noData && (
                 <p className="text-sm leading-relaxed text-text-main max-w-lg">
@@ -962,7 +1025,7 @@ function EmployeePersonalView({ snap, month, year }) {
           <div className="border-t border-border px-5 py-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-xs font-extrabold uppercase tracking-wide text-text-soft">
-                تفصيل المؤشرات الست — نتيجتك هذا الشهر
+                تفصيل المحاور الأربعة — نتيجتك هذا الشهر
               </h3>
               <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary">
                 الدرجة الكلية = مجموع (درجة × وزن) لكل مؤشر
@@ -978,6 +1041,7 @@ function EmployeePersonalView({ snap, month, year }) {
 
         {/* شرح طريقة الاحتساب */}
         {!noData && <HowScoreWorks snap={s} />}
+        {!noData && <WhyMyScore snap={s} />}
       </div>
 
       {/* الرادار + الرؤى */}
@@ -1160,7 +1224,7 @@ function MultiPeriodResults({ months, isManager }) {
     : 0;
 
   const projectList = useMemo(() =>
-    [...new Set(data.map(s => s.user?.operationalProject?.name).filter(Boolean))],
+    [...new Set(data.map(s => projectOf(s)).filter(Boolean))],
     [data]
   );
 
@@ -1173,7 +1237,7 @@ function MultiPeriodResults({ months, isManager }) {
   const filtered = useMemo(() => {
     let snaps = levelFilter ? activeSnaps.filter(x => x.performanceLevel === levelFilter) : [...activeSnaps, ...inactiveSnaps];
     if (nameFilter)    snaps = snaps.filter(s => `${s.user?.firstName} ${s.user?.lastName}`.includes(nameFilter));
-    if (projectFilter) snaps = snaps.filter(s => s.user?.operationalProject?.name === projectFilter);
+    if (projectFilter) snaps = snaps.filter(s => projectOf(s) === projectFilter);
     return snaps;
   }, [activeSnaps, inactiveSnaps, levelFilter, nameFilter, projectFilter]);
 
@@ -1268,7 +1332,7 @@ function MultiPeriodResults({ months, isManager }) {
               <tbody className="divide-y divide-border/50">
                 {filtered.map((snap, idx) => {
                   const name  = `${snap.user?.firstName || ''} ${snap.user?.lastName || ''}`.trim();
-                  const proj  = snap.user?.operationalProject?.name || '—';
+                  const proj  = projectOf(snap) || '—';
                   const ini   = initials(snap.user?.firstName, snap.user?.lastName);
                   const score = Number(snap.finalScore ?? 0);
                   const noData = !snap.isSubjectToEvaluation;
@@ -1521,14 +1585,14 @@ export default function KpisPage() {
   }, [activeSnaps, inactiveSnaps]);
 
   const projectList = useMemo(() =>
-    [...new Set(snapshots.map(s => s.user?.operationalProject?.name).filter(Boolean))],
+    [...new Set(snapshots.map(s => projectOf(s)).filter(Boolean))],
     [snapshots],
   );
 
   const filteredSnaps = useMemo(() => {
     let snaps = levelFilter ? activeSnaps.filter(x => x.performanceLevel === levelFilter) : [...activeSnaps, ...inactiveSnaps];
     if (nameFilter)    snaps = snaps.filter(s => `${s.user?.firstName || ''} ${s.user?.lastName || ''}`.includes(nameFilter));
-    if (projectFilter) snaps = snaps.filter(s => s.user?.operationalProject?.name === projectFilter);
+    if (projectFilter) snaps = snaps.filter(s => projectOf(s) === projectFilter);
     return snaps;
   }, [activeSnaps, inactiveSnaps, levelFilter, nameFilter, projectFilter]);
 

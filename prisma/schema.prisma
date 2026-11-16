@@ -74,13 +74,50 @@ enum ChallengeStatus {
   CANCELLED
 }
 
+// =============================================================
+// بلاغات العوائق — سبب التأخر المُعلن مسبقاً
+// -------------------------------------------------------------
+// يرفع المنسق البلاغ وهو منتظر، فتتوقف ساعة العنصر من لحظة
+// الرفع لا من تاريخ يكتبه بيده. والبلاغ المرفوع بعد فوات
+// الموعد لا يؤجّله — وبهذا يُسدّ باب الادّعاء بأثر رجعي.
+// =============================================================
+enum BlockerReason {
+  TRAINER_GRADES       // تأخر تسجيل الدرجات من المدرب
+  TRAINEE_NAMES        // تأخر استلام أسماء المتدربين
+  INSURANCE_SUSPENDED  // إيقاف إصدار التأمين الطبي
+  FINANCE_PENDING      // بانتظار إجراء مالي
+  BENEFICIARY_PENDING  // بانتظار الجهة المستفيدة
+  OTHER
+}
+
+enum BlockerStatus {
+  OPEN       // العائق قائم والساعة متوقفة
+  RESOLVED   // انتهى العائق وعادت الساعة
+  CANCELLED  // سحبه المنسق — لا يُحتسب
+}
+
+enum BlockerCredit {
+  AUTO_APPROVED           // تحت السقف الفصلي — يسري تلقائياً
+  QUOTA_EXCEEDED_PENDING  // تجاوز السقف — بانتظار قرار المدير
+  MANAGER_APPROVED        // اعتمده المدير بعد تجاوز السقف
+  MANAGER_REJECTED        // رفضه المدير — العقوبة قائمة
+}
+
+enum LateEntryStatus {
+  PENDING   // بانتظار نظر المدير
+  ACCEPTED  // مبرر مقبول — لا ملاحظة على المنسق
+  REJECTED  // مبرر مرفوض — تُسجّل نقطة والدورة تبقى
+}
+
 model OperationalProject {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  createdAt   DateTime @default(now())
-  users       User[]
-  courses     Course[]
-  supervisors ProjectSupervisor[]
+  id           String   @id @default(uuid())
+  name         String   @unique
+  createdAt    DateTime @default(now())
+  users        User[]
+  courses      Course[]
+  supervisors  ProjectSupervisor[]
+  // لقطات الأداء المنسوبة لهذا المشروع لحظة التقاطها (تاريخ ثابت لا يتغيّر بنقل المنسقين)
+  kpiSnapshots EmployeeKpiSnapshot[] @relation("KpiSnapshotProject")
 }
 
 model User {
@@ -96,8 +133,14 @@ model User {
   signatureImage       String?
   roles                Role[]
   isActive             Boolean  @default(true)
-  operationalProjectId String
-  operationalProject   OperationalProject @relation(fields: [operationalProjectId], references: [id])
+  // فارغ للمنسق المتعاون: لا ينتمي لمشروع، ومرجعه المدير
+  operationalProjectId String?
+  operationalProject   OperationalProject? @relation(fields: [operationalProjectId], references: [id])
+  // منسق متعاون من خارج موظفي العمليات — يتابعه مشرف يسنده المدير
+  isCollaborator       Boolean  @default(false)
+  followUpSupervisorId String?
+  followUpSupervisor   User?    @relation("FollowUpSupervisor", fields: [followUpSupervisorId], references: [id], onDelete: SetNull)
+  followedCollaborators User[]  @relation("FollowUpSupervisor")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   termsAccepted        Boolean  @default(false)
@@ -131,6 +174,8 @@ model User {
   createdClosureElements ClosureElement[]         @relation("ClosureElementCreator")
   optionalReports      CourseOptionalReport[]     @relation("OptionalReportAuthor")
   fieldReports         FieldReport[]              @relation("FieldReportAuthor")
+  fieldReportComments  FieldReportComment[]       @relation("FieldReportCommentAuthor")
+  closureReviews       ClosureReview[]            @relation("ClosureReviewAuthor")
 
   // ----- علاقة الإشراف على مشاريع تشغيلية -----
   supervisedProjects   ProjectSupervisor[]        @relation("SupervisorUser")
@@ -142,6 +187,87 @@ model User {
   reviewedIdeas        ImprovementIdea[]          @relation("IdeaReviewer")
   ideaSupports         IdeaSupport[]              @relation("IdeaSupportUser")
   pledges              MonthlyPledge[]            @relation("PledgeUser")
+
+  // ----- بلاغات العوائق وفترات الإيقاف والإدخال المتأخر -----
+  raisedBlockers       ElementBlocker[]           @relation("BlockerRaiser")
+  decidedBlockers      ElementBlocker[]           @relation("BlockerDecider")
+  createdSuspensions   ElementSuspension[]        @relation("SuspensionCreator")
+  lateEntryDecisions   Course[]                   @relation("LateEntryDecider")
+  interpreterRecords   CourseInterpreter[]        @relation("InterpreterDataAuthor")
+  interpretersAdded    Interpreter[]              @relation("InterpreterDirectoryAuthor")
+
+  @@index([followUpSupervisorId])
+}
+
+// =============================================================
+// بيانات مترجم الدورة
+// -------------------------------------------------------------
+// تُعبَّأ مرة واحدة لكل دورة، وتخدم مخرجات المترجم الأربعة:
+// العقد، وطلب الصرف بالتحويل، ونموذج الاستحقاق بالسلفة، وشهادة
+// إنجاز الترجمة — فلا يُعاد إدخال الاسم والهوية في كل مستند.
+// بيانات الطرف الأول (الجامعة) ثابتة في قالب المستند لا هنا.
+// =============================================================
+model CourseInterpreter {
+  id          String   @id @default(uuid())
+  courseId    String   @unique
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  fullName    String
+  nationalId  String
+  email       String
+  mobile      String
+  address     String
+  // الجنسية — تُذكر في صدر العقد
+  nationality String?
+  // قيمة المستحق — يحتاجها طلب الصرف ونموذج الاستحقاق
+  amount      Float?
+  // الحساب البنكي — جدول الدفع في العقد ونموذج الاستحقاق المالي
+  bankName    String?
+  bankBranch  String?
+  bankCountry String?
+  iban        String?
+  notes       String?
+
+  createdById String?
+  createdBy   User?    @relation("InterpreterDataAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // المترجم في السجل الذي اختير منه — والبيانات أعلاه نسخة الدورة منه،
+  // فتعديل السجل لاحقاً لا يغيّر عقداً وُقّع
+  interpreterId String?
+  interpreter   Interpreter? @relation(fields: [interpreterId], references: [id], onDelete: SetNull)
+
+  @@index([interpreterId])
+}
+
+// سجل المترجمين — قاعدة واحدة يختار منها المنسق بدل إعادة إدخال
+// البيانات في كل دورة. يديره المدير، ويُضاف إليه تلقائياً كل مترجم
+// جديد يسجّله منسق. البيانات الثابتة وحدها (الشخصية والبنكية)؛
+// أما المتغيّر مع كل تعاقد (المبلغ، المدة، البرنامج) فمكانه الدورة.
+model Interpreter {
+  id          String   @id @default(uuid())
+  fullName    String
+  nationalId  String   @unique
+  nationality String?
+  email       String
+  mobile      String
+  address     String
+  specialty   String?
+  bankName    String?
+  bankBranch  String?
+  bankCountry String?
+  iban        String?
+  notes       String?
+
+  createdById String?
+  createdBy   User?    @relation("InterpreterDirectoryAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  courses     CourseInterpreter[]
+
+  @@index([fullName])
 }
 
 // =============================================================
@@ -191,6 +317,12 @@ model Course {
   // الموظف فعّل التقرير بنفسه تطوّعاً (وليس لكونه إجبارياً) — يُستخدم لمنح تقدير في المؤشرات
   openingReportVoluntary         Boolean      @default(false)
   closingReportVoluntary         Boolean      @default(false)
+
+  // ----- مترجم الدورة -----
+  // اختياري: المنسق يحدده عند إضافة الدورة. ونوع التعاقد يحدد العنصر
+  // المطلوب منه: عقد، أو طلب صرف بتحويل، أو نموذج استحقاق بسلفة.
+  requiresInterpreter            Boolean      @default(false)
+  interpreterContractType        String?      // CONTRACT | TRANSFER | ADVANCE
   status                         CourseStatus @default(PREPARATION)
 
   operationalProjectId           String
@@ -205,6 +337,26 @@ model Course {
   fieldReports                   FieldReport[]
   auditLogs                      AuditLog[]
   messages                       Message[]
+  blockers                       ElementBlocker[]
+  interpreter                    CourseInterpreter?
+  // توثيق الدورة — عنصر تميّز اختياري (لا يدخل في الإقفال ولا يُخصم بغيابه)
+  documentation                  CourseDocumentation?
+  // تقييم صعوبات الإقفال — يقيّم به المنسق الإدارات الأخرى بعد إقفال الدورة
+  closureReview                  ClosureReview?
+
+  // ----- الإدخال المتأخر للدورة -----
+  // المنصة تكتشف التأخير بنفسها (مقارنة لحظة الإدخال بتواريخ الدورة)
+  // فلا يستطيع المنسق الكذب فيه. والمبرر وحده هو ما ينظر فيه المدير.
+  isLateEntry                    Boolean          @default(false)
+  lateEntryHours                 Int?             // مقدار التأخير بالساعات — للتدريج
+  lateEntryReason                String?          // مبرر المنسق (إلزامي عند التأخر)
+  lateEntryStatus                LateEntryStatus?
+  lateEntryDecidedById           String?
+  lateEntryDecidedBy             User?            @relation("LateEntryDecider", fields: [lateEntryDecidedById], references: [id], onDelete: SetNull)
+  lateEntryDecidedAt             DateTime?
+  lateEntryDecisionNote          String?
+  // لحظة إدخال الدورة — مرجع استثناء العناصر التي فات موعدها قبلها
+  entryBaselineAt                DateTime?
 
   createdAt                      DateTime @default(now())
   updatedAt                      DateTime @updatedAt
@@ -214,6 +366,7 @@ model Course {
   @@index([operationalProjectId])
   @@index([primaryEmployeeId])
   @@index([status])
+  @@index([isLateEntry, lateEntryStatus])
 }
 
 // تقارير اختيارية — متعددة لكل دورة, لا تؤثر على KPI سلباً
@@ -252,9 +405,76 @@ model FieldReport {
   author    User     @relation("FieldReportAuthor", fields: [authorId], references: [id])
   formData  Json
   createdAt DateTime @default(now())
+  comments  FieldReportComment[]
 
   @@index([courseId])
   @@index([authorId])
+}
+
+// تعليقات الزملاء على التقرير الميداني — ليُتلافى ما لوحظ في الدورات القادمة
+model FieldReportComment {
+  id        String      @id @default(uuid())
+  reportId  String
+  report    FieldReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User        @relation("FieldReportCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime    @default(now())
+
+  @@index([reportId, createdAt])
+}
+
+// تقييم صعوبات الإقفال: بعد إقفال الدورة يسجّل المنسق ما واجهه من الإدارات
+// الأخرى (تأخر أسماء المتدربين، معلومات المدربين…)، فيُبنى منه مؤشر أداء الإدارات.
+model ClosureReview {
+  id        String            @id @default(uuid())
+  courseId  String            @unique
+  course    Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?             @relation("ClosureReviewAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  noIssues  Boolean           @default(false)
+  note      String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  issues    DepartmentIssue[]
+
+  @@index([createdAt])
+}
+
+model DepartmentIssue {
+  id         String        @id @default(uuid())
+  reviewId   String
+  review     ClosureReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  courseId   String
+  department String        // مفتاح الإدارة من القائمة (business_dev …)
+  issueType  String        // مفتاح نوع الصعوبة داخل الإدارة
+  impact     String        @default("MEDIUM") // LOW | MEDIUM | HIGH
+  delayDays  Int?
+  note       String?
+  // كيف تجاوزها المنسق — خبرة تُنقل لزملائه في «مساعد التنفيذ»
+  resolution String?
+  // موضع الصعوبة إن كانت في مقر التنفيذ (بطء الإنترنت، القاعة…)
+  country    String?
+  city       String?
+  venue      String?
+  createdAt  DateTime      @default(now())
+
+  @@index([department, createdAt])
+  @@index([courseId])
+}
+
+// صعوبات أضافها المنسقون بأنفسهم — تصير خياراً لمن بعدهم في القائمة نفسها
+model IssueType {
+  id          String   @id @default(uuid())
+  department  String
+  key         String   @unique // c_xxxxxxxx
+  label       String
+  usageCount  Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@unique([department, label])
 }
 
 model ClosureElement {
@@ -277,6 +497,36 @@ model ClosureElement {
   createdAt              DateTime @default(now())
 
   courseClosureTrackings CourseClosureTracking[]
+  suspensions            ElementSuspension[]
+}
+
+// =============================================================
+// فترات إيقاف عنصر إقفال — قرار مؤسسي بتاريخ
+// -------------------------------------------------------------
+// مثال: إيقاف إصدار التأمين الطبي من تاريخ كذا إلى إشعار آخر.
+// كل دورة تبدأ داخل الفترة يسقط عنها العنصر تلقائياً ولا يُحتسب،
+// والدورات المفتوحة حالياً تُحدَّث معها. والمنسق لا يفعل شيئاً —
+// فلا نسيان ولا خطأ ولا تلاعب، والسجل يبيّن سبب السقوط بعد سنوات.
+// =============================================================
+model ElementSuspension {
+  id          String   @id @default(uuid())
+  elementId   String
+  element     ClosureElement @relation(fields: [elementId], references: [id], onDelete: Cascade)
+
+  startsAt    DateTime
+  endsAt      DateTime?  // فارغ = إلى إشعار آخر
+  reason      String
+  isActive    Boolean  @default(true)
+
+  createdById String?
+  createdBy   User?    @relation("SuspensionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trackings   CourseClosureTracking[]
+
+  @@index([elementId, isActive])
+  @@index([startsAt, endsAt])
 }
 
 model CourseClosureTracking {
@@ -310,6 +560,14 @@ model CourseClosureTracking {
   overriddenById       String?
   overriddenBy         User?     @relation("ElementOverrider", fields: [overriddenById], references: [id], onDelete: SetNull)
 
+  // سقوط العنصر بفترة إيقاف مؤسسية (لا بإعفاء يدوي من المدير)
+  // نحتفظ بالمرجع لنعيد العنصر وحده عند انتهاء الإيقاف، بلا أن
+  // نمسّ ما أعفاه المدير بقراره.
+  suspensionId    String?
+  suspension      ElementSuspension? @relation(fields: [suspensionId], references: [id], onDelete: SetNull)
+
+  blockers        ElementBlocker[]
+
   course          Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   element         ClosureElement @relation(fields: [elementId], references: [id])
 
@@ -318,6 +576,57 @@ model CourseClosureTracking {
   @@index([executedById])
   @@index([decidedById])
   @@index([elementId])
+  @@index([suspensionId])
+}
+
+// =============================================================
+// بلاغ عائق على عنصر إقفال
+// -------------------------------------------------------------
+// البلاغ يسري بمجرد رفعه (لا يعتمده أحد) ما دام المنسق تحت
+// سقفه الفصلي — فلا يتوقف الإنصاف على اجتهاد مُراجِع. وهو
+// منشور ومنسوب لجهة بالاسم، فالحارس عليه هو الجهة المتّهمة
+// لا المُراجِع. ومَن تجاوز سقفه وصل إلى مكتب المدير وحده.
+// =============================================================
+model ElementBlocker {
+  id             String        @id @default(uuid())
+  trackingId     String
+  tracking       CourseClosureTracking @relation(fields: [trackingId], references: [id], onDelete: Cascade)
+  // مكرَّر عن قصد: التقارير الأسبوعية والمقارنات تستعلم بالدورة مباشرة
+  courseId       String
+  course         Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  raisedById     String
+  raisedBy       User          @relation("BlockerRaiser", fields: [raisedById], references: [id])
+
+  reason         BlockerReason
+  awaitedParty   String        // الجهة المنتظَرة بالاسم — "المدرب فلان" / "إدارة تطوير الأعمال"
+  details        String
+
+  raisedAt       DateTime      @default(now())
+  resolvedAt     DateTime?
+  status         BlockerStatus @default(OPEN)
+
+  // ── الاحتساب في المؤشرات ──
+  isCredited     Boolean       @default(true)
+  credit         BlockerCredit @default(AUTO_APPROVED)
+  quarterKey     String        // الفصل الذي يُحتسب منه السقف — مثل 2026-Q4
+
+  decidedById    String?
+  decidedBy      User?         @relation("BlockerDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt      DateTime?
+  decisionNote   String?
+
+  // آخر مرة أُدرج فيها في القائمة الأسبوعية المُرسلة للجهة المنتظَرة
+  lastNotifiedAt DateTime?
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([trackingId])
+  @@index([courseId])
+  @@index([raisedById, quarterKey])
+  @@index([status])
+  @@index([reason, status])
 }
 
 model AuditLog {
@@ -479,8 +788,24 @@ model EmployeeKpiSnapshot {
   speedScore                       Float               @default(0)
   disciplineScore                  Float               @default(0)
   reportBonusScore                 Float               @default(0)  // مكافأة تقديم التقارير (+0 إلى +5)
+  excellenceBonus                  Float               @default(0)  // مكافأة توثيق الدورات المميّز (+٣ لكل دورة، حد +٦)
   finalScore                       Float               @default(0)
+
+  // ----- النموذج الثاني: أربعة محاور -----
+  // timelinessScore = الالتزام بالمواعيد · qualityScore = جودة التنفيذ
+  // productivityScore = إقفال الدورات · excellenceScore = التميّز والتعاون
+  excellenceScore                  Float               @default(0)
+  rollingScore                     Float?              // متوسط آخر ثلاثة أشهر — يُرتَّب به
+  isSubjectToEvaluation            Boolean             @default(true)
+  modelVersion                     Int                 @default(1)
+  breakdown                        Json?               // أسباب الدرجة: ما خسر فيه نقاطاً
   performanceLevel                 PerformanceLevel    @default(GOOD)
+
+  // ----- المشروع التشغيلي لحظة التقاط اللقطة -----
+  // يُسجَّل مع اللقطة نفسها، فيبقى أداء الشهر منسوباً للمشروع الذي كان
+  // المنسق يعمل فيه فعلاً، ولا يغيّره أي نقل لاحق بين المشاريع.
+  operationalProjectId             String?
+  operationalProject               OperationalProject? @relation("KpiSnapshotProject", fields: [operationalProjectId], references: [id], onDelete: SetNull)
 
   settingsId                       String?
   settings                         EmployeeKpiSetting? @relation(fields: [settingsId], references: [id], onDelete: SetNull)
@@ -494,6 +819,7 @@ model EmployeeKpiSnapshot {
   @@unique([userId, periodType, periodLabel])
   @@index([periodType, periodStart, periodEnd])
   @@index([finalScore])
+  @@index([periodType, periodLabel, operationalProjectId])
 }
 
 model EmployeeKpiNote {
@@ -707,4 +1033,103 @@ model AppSetting {
   createdAt DateTime @default(now())
 
   @@index([category])
+}
+
+// =============================================================
+// توثيق الدورة — عنصر التميّز
+// -------------------------------------------------------------
+// اختياري في كل دورة: من وثّق دورته بالحد الأدنى من الجودة ونشرها
+// نال «نجمة تميّز» ودرجات إضافية في مؤشره، ومن لم يوثّق لا يُخصم
+// عليه شيء. وبيانات الدورة (اسمها وتواريخها ومكانها ومنسقها) تُقرأ
+// من الدورة نفسها، فلا تُدخل مرتين.
+// الصور تُحفظ في مخزن ملفات المنصة (lib/storage/mediaStore)، وهنا
+// مراجعها وترتيبها وتعليقاتها.
+// =============================================================
+model CourseDocumentation {
+  id            String    @id @default(uuid())
+  courseId      String    @unique
+  course        Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  status        String    @default("DRAFT") // DRAFT | PUBLISHED
+  slug          String?   @unique           // رابط المجلة العام (عشوائي لا يُخمَّن)
+  intro         String?
+  closing       String?
+  coverMediaId  String?
+  format        String    @default("A4") // A4 | SQUARE — مقاس المجلة
+  welcome       String?   // كلمة ترحيب اختيارية في أول المجلة
+  patronage     String?   // عبارة الإشراف أو الشراكة على الغلاف (اختيارية)
+  logos         Json?     // شعارات الشركاء بجوار شعار الجامعة [{ preset } أو { key, name }]
+  featured      Boolean   @default(false) // «إصدار مميّز» يمنحه المدير في مكتبة الإصدارات
+  featuredAt    DateTime?
+  sections      Json?     // الأقسام الظاهرة في المجلة والتقرير { gallery: false, … } — الغائب ظاهر
+  publishedAt   DateTime?
+  publishedById String?
+  starAwarded   Boolean   @default(false)
+  starAwardedAt DateTime?
+  views         Int       @default(0)
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // التقرير الفني للقيادات وجهة التدريب
+  reportSummary   String?
+  recommendations String?
+
+  media         DocumentationMedia[]
+  sessions      DocumentationSession[]
+  trainees      DocumentationTrainee[]
+
+  @@index([status])
+  @@index([status, publishedAt])
+}
+
+model DocumentationMedia {
+  id              String              @id @default(uuid())
+  documentationId String
+  documentation   CourseDocumentation @relation(fields: [documentationId], references: [id], onDelete: Cascade)
+  fileKey         String              // النسخة المعروضة (WebP حتى ٢٠٠٠ نقطة)
+  thumbKey        String              // المصغّرة
+  width           Int
+  height          Int
+  size            Int
+  caption         String?
+  // تعديل لا يمسّ الأصل: موضع التركيز والتقريب والفلتر (يُطبَّق عند العرض)
+  edit            Json?
+  sortOrder       Int                 @default(0)
+  uploadedById    String?
+  createdAt       DateTime            @default(now())
+
+  @@index([documentationId, sortOrder])
+}
+
+model DocumentationSession {
+  id              String              @id @default(uuid())
+  documentationId String
+  documentation   CourseDocumentation @relation(fields: [documentationId], references: [id], onDelete: Cascade)
+  title           String
+  presenter       String?
+  date            DateTime?
+  time            String?
+  description     String?
+  // صور الجلسة من صور التوثيق (حتى ٤) — تظهر معها في المجلة
+  photoIds        String[]            @default([])
+  sortOrder       Int                 @default(0)
+
+  @@index([documentationId, sortOrder])
+}
+
+// متدربو الدورة في التقرير الفني: صورهم ودرجاتهم وما تميّزوا به.
+// لا تظهر في المجلة العامة — التقرير يُستخرج من داخل المنصة وحدها.
+model DocumentationTrainee {
+  id              String              @id @default(uuid())
+  documentationId String
+  documentation   CourseDocumentation @relation(fields: [documentationId], references: [id], onDelete: Cascade)
+  name            String
+  entity          String?             // جهة المتدرب أو دولته
+  score           Float?
+  distinction     String?             // بماذا تميّز
+  isDistinguished Boolean             @default(false)
+  photoKey        String?
+  sortOrder       Int                 @default(0)
+
+  @@index([documentationId, sortOrder])
 }

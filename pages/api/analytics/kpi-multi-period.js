@@ -29,24 +29,41 @@ async function handler(req, res) {
 
   // فلتر المستخدمين حسب الدور
   let userFilter = { isActive: true };
+  let supervisedProjectIds = null;
   if (activeRole === 'PROJECT_SUPERVISOR') {
     const supervised = await prisma.operationalProject.findMany({
       where: { supervisors: { some: { id: user.id } } },
       select: { id: true },
     });
     const pids = supervised.map(p => p.id);
+    supervisedProjectIds = pids;
     userFilter = { isActive: true, operationalProjectId: { in: pids } };
   }
 
   // جلب جميع اللقطات للشهور المحددة
+  // نطاق المشرف يُقاس بمشروع اللقطة لا بانتماء المنسق اليوم،
+  // واللقطات القديمة التي لا مشروع عليها تُقاس بالانتماء الحالي
   const snapshots = await prisma.employeeKpiSnapshot.findMany({
     where: {
       periodType: 'MONTHLY',
       periodLabel: { in: months },
-      user: userFilter,
+      // مدير الإدارة لا يُقيَّم منسقاً فلا يدخل المؤشرات
+      user: { AND: [supervisedProjectIds ? { isActive: true } : (userFilter || {}), { NOT: { roles: { has: 'MANAGER' } } }] },
+      ...(supervisedProjectIds
+        ? {
+            OR: [
+              { operationalProjectId: { in: supervisedProjectIds } },
+              {
+                operationalProjectId: null,
+                user: { operationalProjectId: { in: supervisedProjectIds } },
+              },
+            ],
+          }
+        : {}),
     },
     include: {
       user: { include: { operationalProject: true } },
+      operationalProject: { select: { id: true, name: true } },
     },
     orderBy: { periodLabel: 'asc' },
   });
@@ -121,7 +138,7 @@ async function handler(req, res) {
 
   // أضف الموظفين الذين لا توجد لهم لقطات أصلاً في هذه الشهور
   const allUsers = await prisma.user.findMany({
-    where: { ...userFilter },
+    where: { ...userFilter, NOT: { roles: { has: 'MANAGER' } } },
     select: { id: true, firstName: true, lastName: true, operationalProject: { select: { id: true, name: true } } },
   });
   const existingIds = new Set(byUser.keys());

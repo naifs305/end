@@ -1,6 +1,10 @@
 ﻿// مركز التحفيز — 4 أدوات تحفيزية
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import MainLayout from '../components/layout/MainLayout';
+import CoverCard from '../components/documentation/CoverCard';
+import Avatar from '../components/shared/Avatar';
+import { filterDefsMarkup } from '../lib/documentation/photoLook';
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 import toast from 'react-hot-toast';
@@ -27,6 +31,7 @@ import {
   Check,
   X,
   Circle,
+  BookOpen,
 } from 'lucide-react';
 import { useTranslation } from '../lib/i18n';
 
@@ -859,11 +864,73 @@ function PledgeSection({ isManager, currentUser, users, t, intl }) {
 
 // ─── الصفحة الرئيسية ─────────────────────────────────────────────────────────
 
+// ── التوثيق: المجلات المنشورة حافزاً — لوحة الموثّقين والإصدارات المميّزة ──
+const FILTER_DEFS = filterDefsMarkup();
+function DocumentationSection({ isManager }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    api.get('/documentation/library').then((r) => { if (alive) setData(r?.data?.data ?? r?.data); }).catch(() => setData({ items: [] }));
+    return () => { alive = false; };
+  }, []);
+  if (!data) return <Spinner />;
+  const items = data.items || [];
+  const board = Object.values(items.reduce((acc, x) => {
+    const c = x.coordinator; if (!c) return acc;
+    acc[c.id] = acc[c.id] || { user: c, count: 0, featured: 0, views: 0 };
+    acc[c.id].count += 1; if (x.featured) acc[c.id].featured += 1; acc[c.id].views += x.views || 0;
+    return acc;
+  }, {})).sort((a, b) => (b.featured - a.featured) || (b.count - a.count) || (b.views - a.views)).slice(0, 8);
+  const featured = items.filter((x) => x.featured).slice(0, 4);
+  const latest = items.filter((x) => !x.featured).slice(0, 4);
+  const toAr = (n) => String(n ?? '').replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d]);
+  return (
+    <div className="space-y-4">
+      <div aria-hidden="true" dangerouslySetInnerHTML={{ __html: FILTER_DEFS }} />
+      <div className="rounded-2xl border border-[#C6AA76]/40 bg-gradient-to-l from-[#fffaf0] to-white p-5 shadow-card">
+        <p className="inline-flex items-center gap-2 text-base font-extrabold text-text-main"><Award size={18} aria-hidden="true" className="text-warning" /> لوحة الموثّقين</p>
+        <p className="mb-3 text-xs text-text-soft">من وثّق دورته ونشرها ينال نجمة تميّز ودرجات إضافية — والإصدارات المميّزة يختارها المدير.</p>
+        {board.length === 0 ? (
+          <p className="py-6 text-center text-sm text-text-soft">لا مجلات منشورة بعد — كن أول من يوثّق دورته.</p>
+        ) : (
+          <ol className="grid gap-2 sm:grid-cols-2">
+            {board.map((r, i) => (
+              <li key={r.user.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${i === 0 ? 'border-[#C6AA76] bg-[#fbf3e3]' : 'border-border bg-white'}`}>
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold ${i === 0 ? 'bg-[#C6AA76] text-[#0b3f42]' : 'bg-background text-text-soft'}`}>{toAr(i + 1)}</span>
+                <Avatar user={r.user} size={32} />
+                <span className="min-w-0 flex-1 truncate text-sm font-bold text-text-main">{r.user.firstName} {r.user.lastName}</span>
+                <span className="text-xs text-text-soft"><b className="text-primary">{toAr(r.count)}</b> مجلة</span>
+                {r.featured > 0 && <span className="inline-flex items-center gap-0.5 rounded-full bg-[#C6AA76] px-2 py-0.5 text-[11px] font-extrabold text-[#0b3f42]"><Star size={11} fill="currentColor" aria-hidden="true" /> {toAr(r.featured)}</span>}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+      {featured.length > 0 && (
+        <div>
+          <p className="mb-2 text-sm font-extrabold text-text-main">★ الإصدارات المميّزة</p>
+          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-4">{featured.map((x) => <CoverCard key={x.slug} item={x} canFeature={false} onFeature={() => {}} />)}</ul>
+        </div>
+      )}
+      {latest.length > 0 && (
+        <div>
+          <p className="mb-2 text-sm font-extrabold text-text-main">أحدث المجلات</p>
+          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-4">{latest.map((x) => <CoverCard key={x.slug} item={x} canFeature={false} onFeature={() => {}} />)}</ul>
+        </div>
+      )}
+      <Link href="/library" className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary-dark">
+        مكتبة الإصدارات كاملة{isManager ? ' — وتمييز الإصدارات' : ''}
+      </Link>
+    </div>
+  );
+}
+
 const TABS = [
   { key:'badges',    Icon: Award },
   { key:'ideas',     Icon: Lightbulb },
   { key:'challenge', Icon: Target },
   { key:'pledge',    Icon: CalendarDays },
+  { key:'documentation', Icon: BookOpen },
 ];
 
 export default function MotivationPage() {
@@ -899,12 +966,13 @@ export default function MotivationPage() {
               <Sparkles size={24} aria-hidden="true" /> {t('motivation.title')}
             </h1>
             <p className="text-sm opacity-80 mb-4">{t('motivation.subtitle', { month: monthName })}</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               {[
                 { Icon: Award,        label:t('motivation.tabs.badges'),    desc:t('motivation.bannerBadges') },
                 { Icon: Lightbulb,    label:t('motivation.tabs.ideas'),     desc:t('motivation.bannerIdeas') },
                 { Icon: Target,       label:t('motivation.tabs.challenge'), desc:t('motivation.bannerChallenge') },
                 { Icon: CalendarDays, label:t('motivation.tabs.pledge'),    desc:t('motivation.bannerPledge') },
+                { Icon: BookOpen,     label:t('motivation.tabs.documentation'), desc:t('motivation.bannerDocumentation') },
               ].map(item => {
                 const ItemIcon = item.Icon;
                 return (
@@ -944,6 +1012,7 @@ export default function MotivationPage() {
         {tab === 'badges'    && <BadgesSection   isManager={isManager||isSupervisor} currentUser={user} users={users} t={t} intl={intl} />}
         {tab === 'ideas'     && <IdeasSection    isManager={isManager||isSupervisor} currentUser={user} t={t} intl={intl} />}
         {tab === 'challenge' && <ChallengeSection isManager={isManager}              currentUser={user} t={t} intl={intl} />}
+        {tab === 'documentation' && <DocumentationSection isManager={isManager} />}
         {tab === 'pledge'    && <PledgeSection   isManager={isManager}               currentUser={user} users={users} t={t} intl={intl} />}
 
       </div>
