@@ -451,10 +451,30 @@ model DepartmentIssue {
   impact     String        @default("MEDIUM") // LOW | MEDIUM | HIGH
   delayDays  Int?
   note       String?
+  // كيف تجاوزها المنسق — خبرة تُنقل لزملائه في «مساعد التنفيذ»
+  resolution String?
+  // موضع الصعوبة إن كانت في مقر التنفيذ (بطء الإنترنت، القاعة…)
+  country    String?
+  city       String?
+  venue      String?
   createdAt  DateTime      @default(now())
 
   @@index([department, createdAt])
   @@index([courseId])
+}
+
+// صعوبات أضافها المنسقون بأنفسهم — تصير خياراً لمن بعدهم في القائمة نفسها
+model IssueType {
+  id          String   @id @default(uuid())
+  department  String
+  key         String   @unique // c_xxxxxxxx
+  label       String
+  usageCount  Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@unique([department, label])
 }
 
 model ClosureElement {

@@ -12,12 +12,19 @@ import api from '../../lib/axios';
 
 const unwrap = (r) => r?.data?.data ?? r?.data;
 
-// تقييم مجمّع لكل إدارة: أنواعها المختارة، وأثر واحد، وأيام تأخير، وملاحظة
+// تقييم مجمّع لكل إدارة: أنواعها المختارة، وأثر واحد، وأيام تأخير، وملاحظة،
+// وكيف تجاوزها المنسق، وموضعها إن كانت في مقر التنفيذ
+// القائمة تُنشأ جديدة لكل إدارة — لا تُشارك بين الإدارات
+const emptyGroup = () => ({ types: [], labels: [], newLabel: '', impact: 'MEDIUM', delayDays: '', note: '', resolution: '', country: '', city: '', venue: '' });
 function toGroups(issues = []) {
   const g = {};
   for (const i of issues) {
-    g[i.department] = g[i.department] || { types: [], impact: i.impact || 'MEDIUM', delayDays: i.delayDays ?? '', note: i.note || '' };
+    g[i.department] = g[i.department] || {
+      ...emptyGroup(), impact: i.impact || 'MEDIUM', delayDays: i.delayDays ?? '', note: i.note || '', resolution: i.resolution || '',
+      country: i.country || '', city: i.city || '', venue: i.venue || '',
+    };
     g[i.department].types.push(i.issueType);
+    g[i.department].labels.push(i.issueLabel || i.issueType);
   }
   return g;
 }
@@ -52,7 +59,7 @@ export default function ClosureReviewCard({ courseId }) {
 
   const toggleDep = (key) => setGroups((g) => {
     const next = { ...g };
-    if (next[key]) delete next[key]; else next[key] = { types: [], impact: 'MEDIUM', delayDays: '', note: '' };
+    if (next[key]) delete next[key]; else next[key] = { ...emptyGroup(), city: deps.find((d) => d.key === key)?.location ? (data.course?.city || '') : '' };
     return next;
   });
   const setGroup = (key, patch) => setGroups((g) => ({ ...g, [key]: { ...g[key], ...patch } }));
@@ -63,13 +70,21 @@ export default function ClosureReviewCard({ courseId }) {
 
   const save = async () => {
     const issues = mode === 'issues'
-      ? Object.entries(groups).flatMap(([department, x]) => x.types.map((issueType) => ({ department, issueType, impact: x.impact, delayDays: x.delayDays, note: x.note })))
+      ? Object.entries(groups).flatMap(([department, x]) => {
+        const base = { department, impact: x.impact, delayDays: x.delayDays, note: x.note, resolution: x.resolution, country: x.country, city: x.city, venue: x.venue };
+        const chosen = x.types.map((issueType) => ({ ...base, issueType }));
+        // صعوبة لم تُذكر: تُضاف لقائمة الصعوبات فيجدها المنسق التالي
+        if (x.newLabel.trim().length >= 4) chosen.push({ ...base, issueType: 'new', newLabel: x.newLabel.trim() });
+        return chosen;
+      })
       : [];
-    if (mode === 'issues' && !issues.length) { toast.error('اختر الإدارة ونوع الصعوبة'); return; }
+    if (mode === 'issues' && !issues.length) { toast.error('اختر الإدارة ونوع الصعوبة، أو اكتب صعوبة جديدة'); return; }
     setSaving(true);
     try {
       const d = unwrap(await api.put(`/courses/${courseId}/closure-review`, { noIssues: mode === 'none', note, issues }));
       setData(d);
+      // الصعوبة الجديدة صارت نوعاً في القائمة: تُعاد المجموعات من المحفوظ
+      setGroups(d.review ? toGroups(d.review.issues) : {});
       setEditing(false);
       toast.success('شكراً — سُجّل تقييمك');
     } catch (e) {
@@ -103,9 +118,11 @@ export default function ClosureReviewCard({ courseId }) {
               {Object.entries(toGroups(review.issues)).map(([dep, g]) => (
                 <li key={dep} className="rounded-xl border border-border px-3 py-2.5 text-sm">
                   <p className="font-extrabold text-text-main">{deps.find((d) => d.key === dep)?.name || dep}</p>
-                  <p className="text-text-soft">{g.types.map((t) => deps.find((d) => d.key === dep)?.issues.find((i) => i.key === t)?.label || t).join('، ')}
+                  <p className="text-text-soft">{g.labels.join('، ')}
                     {' · '}أثر {catalog.impacts.find((i) => i.key === g.impact)?.label}{g.delayDays !== '' && g.delayDays !== null ? ` · تأخير ${g.delayDays} يوم` : ''}</p>
+                  {(g.venue || g.city || g.country) && <p className="mt-0.5 text-xs text-text-soft">📍 {[g.venue, g.city, g.country].filter(Boolean).join('، ')}</p>}
                   {g.note && <p className="mt-0.5 text-xs text-text-soft">«{g.note}»</p>}
+                  {g.resolution && <p className="mt-0.5 text-xs text-primary">✔ تجاوزها بـ: {g.resolution}</p>}
                 </li>
               ))}
             </ul>
@@ -146,13 +163,29 @@ export default function ClosureReviewCard({ courseId }) {
                   <div key={key} className="space-y-3 rounded-2xl border border-border bg-background/60 p-4">
                     <p className="text-sm font-extrabold text-text-main">{dep?.name}</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {dep?.issues.map((i) => (
-                        <button key={i.key} type="button" onClick={() => toggleType(key, i.key)} aria-pressed={g.types.includes(i.key)}
+                      {dep?.issues.filter((i) => i.key !== 'other' || g.types.includes('other')).map((i) => (
+                        <button key={i.key} type="button" onClick={() => toggleType(key, i.key)} aria-pressed={g.types.includes(i.key)} title={i.custom ? `أضافها زميل — اختيرت ${i.uses || 1} مرة` : ''}
                           className={`rounded-full border px-3 py-1.5 text-xs font-bold ${g.types.includes(i.key) ? 'border-primary bg-primary text-white' : 'border-border bg-white text-text-main hover:border-primary/40'}`}>
-                          {i.label}
+                          {i.label}{i.custom && <span className={`ms-1 text-[10px] ${g.types.includes(i.key) ? 'text-white/80' : 'text-warning'}`}>✦</span>}
                         </button>
                       ))}
                     </div>
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-bold text-text-soft">صعوبة لم تُذكر؟ اكتبها — تُضاف للقائمة فيجدها زملاؤك بعدك</span>
+                      <input value={g.newLabel} maxLength={120} onChange={(e) => setGroup(key, { newLabel: e.target.value })} placeholder="مثال: تأخر موافقة المعالي من مكتب الوكيل"
+                        className="w-full rounded-xl border border-dashed border-border bg-white px-3 py-1.5 text-sm outline-none focus:border-primary" />
+                    </label>
+                    {dep?.location && (
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        {[['country', 'الدولة', 'إسبانيا'], ['city', 'المدينة', 'مدريد'], ['venue', 'مقر التنفيذ', 'اسم الفندق أو المركز']].map(([f, l, ph]) => (
+                          <label key={f} className="block">
+                            <span className="mb-1 block text-[11px] font-bold text-text-soft">{l}</span>
+                            <input value={g[f]} maxLength={120} onChange={(e) => setGroup(key, { [f]: e.target.value })} placeholder={ph}
+                              className="w-full rounded-xl border border-border bg-white px-3 py-1.5 text-sm outline-none focus:border-primary" />
+                          </label>
+                        ))}
+                      </div>
+                    )}
                     <div className="grid gap-3 sm:grid-cols-[auto_120px_1fr] sm:items-end">
                       <div>
                         <p className="mb-1 text-[11px] font-bold text-text-soft">أثرها على الإقفال</p>
@@ -176,6 +209,11 @@ export default function ClosureReviewCard({ courseId }) {
                           className="w-full rounded-xl border border-border bg-white px-3 py-1.5 text-sm outline-none focus:border-primary" />
                       </label>
                     </div>
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-bold text-text-soft">كيف تجاوزتها؟ <span className="font-normal">— اختياري، وتنفع زملاءك في «مساعد التنفيذ»</span></span>
+                      <input value={g.resolution} maxLength={500} onChange={(e) => setGroup(key, { resolution: e.target.value })} placeholder="مثال: نسّقنا مع الفندق لتوفير خط إنترنت مستقل للقاعة"
+                        className="w-full rounded-xl border border-border bg-white px-3 py-1.5 text-sm outline-none focus:border-primary" />
+                    </label>
                   </div>
                 );
               })}

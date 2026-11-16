@@ -398,7 +398,8 @@
     "jobs": "Scheduled Jobs",
     "audit": "Audit Log",
     "profile": "Profile",
-    "settings": "Operational settings"
+    "settings": "Operational settings",
+    "assistant": "Execution Assistant"
   },
   "auth": {
     "loginTitle": "Sign In",

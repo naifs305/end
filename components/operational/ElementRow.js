@@ -15,6 +15,7 @@ import {
   FileText,
   Languages,
   UserRound,
+  Map as MapIcon,
 } from 'lucide-react';
 import api from '../../lib/axios';
 import toast from 'react-hot-toast';
@@ -24,6 +25,7 @@ import { useSettings } from '../../lib/hooks/useSettings';
 import CourseReportForm from './CourseReportForm';
 import InterpreterForm from './InterpreterForm';
 import ExternalTrainerForm from './ExternalTrainerForm';
+import TravelGuideForm, { PLANNER_URL } from './TravelGuideForm';
 import BlockerPanel from './BlockerPanel';
 
 // ======================================================================
@@ -85,6 +87,10 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const isTrainerElement = element?.element?.key === 'external_trainer';
   const [showTrainerForm, setShowTrainerForm] = useState(false);
   const [trainerReadOnly, setTrainerReadOnly] = useState(false);
+  // عنصر «دليل السفر التعريفي»: رابط الدليل أو طلب تصميم دليل جديد
+  const isTravelGuide = element?.element?.key === 'travel_guide';
+  const [showGuideForm, setShowGuideForm] = useState(false);
+  const [guideReadOnly, setGuideReadOnly] = useState(false);
   const solfUrl = getSetting('solf.url', process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-training.nauss.edu.sa');
 
   // ── نموذج التأمين الطبي ──
@@ -344,6 +350,15 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
                 <HeartPulse size={14} aria-hidden="true" />
                 {element.status === 'RETURNED' ? t('element.resubmit') : t('element.submitInsurance')}
               </button>
+            ) : isTravelGuide ? (
+              <button
+                onClick={() => { setGuideReadOnly(false); setShowGuideForm(true); }}
+                disabled={loading}
+                className={BTN.primary}
+              >
+                <MapIcon size={14} aria-hidden="true" />
+                {element.status === 'RETURNED' ? t('element.resubmit') : 'دليل السفر'}
+              </button>
             ) : isTrainerElement ? (
               <button
                 onClick={() => { setTrainerReadOnly(false); setShowTrainerForm(true); }}
@@ -503,6 +518,19 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             </div>
           )}
         </div>
+      )}
+
+      {/* منصة أدلة السفر: ظاهرة في بطاقة العنصر دائماً */}
+      {isTravelGuide && element.status !== 'NOT_APPLICABLE' && (
+        <a href={PLANNER_URL} target="_blank" rel="noopener noreferrer" className={BTN.secondary}>
+          <ExternalLink size={14} aria-hidden="true" /> منصة أدلة السفر
+        </a>
+      )}
+
+      {isTravelGuide && !(canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status)) && element.status !== 'NOT_APPLICABLE' && (
+        <button type="button" onClick={() => { setGuideReadOnly(true); setShowGuideForm(true); }} className={BTN.primary}>
+          <MapIcon size={14} aria-hidden="true" /> عرض دليل السفر
+        </button>
       )}
 
       {isTrainerElement && !(canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status)) && element.status !== 'NOT_APPLICABLE' && (
@@ -727,6 +755,16 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
               onSuccess={onUpdate}
               readOnly={interpreterReadOnly}
             />
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── نموذج دليل السفر التعريفي ─────────────────────────────── */}
+      {isTravelGuide && showGuideForm && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
+          <div className="my-8 w-full max-w-2xl">
+            <TravelGuideForm trackingId={element.id} onClose={() => setShowGuideForm(false)} onSuccess={onUpdate} readOnly={guideReadOnly} />
           </div>
         </div>,
         document.body

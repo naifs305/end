@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
-import { Plane, PlaneLanding, PlaneTakeoff, Save, Mail, Send, X, Check, AlertTriangle, Loader2, UserRound, Hotel, Handshake } from 'lucide-react';
+import { Plane, PlaneLanding, PlaneTakeoff, Save, Mail, Send, X, Check, AlertTriangle, Loader2, UserRound, Hotel, Handshake, ScanLine, Camera, Upload, ShieldCheck } from 'lucide-react';
 import api from '../../lib/axios';
 
 const EMPTY_FLIGHT = { date: '', time: '', flightNo: '', airline: '', city: '' };
@@ -78,6 +78,74 @@ function MailButton({ output, needTicket, ticketReady, enabled, sentAt, fmt, onO
   );
 }
 
+// تصغير صورة الجواز قبل إرسالها: يكفي ٢٠٠٠ بكسل لقراءة السطرين أسفل الصفحة بوضوح
+async function fileToDataUrl(file) {
+  const raw = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result); r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+  if (!file.type.startsWith('image/')) return raw;
+  const img = await new Promise((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = raw; });
+  const scale = Math.min(1, 2000 / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.9);
+}
+
+const PASSPORT_FIELDS = [['nameEn', 'الاسم كما في الجواز'], ['nameAr', 'الاسم بالعربية'], ['nationality', 'الجنسية'], ['passportNo', 'رقم الجواز'], ['passportExpiry', 'تاريخ الانتهاء']];
+
+/** قراءة الجواز: تصوير بالكاميرا أو رفع صورة/PDF، فتُملأ الحقول للمراجعة */
+function PassportReader({ trackingId, onRead }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const pick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') { toast.error('صورة أو ملف PDF فقط'); return; }
+    setBusy(true); setResult(null);
+    try {
+      const data = await fileToDataUrl(file);
+      const r = await api.post(`/closure/${trackingId}/passport`, { file: data }, { timeout: 120000 });
+      const d = r?.data?.data ?? r?.data;
+      const filled = PASSPORT_FIELDS.filter(([k]) => d.fields[k]).map(([, l]) => l);
+      onRead(Object.fromEntries(PASSPORT_FIELDS.map(([k]) => [k, d.fields[k]]).filter(([, v]) => v)));
+      setResult({ ...d, filled });
+      toast.success('قُرئ الجواز — راجع الحقول ثم احفظ');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'تعذّرت قراءة الجواز');
+    } finally { setBusy(false); }
+  };
+  const btn = 'inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-primary/30 bg-white px-3 py-2 text-[13px] font-bold text-primary hover:bg-primary-light';
+  return (
+    <div className="mb-4 rounded-2xl border border-dashed border-primary/40 bg-primary-light/40 p-3.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex flex-1 items-center gap-1.5 text-[13px] font-extrabold text-text-main"><ScanLine size={16} aria-hidden="true" className="text-primary" /> اقرأ البيانات من جواز المدرب</span>
+        {busy ? (
+          <span className="inline-flex items-center gap-1.5 text-[13px] font-bold text-primary"><Loader2 size={15} className="animate-spin" aria-hidden="true" /> جارٍ قراءة الجواز…</span>
+        ) : (
+          <>
+            <label className={btn}><Camera size={15} aria-hidden="true" /> تصوير<input type="file" accept="image/*" capture="environment" className="sr-only" onChange={pick} /></label>
+            <label className={btn}><Upload size={15} aria-hidden="true" /> رفع صورة أو PDF<input type="file" accept="image/*,application/pdf" className="sr-only" onChange={pick} /></label>
+          </>
+        )}
+      </div>
+      <p className="mt-1.5 text-[11.5px] text-text-soft">صوّر صفحة البيانات كاملة بما فيها السطران أسفلها. الصورة تُقرأ ولا تُحفظ في المنصة.</p>
+      {result && (
+        <div className="mt-2.5 space-y-1 rounded-xl bg-white px-3 py-2.5 text-[12.5px]">
+          {result.verified
+            ? <p className="flex items-center gap-1.5 font-bold text-success"><ShieldCheck size={15} aria-hidden="true" /> طابقت البيانات أرقام التحقق في أسفل الجواز</p>
+            : null}
+          {result.warnings.map((w) => <p key={w} className="flex items-start gap-1.5 font-bold text-warning"><AlertTriangle size={14} aria-hidden="true" className="mt-0.5 shrink-0" /> {w}</p>)}
+          {result.filled.length > 0 && <p className="text-text-soft">مُلئ: {result.filled.join('، ')}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ExternalTrainerForm({ trackingId, onClose, onSuccess, readOnly = false }) {
   const [form, setForm] = useState(EMPTY);
   const [sent, setSent] = useState({});
@@ -89,6 +157,7 @@ export default function ExternalTrainerForm({ trackingId, onClose, onSuccess, re
   const [dirty, setDirty] = useState(false);
   const [reminder, setReminder] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [reader, setReader] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -99,6 +168,7 @@ export default function ExternalTrainerForm({ trackingId, onClose, onSuccess, re
       setSent(d.sent || {});
       setCourse(d.course);
       setCanEdit(!!d.canEdit && !readOnly);
+      setReader(!!d.passportReader);
     }).catch((e) => toast.error(e?.response?.data?.message || 'تعذّر تحميل بيانات المدرب')).finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, [trackingId, readOnly]);
@@ -171,6 +241,7 @@ export default function ExternalTrainerForm({ trackingId, onClose, onSuccess, re
         {/* ١. بيانات المدرب */}
         <section className="rounded-2xl border border-border bg-white p-4">
           <p className="mb-3 text-sm font-extrabold text-text-main">١. بيانات المدرب</p>
+          {canEdit && reader && <PassportReader trackingId={trackingId} onRead={(v) => { setForm((f) => ({ ...f, ...v })); setDirty(true); }} />}
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="الاسم بالعربية" value={form.nameAr} onChange={(v) => set('nameAr', v)} disabled={disabled} />
             <Field label="الاسم كما في جواز السفر" value={form.nameEn} onChange={(v) => set('nameEn', v)} dir="ltr" placeholder="JOHN SMITH" disabled={disabled} />

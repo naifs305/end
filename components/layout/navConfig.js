@@ -20,6 +20,7 @@ import {
   NotebookPen,
   LibraryBig,
   Building2,
+  Compass,
 } from 'lucide-react';
 import { isAdminRole, canAccessKpis, canViewReportsOnly } from '../../lib/roles';
 
@@ -59,6 +60,8 @@ export function buildNavSections(activeRole, t) {
   const operations = [item('/courses', BookOpen, t('nav.courses'))];
   if (isOversight) operations.push(item('/approvals', ClipboardCheck, t('nav.approvals')));
   operations.push(item('/archive', Archive, t('nav.archive')));
+  // مساعد التنفيذ مفتوح للجميع: صعوبات الزملاء وحلولهم حسب الإدارة ومقر التنفيذ
+  operations.push(item('/assistant', Compass, t('nav.assistant')));
   push('operations', t('navSections.operations'), operations);
 
   // ── 3. الأداء والتقارير ──
