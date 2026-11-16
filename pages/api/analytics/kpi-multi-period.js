@@ -47,7 +47,8 @@ async function handler(req, res) {
     where: {
       periodType: 'MONTHLY',
       periodLabel: { in: months },
-      user: supervisedProjectIds ? { isActive: true } : userFilter,
+      // مدير الإدارة لا يُقيَّم منسقاً فلا يدخل المؤشرات
+      user: { AND: [supervisedProjectIds ? { isActive: true } : (userFilter || {}), { NOT: { roles: { has: 'MANAGER' } } }] },
       ...(supervisedProjectIds
         ? {
             OR: [
@@ -137,7 +138,7 @@ async function handler(req, res) {
 
   // أضف الموظفين الذين لا توجد لهم لقطات أصلاً في هذه الشهور
   const allUsers = await prisma.user.findMany({
-    where: { ...userFilter },
+    where: { ...userFilter, NOT: { roles: { has: 'MANAGER' } } },
     select: { id: true, firstName: true, lastName: true, operationalProject: { select: { id: true, name: true } } },
   });
   const existingIds = new Set(byUser.keys());

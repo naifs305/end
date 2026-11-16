@@ -31,7 +31,8 @@ async function handler(req, res) {
     prisma.courseClosureTracking.count({ where: { status: 'PENDING_APPROVAL', course: courseWhere } }),
     prisma.course.count({ where: { ...courseWhere, endDate: { lt: new Date() }, status: { notIn: ['CLOSED','ARCHIVED'] } } }),
     prisma.employeeKpiSnapshot.findMany({
-      where: { periodType: 'MONTHLY', periodLabel },
+      // مدير الإدارة لا يُقيَّم منسقاً فلا يدخل ترتيب الأداء
+      where: { periodType: 'MONTHLY', periodLabel, user: { NOT: { roles: { has: 'MANAGER' } } } },
       include: {
         user: { select: { id:true, firstName:true, lastName:true, operationalProject:{ select:{ name:true } } } },
         // مشروع اللقطة — أداء الشهر يُنسب لمشروعه لا لانتماء المنسق اليوم
