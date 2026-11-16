@@ -24,6 +24,7 @@ import PhotoEditor from '../../../components/documentation/PhotoEditor';
 import { filterDefsMarkup, lookOf, cssFilter } from '../../../lib/documentation/photoLook';
 import { MAGAZINE_SECTIONS, REPORT_SECTIONS, isOn } from '../../../lib/documentation/sections';
 import PhotoImg from '../../../components/documentation/PhotoImg';
+import { parseNumberedReply } from '../../../lib/documentation/aiReply';
 
 const FILTER_DEFS = filterDefsMarkup();
 const SESSION_PHOTOS = 4;
@@ -59,17 +60,34 @@ function Portal({ children }) {
   return createPortal(children, document.body);
 }
 
-// حقل نص بزر «اكتب بالمساعد» — المساعد يصوغ، والمنسق يراجع ويعدّل
-function AiText({ label, hint, value, onChange, rows = 4, max = 3000, editable, onAi, busy, placeholder }) {
+// نسخ نص إلى الحافظة — مع بديل للصفحات غير الآمنة (http) حيث لا تتاح الحافظة الحديثة
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
+  } catch { /* نجرّب البديل */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch { return false; }
+}
+
+// حقل نص بزر «اكتب بالمساعد» — المساعد يصوغ، والمنسق يراجع ويعدّل.
+// وإن لم يكن المساعد مفعّلاً على الخادم صار الزر «طلب جاهز» ينسخه المنسق إلى أداته.
+function AiText({ label, hint, value, onChange, rows = 4, max = 3000, editable, onAi, busy, placeholder, aiOn = true }) {
   return (
     <div>
       <div className="mb-1 flex flex-wrap items-end gap-2">
         <span className="text-xs font-bold text-text-main">{label} {hint && <span className="font-normal text-text-soft">— {hint}</span>}</span>
         {editable && onAi && (
           <button type="button" onClick={onAi} disabled={busy}
+            title={aiOn ? '' : 'يُنسخ طلب جاهز بأسلوب الجامعة — الصقه في أداة الذكاء الاصطناعي التي تستخدمها، ثم الصق ردها هنا'}
             className="ms-auto inline-flex items-center gap-1.5 rounded-full bg-sand/20 px-3 py-1.5 text-[12px] font-bold text-warning hover:bg-sand/35 disabled:opacity-60">
-            {busy ? <Loader2 size={14} aria-hidden="true" className="animate-spin" /> : <Sparkles size={14} aria-hidden="true" />}
-            {value?.trim() ? 'أعد الصياغة بالمساعد' : 'اكتبها بالمساعد'}
+            {busy ? <Loader2 size={14} aria-hidden="true" className="animate-spin" /> : aiOn ? <Sparkles size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+            {aiOn ? (value?.trim() ? 'أعد الصياغة بالمساعد' : 'اكتبها بالمساعد') : 'طلب جاهز للذكاء الاصطناعي'}
           </button>
         )}
       </div>
@@ -111,6 +129,9 @@ export default function CourseDocumentationPage() {
   const [schedFound, setSchedFound] = useState(null);
   const [schedBusy, setSchedBusy] = useState(false);
   const [aiBusy, setAiBusy] = useState(null); // 'all' أو رقم الجلسة
+  // بلا مساعد على الخادم: رد أداة المنسق يُلصق هنا فيوزَّع على الجلسات
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyText, setReplyText] = useState('');
   const [picker, setPicker] = useState(null); // رقم الجلسة التي تُختار صورها
   const [reportBusy, setReportBusy] = useState(false);
   const [reportDraft, setReportDraft] = useState(null);
@@ -161,6 +182,7 @@ export default function CourseDocumentationPage() {
   const doc = data?.documentation;
   const media = doc?.media || [];
   const editable = !!data?.canEdit;
+  const aiOn = !!data?.aiEnabled;
   const published = doc?.status === 'PUBLISHED';
 
   // معاينة المعايير مباشرة بما في الصفحة (قبل الحفظ)
@@ -298,6 +320,19 @@ export default function CourseDocumentationPage() {
   const describe = async (indexes, tag) => {
     if (!indexes.length) { toast('كل الجلسات موصوفة — لإعادة كتابة وصف استعمل الزر بجانبه'); return; }
     setAiBusy(tag);
+    if (!aiOn) {
+      // طلب جاهز ينسخه المنسق إلى أداته، ثم يلصق ردها فيوزَّع على الجلسات
+      try {
+        const r = unwrap(await api.post(`/courses/${id}/documentation/assist`, { action: 'describe', sessions, indexes, intro, promptOnly: true }));
+        const ok = await copyText(r.prompt);
+        setReplyOpen(true);
+        if (ok) toast.success('نُسخ الطلب — الصقه في أداة الذكاء الاصطناعي التي تستخدمها، ثم الصق ردها في المربع تحت الجدول');
+        else { setReplyText(r.prompt); toast('انسخ الطلب من المربع، ثم استبدله برد الأداة'); }
+      } catch (e) {
+        toast.error(e.response?.data?.message || 'تعذّر إعداد الطلب');
+      } finally { setAiBusy(null); }
+      return;
+    }
     try {
       const r = unwrap(await api.post(`/courses/${id}/documentation/assist`, { action: 'describe', sessions, indexes, intro }, { timeout: 200000 }));
       const map = r.descriptions || {};
@@ -312,6 +347,18 @@ export default function CourseDocumentationPage() {
     } catch (e) {
       toast.error(e.response?.data?.message || 'تعذّرت كتابة الأوصاف');
     } finally { setAiBusy(null); }
+  };
+
+  // ── رد أداة المنسق: فقرة لكل جلسة برقمها ──
+  const applyReply = async () => {
+    const map = parseNumberedReply(replyText, sessions.length);
+    const n = Object.keys(map).length;
+    if (!n) { toast.error('لم يُتعرّف على أوصاف مرقّمة — تأكد أن كل فقرة تبدأ برقم الجلسة ثم نقطتين'); return; }
+    const next = sessions.map((s, i) => (map[i] ? { ...s, description: map[i] } : s));
+    setSessions(next);
+    setReplyText(''); setReplyOpen(false);
+    await save({ sessions: next }, { quiet: true });
+    toast.success(`وُزّعت ${n} أوصاف على الجلسات وحُفظت — راجعها وعدّل ما تشاء`);
   };
 
   // ── تقرير الجهة المنفّذة ──
@@ -353,6 +400,20 @@ export default function CourseDocumentationPage() {
   const FIELD_SETTERS = { intro: setIntro, closing: setClosing, welcome: setWelcome, reportSummary: setReportSummary, recommendations: setRecommendations };
   const compose = async (field) => {
     setAiBusy(field);
+    if (!aiOn) {
+      try {
+        const r = unwrap(await api.post(`/courses/${id}/documentation/assist`, {
+          action: 'compose', field, intro, closing, welcome, patronage, reportSummary, recommendations, sessions, promptOnly: true,
+          trainees: trainees.map((t) => ({ score: t.score, entity: t.entity, isDistinguished: t.isDistinguished, distinction: t.distinction })),
+        }));
+        const ok = await copyText(r.prompt);
+        if (ok) toast.success('نُسخ الطلب — الصقه في أداة الذكاء الاصطناعي التي تستخدمها، ثم الصق ردها في الحقل واحفظ');
+        else toast.error('تعذّر النسخ تلقائياً — جرّب متصفحاً آخر');
+      } catch (e) {
+        toast.error(e.response?.data?.message || 'تعذّر إعداد الطلب');
+      } finally { setAiBusy(null); }
+      return;
+    }
     try {
       const r = unwrap(await api.post(`/courses/${id}/documentation/assist`, {
         action: 'compose', field, intro, closing, welcome, patronage, reportSummary, recommendations, sessions,
@@ -588,7 +649,7 @@ export default function CourseDocumentationPage() {
                   )}
                 </div>
                 <AiText label="كلمة الترحيب" hint="صفحة بعد الغلاف، تُحذف إن تُركت فارغة" value={welcome} rows={3} max={1500} editable={editable}
-                  onChange={(v) => { setWelcome(v); setDirty(true); }} onAi={() => compose('welcome')} busy={aiBusy === 'welcome'} />
+                  onChange={(v) => { setWelcome(v); setDirty(true); }} aiOn={aiOn} onAi={() => compose('welcome')} busy={aiBusy === 'welcome'} />
                 <div>
                   <span className="mb-1 block text-xs font-bold text-text-main">الشعارات <span className="font-normal text-text-soft">— شعار الجامعة ثابت في كل الإصدارات، وتُضاف بجواره شعارات الشركاء</span></span>
                   <div className="flex flex-wrap items-stretch gap-2">
@@ -627,9 +688,9 @@ export default function CourseDocumentationPage() {
               <SectionHead icon={BookOpenText} title={<span id="h-texts">نص التوثيق</span>} hint="يصوغها المساعد من بيانات الدورة وجلساتها، وتراجعها أنت وتعدّل ما تشاء." />
               <div className="space-y-4 p-5">
                 <AiText label="المقدمة" hint="عن الدورة وأهدافها وما ميّزها" value={intro} rows={5} editable={editable}
-                  onChange={(v) => { setIntro(v); setDirty(true); }} onAi={() => compose('intro')} busy={aiBusy === 'intro'} />
+                  onChange={(v) => { setIntro(v); setDirty(true); }} aiOn={aiOn} onAi={() => compose('intro')} busy={aiBusy === 'intro'} />
                 <AiText label="الخاتمة" hint="اختيارية" value={closing} rows={3} editable={editable}
-                  onChange={(v) => { setClosing(v); setDirty(true); }} onAi={() => compose('closing')} busy={aiBusy === 'closing'} />
+                  onChange={(v) => { setClosing(v); setDirty(true); }} aiOn={aiOn} onAi={() => compose('closing')} busy={aiBusy === 'closing'} />
               </div>
             </section>
 
@@ -645,7 +706,13 @@ export default function CourseDocumentationPage() {
                     {sessions.length > 0 && (
                       <button type="button" disabled={!!aiBusy} onClick={() => describe(sessions.map((x, i) => (x.title?.trim() && !x.description?.trim() ? i : -1)).filter((i) => i >= 0), 'all')}
                         className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-warning hover:bg-sand/15 disabled:opacity-60">
-                        {aiBusy === 'all' ? <Loader2 size={15} aria-hidden="true" className="animate-spin" /> : <Sparkles size={15} aria-hidden="true" />} اكتب الأوصاف
+                        {aiBusy === 'all' ? <Loader2 size={15} aria-hidden="true" className="animate-spin" /> : aiOn ? <Sparkles size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />} {aiOn ? 'اكتب الأوصاف' : 'طلب جاهز للأوصاف'}
+                      </button>
+                    )}
+                    {!aiOn && sessions.length > 0 && (
+                      <button type="button" onClick={() => setReplyOpen((v) => !v)} aria-expanded={replyOpen}
+                        className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold text-text-soft hover:bg-background hover:text-primary">
+                        <ClipboardPaste size={15} aria-hidden="true" /> لصق رد الأداة
                       </button>
                     )}
                     <button type="button" onClick={() => { setSessions((l) => [...l, { title: '', presenter: '', date: '', time: '', description: '', photoIds: [] }]); setDirty(true); }}
@@ -695,6 +762,24 @@ export default function CourseDocumentationPage() {
                   )}
                 </div>
               )}
+              {!aiOn && editable && sessions.length > 0 && !replyOpen && (
+                <p className="border-b border-border bg-sand/10 px-4 py-2.5 text-[12.5px] text-text-main">
+                  💡 يمكنك الاستعانة بالذكاء الاصطناعي الذي تستخدمه في صياغة أوصاف الجلسات: اضغط «طلب جاهز للأوصاف» فيُنسخ طلب بأسلوب الجامعة وبيانات دورتك، الصقه في أداتك، ثم الصق ردها في «لصق رد الأداة» فتُوزَّع الأوصاف على الجلسات تلقائياً.
+                </p>
+              )}
+              {replyOpen && (
+                <div className="border-b border-border bg-sand/10 p-4">
+                  <p className="mb-2 text-[12.5px] text-text-soft">الصق هنا رد أداة الذكاء الاصطناعي — فقرة لكل جلسة تبدأ برقمها («٣: …»)، فتُوزَّع على الجلسات.</p>
+                  <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={7} aria-label="رد أداة الذكاء الاصطناعي"
+                    className="w-full rounded-2xl border border-border bg-white px-3 py-2 text-[13px] leading-relaxed outline-none focus:border-primary" />
+                  <div className="mt-2 flex gap-1">
+                    <button type="button" onClick={applyReply} disabled={!replyText.trim()} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50">
+                      <Check size={14} aria-hidden="true" /> توزيع على الجلسات
+                    </button>
+                    <button type="button" onClick={() => { setReplyOpen(false); setReplyText(''); }} className="rounded-full px-3 py-2 text-[13px] font-bold text-text-soft hover:bg-white">إلغاء</button>
+                  </div>
+                </div>
+              )}
               <div className="space-y-3 p-4">
                 {sessions.length === 0 && <p className="py-4 text-center text-[13px] text-text-soft">لا جلسات بعد — الصقها من منصة التدريب بنقرة.</p>}
                 {sessions.map((s, i) => (
@@ -710,7 +795,7 @@ export default function CourseDocumentationPage() {
                       <textarea value={s.description || ''} disabled={!editable} onChange={(e) => setSession(i, 'description', e.target.value)} rows={2} placeholder="وصف موجز (اختياري)" aria-label="وصف الجلسة"
                         className="block w-full resize-y rounded-xl border border-border px-3 py-2 pe-11 text-[13px] leading-relaxed outline-none focus:border-primary" />
                       {editable && s.title?.trim() && (
-                        <button type="button" disabled={!!aiBusy} onClick={() => describe([i], i)} title={s.description ? 'أعد كتابة الوصف' : 'اكتب الوصف'} aria-label="كتابة الوصف بالذكاء الاصطناعي"
+                        <button type="button" disabled={!!aiBusy} onClick={() => describe([i], i)} title={aiOn ? (s.description ? 'أعد كتابة الوصف' : 'اكتب الوصف') : 'طلب جاهز لوصف هذه الجلسة'} aria-label="كتابة الوصف بالذكاء الاصطناعي"
                           className="absolute end-1.5 top-1.5 grid h-8 w-8 place-items-center rounded-full text-warning hover:bg-sand/20 disabled:opacity-50">
                           {aiBusy === i ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
                         </button>
@@ -784,9 +869,9 @@ export default function CourseDocumentationPage() {
               )}
               <div className="space-y-4 p-5">
                 <AiText label="ملخص التنفيذ" hint="ما تحقق من أهداف البرنامج وأبرز مخرجاته" value={reportSummary} rows={5} max={4000} editable={editable}
-                  onChange={(v) => { setReportSummary(v); setDirty(true); }} onAi={() => compose('reportSummary')} busy={aiBusy === 'reportSummary'} />
+                  onChange={(v) => { setReportSummary(v); setDirty(true); }} aiOn={aiOn} onAi={() => compose('reportSummary')} busy={aiBusy === 'reportSummary'} />
                 <AiText label="التوصيات" hint="توصية في كل سطر" value={recommendations} rows={4} max={4000} editable={editable}
-                  onChange={(v) => { setRecommendations(v); setDirty(true); }} onAi={() => compose('recommendations')} busy={aiBusy === 'recommendations'} />
+                  onChange={(v) => { setRecommendations(v); setDirty(true); }} aiOn={aiOn} onAi={() => compose('recommendations')} busy={aiBusy === 'recommendations'} />
               </div>
             </section>
 
