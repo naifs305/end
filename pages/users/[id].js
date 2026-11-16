@@ -231,6 +231,11 @@ export default function EditUser() {
                 <label className="mb-1.5 block text-xs font-bold text-text-main">{t('admin.users.lastName')}</label>
                 <input className={inputCls} value={user.lastName||''} onChange={e=>setUser({...user,lastName:e.target.value})} />
               </div>
+              {/[A-Za-z]/.test(`${user.firstName||''}${user.lastName||''}`) && !/[؀-ۿ]/.test(`${user.firstName||''}${user.lastName||''}`) && (
+                <p className="col-span-2 rounded-xl bg-sand/15 px-3 py-2 text-xs text-text-main">
+                  الاسم بالإنجليزية كما جاء من الحساب الجامعي — اكتبه بالعربية ليظهر على البطاقات والتقارير، ولن يستبدله الدخول بعد ذلك.
+                </p>
+              )}
               {isManager && (
                 <label className={`col-span-2 flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${user.isCollaborator ? 'border-accent/50 bg-sand/10' : 'border-border bg-background'}`}>
                   <input type="checkbox" checked={!!user.isCollaborator}

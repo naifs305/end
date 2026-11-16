@@ -27,6 +27,7 @@ import InterpreterForm from './InterpreterForm';
 import ExternalTrainerForm from './ExternalTrainerForm';
 import TravelGuideForm, { PLANNER_URL } from './TravelGuideForm';
 import BlockerPanel from './BlockerPanel';
+import CertReviewPanel from './CertReviewPanel';
 
 // ======================================================================
 // مقياس الأزرار — مظهر واحد لكل رتبة، فلا تتنافس الألوان داخل البطاقة
@@ -141,6 +142,11 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const isEmployee = activeRole === 'EMPLOYEE';
   const isCoordinator = user?.id && user.id === element?.course?.primaryEmployeeId;
   const canExecute = isEmployee || isCoordinator;
+  // إصدار الشهادات: لا يُقدَّم قبل أن يؤكد منسق آخر مراجعتها
+  const isCertificates = element?.element?.key === 'certificates';
+  const certReview = element?.formData?.certReview;
+  const certConfirmed = certReview?.status === 'CONFIRMED';
+  const isCertReviewer = !!user?.id && certReview?.reviewerId === user.id;
   const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
   const isManager = activeRole === 'MANAGER';
   const [volunteering, setVolunteering] = useState(false);
@@ -401,7 +407,8 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             ) : (
               <button
                 onClick={handleSubmit}
-                disabled={loading}
+                disabled={loading || (isCertificates && !certConfirmed)}
+                title={isCertificates && !certConfirmed ? 'يُقدَّم بعد أن يؤكد المنسق المراجِع مراجعة الشهادات' : undefined}
                 className={isFinancialElement ? `order-first ${BTN.warn} border border-sand/60 bg-white` : BTN.primary}
               >
                 {loading ? (
@@ -530,6 +537,11 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             </div>
           )}
         </div>
+      )}
+
+      {/* مراجعة الشهادات بعين ثانية: للمنسق وللمراجِع المسند */}
+      {isCertificates && element.status !== 'NOT_APPLICABLE' && (canExecute || isCertReviewer) && (
+        <CertReviewPanel trackingId={element.id} onChange={onUpdate} />
       )}
 
       {/* منصة أدلة السفر: ظاهرة في بطاقة العنصر دائماً */}

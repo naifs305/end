@@ -226,6 +226,9 @@ export default function UserManagement() {
 
             {picked && (
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <p className="rounded-xl bg-sand/15 px-3 py-2 text-xs text-text-main sm:col-span-2">
+                  اكتب الاسم بالعربية — يظهر على البطاقات والتقارير، ولا يستبدله الدخول بالحساب الجامعي.
+                </p>
                 <div>
                   <label className="mb-1 block text-xs font-bold text-text-main">{t('admin.users.firstName')}</label>
                   <input value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)}

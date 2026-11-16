@@ -23,6 +23,7 @@ import {
 import useAuth from '../context/AuthContext';
 import api from '../lib/axios';
 import MainLayout from '../components/layout/MainLayout';
+import CertReviewsDue from '../components/operational/CertReviewsDue';
 import { useTranslation } from '../lib/i18n';
 
 const StatusDonut = dynamic(() => import('../components/charts/StatusDonut'), { ssr: false });
@@ -501,6 +502,8 @@ export default function Home() {
   return (
     <MainLayout>
       <div className="space-y-6">
+        {/* شهادات أسندها الزملاء لمراجعتها — لا تُقدَّم قبل تأكيدها */}
+        <CertReviewsDue />
         {/* Banner */}
         <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-l from-primary to-primary-dark p-6 text-white shadow-soft">
           <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
