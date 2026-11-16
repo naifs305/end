@@ -963,10 +963,10 @@ export default function CourseDetail() {
                     <div key={el.id} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2">
                       <div className="min-w-0">
                         <span className="text-sm font-bold text-text-main block truncate">{el.element.name}</span>
-                        <span className="text-[10px] text-text-soft">{el.executedBy?.firstName} {el.executedBy?.lastName}</span>
+                        <span className="text-[10px] text-text-soft">{(el.executor || el.executedBy)?.firstName} {(el.executor || el.executedBy)?.lastName}</span>
                       </div>
                       <button
-                        onClick={() => setMsgModal({ trackingId: el.id, elementName: el.element.name, employeeName: `${el.executedBy?.firstName} ${el.executedBy?.lastName}` })}
+                        onClick={() => setMsgModal({ trackingId: el.id, elementName: el.element.name, employeeName: `${(el.executor || el.executedBy)?.firstName || ""} ${(el.executor || el.executedBy)?.lastName || ""}`.trim() })}
                         className="shrink-0 rounded-lg border border-primary/20 bg-primary/5 px-2 py-1 text-[11px] font-bold text-primary hover:bg-primary/10">
                         📩 راسله
                       </button>

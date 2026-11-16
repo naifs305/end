@@ -150,6 +150,13 @@ export default function CourseDocumentationPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  // تنبيه قبل مغادرة الصفحة وفيها تعديلات لم تُحفظ
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   const doc = data?.documentation;
   const media = doc?.media || [];
@@ -278,12 +285,13 @@ export default function CourseDocumentationPage() {
       toast.error(e.response?.data?.message || 'تعذّرت قراءة الجدول');
     } finally { setSchedBusy(false); }
   };
-  const applySchedule = (mode) => {
+  const applySchedule = async (mode) => {
     const rows = (schedFound || []).map((x) => ({ title: x.title, presenter: x.presenter || '', date: x.date || '', time: x.time || '', description: '', photoIds: [] }));
-    setSessions((list) => (mode === 'replace' ? rows : [...list, ...rows]));
-    setDirty(true);
+    const next = mode === 'replace' ? rows : [...sessions, ...rows];
+    setSessions(next);
     setSchedOpen(false); setSchedText(''); setSchedFound(null);
-    toast.success(`أُضيفت ${rows.length} جلسة — راجعها ثم احفظ`);
+    await save({ sessions: next }, { quiet: true });
+    toast.success(`أُضيفت ${rows.length} جلسة وحُفظت — اكتب أوصافها بالمساعد أو بنفسك`);
   };
 
   // ── أوصاف الجلسات بالذكاء الاصطناعي ──
@@ -294,8 +302,13 @@ export default function CourseDocumentationPage() {
       const r = unwrap(await api.post(`/courses/${id}/documentation/assist`, { action: 'describe', sessions, indexes, intro }, { timeout: 200000 }));
       const map = r.descriptions || {};
       const n = Object.keys(map).length;
-      setSessions((list) => list.map((s, i) => (map[i] ? { ...s, description: map[i] } : s)));
-      if (n) { setDirty(true); toast.success(n > 1 ? `كُتبت ${n} أوصاف — راجعها وعدّل ما تشاء` : 'كُتب الوصف — راجعه وعدّل ما تشاء'); }
+      const next = sessions.map((s, i) => (map[i] ? { ...s, description: map[i] } : s));
+      setSessions(next);
+      if (n) {
+        // يُحفظ فوراً: ما كتبه المساعد لا يضيع إن أُغلقت الصفحة قبل «احفظ»
+        await save({ sessions: next }, { quiet: true });
+        toast.success(n > 1 ? `كُتبت ${n} أوصاف وحُفظت — راجعها وعدّل ما تشاء` : 'كُتب الوصف وحُفظ — راجعه وعدّل ما تشاء');
+      }
     } catch (e) {
       toast.error(e.response?.data?.message || 'تعذّرت كتابة الأوصاف');
     } finally { setAiBusy(null); }
@@ -345,7 +358,11 @@ export default function CourseDocumentationPage() {
         action: 'compose', field, intro, closing, welcome, patronage, reportSummary, recommendations, sessions,
         trainees: trainees.map((t) => ({ score: t.score, entity: t.entity, isDistinguished: t.isDistinguished, distinction: t.distinction })),
       }, { timeout: 200000 }));
-      if (r.text) { FIELD_SETTERS[field](r.text); setDirty(true); toast.success('صاغها المساعد — راجعها وعدّل ما تشاء'); }
+      if (r.text) {
+        FIELD_SETTERS[field](r.text);
+        await save({ [field]: r.text }, { quiet: true });
+        toast.success('صاغها المساعد وحُفظت — راجعها وعدّل ما تشاء');
+      }
     } catch (e) {
       toast.error(e.response?.data?.message || 'تعذّرت الصياغة');
     } finally { setAiBusy(null); }
