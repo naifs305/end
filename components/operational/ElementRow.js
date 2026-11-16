@@ -91,6 +91,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const isTravelGuide = element?.element?.key === 'travel_guide';
   const [showGuideForm, setShowGuideForm] = useState(false);
   const [guideReadOnly, setGuideReadOnly] = useState(false);
+  const [guideMode, setGuideMode] = useState(null); // 'existing' | 'request' | null للاطلاع
   const solfUrl = getSetting('solf.url', process.env.NEXT_PUBLIC_SOLF_URL || 'https://solf-training.nauss.edu.sa');
 
   // ── نموذج التأمين الطبي ──
@@ -351,14 +352,25 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
                 {element.status === 'RETURNED' ? t('element.resubmit') : t('element.submitInsurance')}
               </button>
             ) : isTravelGuide ? (
-              <button
-                onClick={() => { setGuideReadOnly(false); setShowGuideForm(true); }}
-                disabled={loading}
-                className={BTN.primary}
-              >
-                <MapIcon size={14} aria-hidden="true" />
-                {element.status === 'RETURNED' ? t('element.resubmit') : 'دليل السفر'}
-              </button>
+              <>
+                {/* إجراءان: تقديم الدليل الموجود، أو طلب تصميم دليل جديد للمدينة */}
+                <button
+                  onClick={() => { setGuideReadOnly(false); setGuideMode('existing'); setShowGuideForm(true); }}
+                  disabled={loading}
+                  className={BTN.primary}
+                >
+                  <Send size={14} aria-hidden="true" />
+                  {element.status === 'RETURNED' ? t('element.resubmit') : 'تقديم الدليل'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setGuideReadOnly(false); setGuideMode('request'); setShowGuideForm(true); }}
+                  disabled={loading}
+                  className={BTN.secondary}
+                >
+                  <MapIcon size={14} aria-hidden="true" /> طلب دليل
+                </button>
+              </>
             ) : isTrainerElement ? (
               <button
                 onClick={() => { setTrainerReadOnly(false); setShowTrainerForm(true); }}
@@ -528,7 +540,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       )}
 
       {isTravelGuide && !(canExecute && ['NOT_STARTED', 'RETURNED', 'REJECTED'].includes(element.status)) && element.status !== 'NOT_APPLICABLE' && (
-        <button type="button" onClick={() => { setGuideReadOnly(true); setShowGuideForm(true); }} className={BTN.primary}>
+        <button type="button" onClick={() => { setGuideReadOnly(true); setGuideMode(null); setShowGuideForm(true); }} className={BTN.primary}>
           <MapIcon size={14} aria-hidden="true" /> عرض دليل السفر
         </button>
       )}
@@ -764,7 +776,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       {isTravelGuide && showGuideForm && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
           <div className="my-8 w-full max-w-2xl">
-            <TravelGuideForm trackingId={element.id} onClose={() => setShowGuideForm(false)} onSuccess={onUpdate} readOnly={guideReadOnly} />
+            <TravelGuideForm trackingId={element.id} onClose={() => setShowGuideForm(false)} onSuccess={onUpdate} readOnly={guideReadOnly} mode={guideMode} />
           </div>
         </div>,
         document.body

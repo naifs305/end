@@ -23,6 +23,7 @@ const EMPTY = {
   requiresSupervisorCompensation: false, requiresTrainerCompensation: false,
   requiresPreTest: false, requiresPostTest: false,
   requiresInterpreter: false, interpreterContractType: '',
+  externalTrainer: false, // عنصر اختياري: يُفعَّل بعد إنشاء الدورة
   lateEntryReason: '',
 };
 
@@ -200,6 +201,16 @@ export default function CreateCoursePage() {
       const res = await api.post('/courses', payload);
       toast.success(t('course.form.createdSuccess'));
       const id = res?.data?.id || res?.data?.data?.id;
+      // «مدرب خارجي» عنصر اختياري يُنشأ معطّلاً، فيُفعَّل هنا إن اختاره المنسق
+      if (id && form.externalTrainer) {
+        try {
+          const c = await api.get(`/courses/${id}`);
+          const tr = (c?.data?.closureElements || []).find((el) => el.element?.key === 'external_trainer');
+          if (tr) await api.post(`/courses/${id}/toggle-element`, { trackingId: tr.id, enabled: true });
+        } catch {
+          toast.error('أُنشئت الدورة، وتعذّر تفعيل «مدرب خارجي» — فعّله من صفحة الدورة');
+        }
+      }
       router.push(id ? `/courses/${id}` : '/courses');
     } catch (err) {
       toast.error(err?.response?.data?.message || t('course.form.createFailed'));
@@ -364,6 +375,12 @@ export default function CreateCoursePage() {
                   set('requiresInterpreter', v);
                   if (!v) set('interpreterContractType', '');
                 }}
+              />
+              <Toggle
+                label="مدرب خارجي"
+                desc="يفتح عنصر المدرب: التذاكر والاستقبال والإسكان"
+                checked={form.externalTrainer}
+                onChange={(v) => set('externalTrainer', v)}
               />
             </div>
 

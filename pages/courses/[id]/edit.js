@@ -110,6 +110,8 @@ export default function EditCoursePage() {
   const [dateOpen, setDateOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // عنصر «مدرب خارجي» اختياري: يُفعَّل من هنا أو من صفحة الدورة
+  const [trainer, setTrainer] = useState(null); // { trackingId, enabled, initial, locked }
 
   useEffect(() => {
     if (!id) return;
@@ -139,6 +141,9 @@ export default function EditCoursePage() {
           requiresInterpreter: !!c.requiresInterpreter,
           interpreterContractType: c.interpreterContractType || '',
         });
+        const tr = (c.closureElements || []).find((el) => el.element?.key === 'external_trainer');
+        const on = !!tr && tr.status !== 'NOT_APPLICABLE';
+        setTrainer(tr ? { trackingId: tr.id, enabled: on, initial: on, locked: ['APPROVED', 'PENDING_APPROVAL'].includes(tr.status) } : null);
       })
       .catch(() => toast.error(t('course.form.loadFailed')))
       .finally(() => setLoading(false));
@@ -187,6 +192,9 @@ export default function EditCoursePage() {
         requiresInterpreter: form.requiresInterpreter,
         interpreterContractType: form.requiresInterpreter ? form.interpreterContractType : null,
       });
+      if (trainer && trainer.enabled !== trainer.initial) {
+        await api.post(`/courses/${id}/toggle-element`, { trackingId: trainer.trackingId, enabled: trainer.enabled });
+      }
       toast.success(t('course.form.updatedSuccess'));
       router.push(`/courses/${id}`);
     } catch (err) {
@@ -320,6 +328,14 @@ export default function EditCoursePage() {
                   if (!v) set('interpreterContractType', '');
                 }}
               />
+              {trainer && (
+                <Toggle
+                  label="مدرب خارجي"
+                  desc={trainer.locked ? 'مُقدَّم للاعتماد أو معتمد — لا يُلغى' : 'يفتح عنصر المدرب: التذاكر والاستقبال والإسكان'}
+                  checked={trainer.enabled}
+                  onChange={(v) => { if (!trainer.locked) setTrainer((x) => ({ ...x, enabled: v })); }}
+                />
+              )}
             </div>
 
             {form.requiresInterpreter && (

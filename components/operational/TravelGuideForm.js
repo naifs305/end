@@ -15,7 +15,8 @@ export const PLANNER_URL = 'https://nauss-journey-planner.lovable.app/';
 const inputCls = 'w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary disabled:bg-background';
 const EMPTY = { mode: 'existing', url: '', city: '', note: '', requestedAt: null };
 
-export default function TravelGuideForm({ trackingId, onClose, onSuccess, readOnly = false }) {
+// mode يأتي من زر البطاقة: «تقديم الدليل» (existing) أو «طلب دليل» (request)
+export default function TravelGuideForm({ trackingId, onClose, onSuccess, readOnly = false, mode: fixedMode = null }) {
   const [form, setForm] = useState(EMPTY);
   const [course, setCourse] = useState(null);
   const [canEdit, setCanEdit] = useState(false);
@@ -30,12 +31,12 @@ export default function TravelGuideForm({ trackingId, onClose, onSuccess, readOn
     api.get(`/closure/${trackingId}/travel-guide`).then((r) => {
       if (!alive) return;
       const d = r?.data?.data ?? r?.data;
-      setForm({ ...EMPTY, city: d.course?.city || '', ...(d.guide || {}) });
+      setForm({ ...EMPTY, city: d.course?.city || '', ...(d.guide || {}), ...(fixedMode ? { mode: fixedMode } : {}) });
       setCourse(d.course);
       setCanEdit(!!d.canEdit && !readOnly);
     }).catch((e) => toast.error(e?.response?.data?.message || 'تعذّر تحميل دليل السفر')).finally(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [trackingId, readOnly]);
+  }, [trackingId, readOnly, fixedMode]);
 
   const set = (k, v) => { setForm((f) => ({ ...f, [k]: v })); setDirty(true); };
   const disabled = !canEdit;
@@ -106,14 +107,14 @@ export default function TravelGuideForm({ trackingId, onClose, onSuccess, readOn
       <div className="flex items-center gap-3 border-b border-border bg-white px-5 py-4">
         <span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary-light text-primary"><MapIcon size={20} aria-hidden="true" /></span>
         <div className="min-w-0 flex-1">
-          <p className="text-base font-extrabold text-text-main">دليل السفر التعريفي</p>
+          <p className="text-base font-extrabold text-text-main">{fixedMode === 'request' ? 'طلب دليل سفر جديد' : fixedMode === 'existing' ? 'تقديم دليل السفر' : 'دليل السفر التعريفي'}</p>
           {course && <p className="truncate text-xs text-text-soft">{course.name}{city ? ` · ${city}` : ''}</p>}
         </div>
         <button type="button" onClick={onClose} aria-label="إغلاق" className="grid h-9 w-9 place-items-center rounded-full text-text-soft hover:bg-background"><X size={18} /></button>
       </div>
 
       <div className="space-y-4 p-5">
-        <a href={PLANNER_URL} target="_blank" rel="noopener noreferrer"
+        {form.mode === 'existing' && <a href={PLANNER_URL} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-3 rounded-2xl bg-[#0b3f42] px-4 py-3 text-white hover:bg-[#0e4c50]">
           <MapIcon size={20} aria-hidden="true" className="text-[#C6AA76]" />
           <span className="flex-1">
@@ -121,12 +122,12 @@ export default function TravelGuideForm({ trackingId, onClose, onSuccess, readOn
             <span className="block text-[12px] text-white/75">ابحث فيها عن دليل {city ? `«${city}»` : 'مدينة التنفيذ'} وانسخ رابطه</span>
           </span>
           <ExternalLink size={16} aria-hidden="true" />
-        </a>
+        </a>}
 
-        <div className="flex flex-col gap-2 sm:flex-row">
+        {!fixedMode && <div className="flex flex-col gap-2 sm:flex-row">
           {choice('existing', Link2, 'تقديم الدليل', 'الدليل موجود: أدخل رابطه وقدّمه للاعتماد')}
           {choice('request', FilePlus2, 'لا يوجد دليل', `طلب تصميم دليل جديد باسم ${city ? `«${city}»` : 'المدينة'}`)}
-        </div>
+        </div>}
 
         {form.mode === 'existing' ? (
           <section className="space-y-3 rounded-2xl border border-border bg-white p-4">
@@ -164,7 +165,7 @@ export default function TravelGuideForm({ trackingId, onClose, onSuccess, readOn
             {form.requestedAt ? (
               <div className="space-y-1.5 rounded-xl bg-background px-3 py-2.5 text-[12.5px]">
                 <p className="flex items-center gap-1.5 font-bold text-success"><Check size={14} aria-hidden="true" /> أُخرجت رسالة الطلب في {fmt(form.requestedAt)}</p>
-                <p className="flex items-start gap-1.5 text-text-soft"><Clock size={14} aria-hidden="true" className="mt-0.5 shrink-0" /> حين يصلك الدليل اختر «تقديم الدليل» وأدخل رابطه.</p>
+                <p className="flex items-start gap-1.5 text-text-soft"><Clock size={14} aria-hidden="true" className="mt-0.5 shrink-0" /> حين يصلك الدليل اضغط «تقديم الدليل» في بطاقة العنصر وأدخل رابطه.</p>
                 <p className="flex items-start gap-1.5 text-text-soft"><AlertTriangle size={14} aria-hidden="true" className="mt-0.5 shrink-0" /> وإن تأخر فارفع «بلاغ عائق» من بطاقة العنصر في صفحة الدورة.</p>
               </div>
             ) : null}
