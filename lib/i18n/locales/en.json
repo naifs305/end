@@ -1306,8 +1306,8 @@
   },
   "kpi": {
     "title": "Performance Indicators",
-    "subtitleEmployee": "Your personal evaluation — 6 indicators tied to your course closure deadlines",
-    "subtitleTeam": "Measuring team performance with 6 smart indicators tied to closure deadlines",
+    "subtitleEmployee": "Your personal evaluation — four axes: punctuality, course closure, quality and excellence",
+    "subtitleTeam": "Team performance on four axes, ranked by the last three months",
     "monthly": "Monthly",
     "yearly": "Yearly",
     "currentMonth": "Current month",
@@ -1343,7 +1343,7 @@
     "noProject": "No project",
     "noCoursesInPeriod": "No courses fall within this period — no indicators are calculated for this month.",
     "radarTitle": "Indicator map",
-    "sixIndicatorsDetail": "Six indicators breakdown",
+    "sixIndicatorsDetail": "Four axes in detail",
     "sixIndicatorsThisMonth": "Six indicators breakdown — your score this month",
     "autoInsights": "Automatic insights",
     "guidanceAndNotes": "Guidance and notes",
@@ -1362,16 +1362,16 @@
     "levelLabel": "Level",
     "indicators": {
       "productivityScore": {
-        "label": "Productivity",
-        "tip": "Completion rate of the required closure elements"
+        "label": "Course closure",
+        "tip": "Closing the whole course on time — 20%"
       },
       "timelinessScore": {
-        "label": "Timeliness",
-        "tip": "Adherence to element submission deadlines"
+        "label": "Punctuality",
+        "tip": "Submitting elements on time — 60% of the score"
       },
       "qualityScore": {
-        "label": "Quality",
-        "tip": "First-time acceptance rate without rework"
+        "label": "Execution quality",
+        "tip": "Accepted on first submission — 10%"
       },
       "criticalScore": {
         "label": "Critical elements",
@@ -1384,6 +1384,10 @@
       "disciplineScore": {
         "label": "Discipline",
         "tip": "Absence of delays and stagnation"
+      },
+      "excellenceScore": {
+        "label": "Excellence & collaboration",
+        "tip": "Documentation, peer certificate reviews and reports — 10%"
       }
     },
     "encourage": {

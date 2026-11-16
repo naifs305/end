@@ -790,6 +790,15 @@ model EmployeeKpiSnapshot {
   reportBonusScore                 Float               @default(0)  // مكافأة تقديم التقارير (+0 إلى +5)
   excellenceBonus                  Float               @default(0)  // مكافأة توثيق الدورات المميّز (+٣ لكل دورة، حد +٦)
   finalScore                       Float               @default(0)
+
+  // ----- النموذج الثاني: أربعة محاور -----
+  // timelinessScore = الالتزام بالمواعيد · qualityScore = جودة التنفيذ
+  // productivityScore = إقفال الدورات · excellenceScore = التميّز والتعاون
+  excellenceScore                  Float               @default(0)
+  rollingScore                     Float?              // متوسط آخر ثلاثة أشهر — يُرتَّب به
+  isSubjectToEvaluation            Boolean             @default(true)
+  modelVersion                     Int                 @default(1)
+  breakdown                        Json?               // أسباب الدرجة: ما خسر فيه نقاطاً
   performanceLevel                 PerformanceLevel    @default(GOOD)
 
   // ----- المشروع التشغيلي لحظة التقاط اللقطة -----
