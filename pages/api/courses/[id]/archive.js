@@ -9,5 +9,5 @@ async function handler(req, res) {
   }
 }
 
-module.exports = withMethods(['PUT'], withManagerOrSupervisor(handler));
+module.exports = withMethods(['PUT', 'POST'], withManagerOrSupervisor(handler));
 module.exports.default = module.exports;
