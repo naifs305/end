@@ -65,7 +65,8 @@ async function handler(req, res) {
     where: employeeWhere,
     select: { id: true },
   });
-  const employeeIds = employees.map(e => e.id);
+  // فصل المهام: ما قدّمه المشرف بنفسه ليس بانتظار قراره هو
+  const employeeIds = employees.map(e => e.id).filter((id) => isManager || id !== req.user.id);
 
   const pending = await prisma.courseClosureTracking.findMany({
     where: {

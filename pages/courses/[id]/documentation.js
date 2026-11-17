@@ -953,6 +953,11 @@ export default function CourseDocumentationPage() {
                   {doc?.starAwarded ? 'نلت نجمة التميّز' : ready ? 'جاهز للنشر' : `${readyCount} من ${liveChecks.length} معايير`}
                 </p>
                 <p className="text-[12px] text-text-soft">{published ? `منشور منذ ${fmt(doc.publishedAt)}` : 'لم يُنشر بعد'}</p>
+                {!doc?.starAwarded && (
+                  <p className="mx-auto mt-2 max-w-[240px] rounded-lg bg-sand/15 px-2 py-1.5 text-[11px] leading-relaxed text-warning">
+                    يُحتسب التوثيق في مؤشراتك عند نشره ونيله النجمة — الحفظ وحده لا يكفي.
+                  </p>
+                )}
               </div>
               <ul className="space-y-2 border-t border-border px-5 py-4">
                 {liveChecks.map((c) => (

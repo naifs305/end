@@ -148,6 +148,10 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const certConfirmed = certReview?.status === 'CONFIRMED';
   const isCertReviewer = !!user?.id && certReview?.reviewerId === user.id;
   const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
+  // فصل المهام: لا يعتمد أحد ما قدّمه بنفسه، ولا يعتمد المشرف عناصر دورة ينسّقها هو
+  const isOwnWork = !!user?.id && (element?.executedById === user.id
+    || (activeRole === 'PROJECT_SUPERVISOR' && isCoordinator));
+  const canDecideHere = isApprover && !isOwnWork;
   const isManager = activeRole === 'MANAGER';
   const [volunteering, setVolunteering] = useState(false);
   const canVolunteerReport = canExecute && isCourseReport && element.status === 'NOT_APPLICABLE';
@@ -432,7 +436,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
 
           {/* بلاغ العائق — يُرفع والمنسق منتظر، لا بعد فوات الموعد */}
           <div className="contents">
-            <BlockerPanel element={element} canAct={canExecute} onUpdate={onUpdate} />
+            <BlockerPanel element={element} canAct={canExecute} canOversee={isApprover} onUpdate={onUpdate} />
           </div>
 
           {showDelayReason && (
@@ -606,7 +610,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       )}
 
       {/* عرض بيانات التأمين للمعتمد */}
-      {isApprover && isMedicalInsurance && element.status === 'PENDING_APPROVAL' && element.formData && (
+      {canDecideHere && isMedicalInsurance && element.status === 'PENDING_APPROVAL' && element.formData && (
         <div className="order-last mb-1 w-full space-y-1.5 rounded-xl border border-primary/20 bg-primary-light px-4 py-3">
           <p className="inline-flex items-center gap-1.5 text-xs font-extrabold text-primary">
             <HeartPulse size={14} aria-hidden="true" /> {t('element.insurance.submittedTitle')}
@@ -640,7 +644,13 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
         </div>
       )}
 
-      {isApprover && element.status === 'PENDING_APPROVAL' && (
+      {isApprover && isOwnWork && element.status === 'PENDING_APPROVAL' && (
+        <p className="order-last w-full text-[11px] text-text-soft">
+          بانتظار اعتماد {activeRole === 'PROJECT_SUPERVISOR' ? 'المدير' : 'مشرف المشروع'} — لا يُعتمد العنصر ممن قدّمه (فصل المهام).
+        </p>
+      )}
+
+      {canDecideHere && element.status === 'PENDING_APPROVAL' && (
         <div className="contents">
           <div className="contents">
             <button
