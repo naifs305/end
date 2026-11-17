@@ -70,6 +70,16 @@ function Hero({ data, name }) {
           )}
         </div>
         <div className="grid grid-cols-2 gap-2 self-center">
+          <div className="col-span-2 rounded-xl bg-white/15 px-4 py-3">
+            <p className="text-[12px] opacity-85">مؤشر الأداء (من ١٠٠) — أساس الترتيب والتقييم، ولا يتأثر بعدد دوراتك</p>
+            <p className="text-3xl font-extrabold tabular-nums">{data.performance == null ? '—' : num(data.performance)}</p>
+            {data.evaluation?.supervision && (
+              <p className="text-[11px] opacity-85">منسقاً {num(data.evaluation.coordination)} · ومن الإشراف +{num(data.evaluation.supervisionBonus)} (مؤشر إشرافك {num(data.evaluation.supervision.index)})</p>
+            )}
+            {data.evaluation?.final != null && !data.evaluation.provisional && (
+              <p className="text-[11px] opacity-85">تقييمك السنوي {num(data.evaluation.final)} · {data.evaluation.rating?.name}</p>
+            )}
+          </div>
           <div className="rounded-xl bg-white/10 px-4 py-3">
             <p className="inline-flex items-center gap-1 text-[12px] opacity-80"><TrendingUp size={13} aria-hidden="true" /> كسبت</p>
             <p className="text-2xl font-extrabold tabular-nums" dir="ltr">+{num(summary?.gained)}</p>
@@ -77,10 +87,6 @@ function Hero({ data, name }) {
           <div className="rounded-xl bg-white/10 px-4 py-3">
             <p className="inline-flex items-center gap-1 text-[12px] opacity-80"><TrendingDown size={13} aria-hidden="true" /> خسرت</p>
             <p className="text-2xl font-extrabold tabular-nums" dir="ltr">{num(summary?.lost)}</p>
-          </div>
-          <div className="col-span-2 rounded-xl bg-white/10 px-4 py-3">
-            <p className="text-[12px] opacity-80">عدد الحركات في سجلك</p>
-            <p className="text-lg font-extrabold">{num(summary?.count, 0)}</p>
           </div>
         </div>
       </div>
@@ -237,7 +243,8 @@ function Leaderboard({ board, meId, canOpen, onOpen }) {
               </div>
               <p className="mt-2 font-extrabold text-text-main">{r.name}</p>
               <p className="text-[11px] text-text-soft">{r.project || '—'}</p>
-              <p className="mt-1 text-2xl font-extrabold text-primary tabular-nums" dir="ltr">{num(r.total)}</p>
+              <p className="mt-1 text-2xl font-extrabold text-primary tabular-nums">{r.performance == null ? '—' : num(r.performance)}</p>
+              <p className="text-[11px] text-text-soft">مؤشر الأداء · رصيد {num(r.total, 0)}</p>
               <LevelBadge level={r.level} />
             </div>
           ))}
@@ -255,6 +262,7 @@ function Leaderboard({ board, meId, canOpen, onOpen }) {
                 <th className="px-4 py-2.5 text-center">كسب</th>
                 <th className="px-4 py-2.5 text-center">خسر</th>
                 <th className="px-4 py-2.5 text-center">الرصيد</th>
+                <th className="px-4 py-2.5 text-center">مؤشر الأداء</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -265,14 +273,15 @@ function Leaderboard({ board, meId, canOpen, onOpen }) {
                     className={`${r.userId === meId ? 'bg-primary-light/50' : ''} ${open ? 'cursor-pointer hover:bg-background' : ''}`}>
                     <td className="px-4 py-2.5 font-extrabold text-primary">{num(r.rank, 0)}</td>
                     <td className="px-4 py-2.5">
-                      <p className="font-bold text-text-main">{r.name}{r.userId === meId && <span className="ms-1 text-[11px] text-primary">(أنت)</span>}</p>
+                      <p className="font-bold text-text-main">{r.name}{r.isSupervisor && <span className="ms-1.5 rounded-full bg-primary-light px-1.5 py-0.5 text-[10px] font-bold text-primary">مشرف</span>}{r.userId === meId && <span className="ms-1 text-[11px] text-primary">(أنت)</span>}</p>
                       <p className="text-[11px] text-text-soft">{r.project || '—'}</p>
                     </td>
                     <td className="px-4 py-2.5"><LevelBadge level={r.level} /></td>
                     <td className="px-4 py-2.5 text-center tabular-nums">{num(r.coursesCount, 0)}</td>
                     <td className="px-4 py-2.5 text-center text-primary tabular-nums" dir="ltr">+{num(r.gained)}</td>
                     <td className="px-4 py-2.5 text-center text-danger tabular-nums" dir="ltr">{num(r.lost)}</td>
-                    <td className="px-4 py-2.5 text-center text-base font-extrabold text-text-main tabular-nums" dir="ltr">{num(r.total)}</td>
+                    <td className="px-4 py-2.5 text-center font-bold text-text-main tabular-nums" dir="ltr">{num(r.total)}</td>
+                    <td className="px-4 py-2.5 text-center text-base font-extrabold text-primary tabular-nums">{r.performance == null ? '—' : num(r.performance)}</td>
                   </tr>
                 );
               })}
@@ -280,7 +289,7 @@ function Leaderboard({ board, meId, canOpen, onOpen }) {
           </table>
         </div>
       </div>
-      <p className="text-[11px] text-text-soft">المستويات: {board.levels.map((l) => `${l.name} من ${num(l.min, 0)}`).join(' · ')}</p>
+      <p className="text-[11px] text-text-soft">الترتيب بمؤشر الأداء: ما حصّله المنسق من أقصى ما أتاحته دوراته، فلا يتقدّم أحد بكثرة ما أُسند إليه. والمشرف يُضاف إليه ربع مؤشر إشرافه بسقف ١٠٠. المستويات بالرصيد: {board.levels.map((l) => `${l.name} من ${num(l.min, 0)}`).join(' · ')}</p>
     </div>
   );
 }

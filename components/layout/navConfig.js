@@ -6,6 +6,7 @@ import {
   BarChart3,
   Gauge,
   Flame,
+  ClipboardList,
   FileText,
   FileSearch,
   Award,
@@ -68,6 +69,7 @@ export function buildNavSections(activeRole, t) {
   // ── 3. الأداء والتقارير ──
   const reports = [];
   if (canViewKpis) reports.push(item('/points', Flame, t('nav.kpis')));
+  if (activeRole === 'MANAGER') reports.push(item('/evaluation', ClipboardList, 'التقييم السنوي'));
   reports.push(item('/reports', BarChart3, t('nav.reports')));
   // التقارير الميدانية مفتوحة للجميع: يطّلع الزملاء على الملاحظات ويعلّقون
   reports.push(item('/field-reports', NotebookPen, t('nav.fieldReports')));
