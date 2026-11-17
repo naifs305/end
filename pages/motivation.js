@@ -13,7 +13,8 @@ import {
   Award,
   Lightbulb,
   Target,
-  CalendarDays,
+  Flame,
+  Trophy,
   Medal,
   Crosshair,
   Zap,
@@ -471,42 +472,49 @@ function IdeasSection({ isManager, currentUser, t, intl }) {
 
 // ─── القسم 3: التحدي الشهري ──────────────────────────────────────────────────
 
-function ChallengeSection({ isManager, currentUser, t, intl }) {
-  const [challenge,  setChallenge]  = useState(null);
-  const [loading,    setLoading]    = useState(true);
-  const [showForm,   setShowForm]   = useState(false);
-  const [saving,     setSaving]     = useState(false);
-  const [form,       setForm]       = useState({ title:'', description:'', targetMetric:'timeliness', targetValue:'80' });
+function ChallengeSection({ isManager, t, intl }) {
+  const [challenge, setChallenge] = useState(null);
+  const [metrics, setMetrics] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ title: '', description: '', targetMetric: 'ideal_submissions', targetValue: '40' });
 
   const label = nowLabel();
 
   const load = useCallback(() => {
     setLoading(true);
     api.get('/motivation/challenges', { params: { periodLabel: label } })
-      .then(r => setChallenge(r.data))
+      .then((r) => setChallenge(r.data))
       .catch(() => setChallenge(null))
       .finally(() => setLoading(false));
   }, [label]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    api.get('/points/meta').then((r) => setMetrics(r.data?.challengeMetrics || [])).catch(() => {});
+  }, []);
 
   const handleCreate = async () => {
     if (!form.title.trim()) { toast.error(t('motivation.titleRequired')); return; }
     const tv = Number(form.targetValue);
-    if (!tv || tv < 10 || tv > 100) { toast.error(t('motivation.targetRange')); return; }
+    if (!Number.isFinite(tv) || tv < 0) { toast.error('اكتب هدفاً رقمياً'); return; }
     setSaving(true);
     try {
       await api.post('/motivation/challenges', { ...form, targetValue: tv, periodLabel: label });
       toast.success(t('motivation.challengeCreated'));
       setShowForm(false);
-      setForm({ title:'', description:'', targetMetric:'timeliness', targetValue:'80' });
       load();
     } catch (e) { toast.error(e?.response?.data?.message || t('common.error')); }
     finally { setSaving(false); }
   };
 
   const monthName = new Date().toLocaleString(intl, { month: 'long' });
-  const metricLabel = (m) => t(`motivation.metric.${m}`);
+  const meta = metrics.find((m) => m.key === form.targetMetric);
+  const lower = !!challenge?.lowerIsBetter;
+  const cur = Number(challenge?.currentValue || 0);
+  const target = Number(challenge?.targetValue || 0);
+  const pct = lower ? (cur <= target ? 100 : Math.max(0, 100 - (cur - target) * 10)) : target ? Math.min(100, (cur / target) * 100) : 0;
 
   return (
     <div className="space-y-4">
@@ -514,8 +522,8 @@ function ChallengeSection({ isManager, currentUser, t, intl }) {
         <div className="rounded-2xl border border-dashed border-border bg-white py-16 text-center shadow-card">
           <Target size={40} aria-hidden="true" className="mx-auto mb-3 text-text-soft/50" />
           <p className="font-bold text-text-main">{t('motivation.noChallenge', { month: monthName })}</p>
-          <p className="mt-1 text-sm text-text-soft mb-4">
-            {isManager ? t('motivation.noChallengeManager') : t('motivation.noChallengeEmployee')}
+          <p className="mb-4 mt-1 text-sm text-text-soft">
+            {isManager ? 'أطلق تحدياً للفريق: إن تحقق نال كل من أسهم فيه درجات في رصيده.' : t('motivation.noChallengeEmployee')}
           </p>
           {isManager && !showForm && (
             <button onClick={() => setShowForm(true)}
@@ -525,51 +533,52 @@ function ChallengeSection({ isManager, currentUser, t, intl }) {
           )}
         </div>
       ) : (
-        <div className={`overflow-hidden rounded-2xl border shadow-card ${challenge.status === 'ACHIEVED' ? 'border-accent/30' : 'border-border'} bg-white`}>
+        <div className={`overflow-hidden rounded-2xl border bg-white shadow-card ${challenge.status === 'ACHIEVED' ? 'border-accent/40' : 'border-border'}`}>
           {challenge.status === 'ACHIEVED' && (
-            <div className="bg-forest-50 border-b border-accent/20 px-5 py-3 text-center text-sm font-extrabold text-accent">
-              <PartyPopper size={16} aria-hidden="true" className="inline me-1 align-text-bottom" /> {t('motivation.challengeAchieved', { month: monthName })}
+            <div className="border-b border-accent/20 bg-forest-50 px-5 py-3 text-center text-sm font-extrabold text-accent">
+              <PartyPopper size={16} aria-hidden="true" className="me-1 inline align-text-bottom" />
+              تحقق التحدي — نال كل من أسهم هذا الشهر +{challenge.reward} في رصيده
             </div>
           )}
           <div className="p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
                   <Target size={24} aria-hidden="true" className="text-primary" />
                   <h3 className="text-xl font-extrabold text-text-main">{challenge.title}</h3>
                   <Badge label={t(`motivation.challengeStatus.${challenge.status}`)} cls={CHALLENGE_STATUS_CLS[challenge.status]} />
                 </div>
-                {challenge.description && <p className="text-sm text-text-soft mt-1">{challenge.description}</p>}
+                {challenge.description && <p className="mt-1 text-sm text-text-soft">{challenge.description}</p>}
+                <p className="mt-2 text-[13px] text-text-main">
+                  <span className="font-bold">{challenge.metricLabel}</span>
+                  {' · '}المكافأة: <span className="font-extrabold text-accent">+{challenge.reward}</span> لكل من أسهم
+                  {challenge.daysLeft > 0 && <> · بقي {challenge.daysLeft} يوماً</>}
+                </p>
               </div>
-              <div className="rounded-xl border border-primary/20 bg-primary-light px-4 py-3 text-center min-w-[100px]">
-                <p className="text-2xl font-extrabold text-primary">{challenge.targetValue}%</p>
-                <p className="text-[10px] text-text-soft mt-0.5">{t('motivation.target')}</p>
+              <div className="min-w-[120px] rounded-xl border border-primary/20 bg-primary-light px-4 py-3 text-center">
+                <p className="text-2xl font-extrabold text-primary">{fmtNum(cur)} <span className="text-sm font-bold text-text-soft">/ {fmtNum(target)}</span></p>
+                <p className="mt-0.5 text-[11px] text-text-soft">{lower ? `الحد الأعلى (${challenge.unit})` : `الهدف (${challenge.unit})`}</p>
               </div>
             </div>
+            <ProgressBar value={pct} max={100} color={challenge.status === 'ACHIEVED' ? 'bg-accent' : pct >= 80 ? 'bg-primary' : 'bg-sand'} />
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="font-bold text-text-main">{metricLabel(challenge.targetMetric)}</span>
-                <span className="text-text-soft">
-                  {challenge.currentValue != null ? `${Number(challenge.currentValue).toFixed(1)}%` : '—'} / {challenge.targetValue}%
-                </span>
+            {challenge.contributors?.length > 0 && (
+              <div className="mt-5">
+                <p className="mb-2 text-xs font-extrabold text-text-main">أكثر من أسهم في التحدي</p>
+                <ol className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {challenge.contributors.map((c, i) => (
+                    <li key={c.userId} className="flex items-center justify-between rounded-lg bg-background px-3 py-1.5 text-[13px]">
+                      <span className="truncate"><span className="me-2 font-extrabold text-primary">{i + 1}</span>{c.name}</span>
+                      <span className="font-bold text-text-main">{fmtNum(c.value)}</span>
+                    </li>
+                  ))}
+                </ol>
               </div>
-              <ProgressBar
-                value={challenge.currentValue || 0}
-                max={challenge.targetValue}
-                color={challenge.status === 'ACHIEVED' ? 'bg-accent' : (challenge.currentValue||0) >= challenge.targetValue * 0.8 ? 'bg-primary' : 'bg-sand'}
-              />
-              <p className="text-[11px] text-text-soft">
-                {challenge.currentValue != null
-                  ? t('motivation.currentProgress', { current: Number(challenge.currentValue).toFixed(1), target: challenge.targetValue })
-                  : t('motivation.noKpiYet')}
-              </p>
-            </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* نموذج إنشاء تحدي */}
       {isManager && showForm && (
         <div className="rounded-2xl border border-primary/20 bg-white p-5 shadow-card">
           <h4 className="mb-4 inline-flex items-center gap-2 font-extrabold text-primary">
@@ -578,39 +587,38 @@ function ChallengeSection({ isManager, currentUser, t, intl }) {
           <div className="space-y-3">
             <div>
               <label className="mb-1 block text-xs font-bold text-text-main">{t('motivation.challengeTitleLabel')} <span className="text-danger">*</span></label>
-              <input value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))}
-                placeholder={t('motivation.challengeTitlePlaceholder')}
+              <input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                placeholder="مثال: شهر بلا تأخير"
                 className="w-full rounded-xl border border-border px-3 py-2.5 text-sm outline-none focus:border-primary" />
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-xs font-bold text-text-main">{t('motivation.targetMetric')}</label>
-                <select value={form.targetMetric} onChange={e=>setForm(p=>({...p,targetMetric:e.target.value}))}
+                <label className="mb-1 block text-xs font-bold text-text-main">المقياس</label>
+                <select value={form.targetMetric} onChange={(e) => setForm((p) => ({ ...p, targetMetric: e.target.value }))}
                   className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none focus:border-primary">
-                  {['timeliness','quality','zero_returns','final_score'].map((k)=>(
-                    <option key={k} value={k}>{t(`motivation.metric.${k}`)}</option>
-                  ))}
+                  {metrics.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-bold text-text-main">{t('motivation.targetValueLabel')}</label>
-                <input type="number" min="10" max="100" value={form.targetValue} onChange={e=>setForm(p=>({...p,targetValue:e.target.value}))}
+                <label className="mb-1 block text-xs font-bold text-text-main">{meta?.lowerIsBetter ? 'الحد الأعلى المسموح' : 'الهدف'} {meta ? `(${meta.unit})` : ''}</label>
+                <input type="number" min="0" value={form.targetValue} onChange={(e) => setForm((p) => ({ ...p, targetValue: e.target.value }))}
                   className="w-full rounded-xl border border-border px-3 py-2.5 text-sm outline-none focus:border-primary" />
               </div>
             </div>
             <div>
               <label className="mb-1 block text-xs font-bold text-text-main">{t('motivation.challengeDescLabel')}</label>
-              <textarea value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))}
+              <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
                 rows={2} placeholder={t('motivation.challengeDescPlaceholder')}
                 className="w-full resize-none rounded-xl border border-border px-3 py-2.5 text-sm outline-none focus:border-primary" />
             </div>
+            <p className="text-[11px] text-text-soft">يُحسب التقدم من رصيد الإنجاز لحظة بلحظة، وإن تحقق نال كل من أسهم في الشهر بعمل +٢٠ في رصيده.</p>
           </div>
           <div className="mt-4 flex gap-2">
             <button onClick={handleCreate} disabled={saving}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-60">
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-60">
               {saving ? t('motivation.launching') : <><Rocket size={16} aria-hidden="true" /> {t('motivation.launchConfirm')}</>}
             </button>
-            <button onClick={()=>setShowForm(false)}
+            <button onClick={() => setShowForm(false)}
               className="rounded-xl border border-border px-4 py-2.5 text-sm text-text-soft hover:bg-background">
               {t('common.cancel')}
             </button>
@@ -620,7 +628,7 @@ function ChallengeSection({ isManager, currentUser, t, intl }) {
 
       {isManager && !showForm && challenge && (
         <button onClick={() => setShowForm(true)}
-          className="w-full rounded-xl border border-dashed border-primary/30 py-2.5 text-sm font-bold text-primary hover:bg-primary-light transition">
+          className="w-full rounded-xl border border-dashed border-primary/30 py-2.5 text-sm font-bold text-primary transition hover:bg-primary-light">
           {t('motivation.updateChallenge')}
         </button>
       )}
@@ -628,236 +636,73 @@ function ChallengeSection({ isManager, currentUser, t, intl }) {
   );
 }
 
-// ─── القسم 4: التعهد الشخصي ─────────────────────────────────────────────────
+const fmtNum = (v) => Number(v || 0).toLocaleString('ar-SA', { maximumFractionDigits: 1 });
 
-function PledgeSection({ isManager, currentUser, users, t, intl }) {
-  const [pledge,      setPledge]      = useState(null);
-  const [loading,     setLoading]     = useState(true);
-  const [form,        setForm]        = useState({ pledge1:'', pledge2:'', pledge3:'' });
-  const [saving,      setSaving]      = useState(false);
-  const [teamPledges, setTeamPledges] = useState([]);
-  const [teamLoading, setTeamLoading] = useState(false);
-  const [evaluating,  setEvaluating]  = useState({});
-  const [showTeam,    setShowTeam]    = useState(false);
+// ─── ارفع رصيدك: الطرق المحفّزة وفرصك القريبة ─────────────────────────────
+const BOOST_WAYS = [
+  { Icon: Rocket, title: 'قدّم قبل الموعد المثالي', points: '+١٢ للعنصر · +٢٤ للحرج', desc: 'المبادرة تُكافأ بخُمس درجة العنصر فوقها.' },
+  { Icon: Flame, title: 'سلسلة الالتزام', points: '+١٠ كل ١٠ عناصر', desc: 'عشرة عناصر متتالية في موعدها تمنحك مكافأة، والتأخر يُعيد العدّ.' },
+  { Icon: Trophy, title: 'أقفل الدورة في موعدها', points: '+٣٠', desc: 'أكبر درجة لعمل واحد، وكل يوم تأخير ينقص ٣.' },
+  { Icon: BookOpen, title: 'وثّق دوراتك', points: '+٢٠ ونجمة +٢٠', desc: 'جلسة موصوفة وثلاث صور تكفي للتوثيق، والنشر المكتمل يمنح النجمة.' },
+  { Icon: Users, title: 'سجّل كل دوراتك', points: '+١٥ للدورة · +٥ مبكراً', desc: 'كل دورة مسندة لم تُسجَّل تخصم ٢٠ بعد انقضاء شهرها.' },
+  { Icon: Award, title: 'راجع شهادات زميل', points: '+١٥', desc: 'تعين زميلك على التقديم، وتكسب درجات التعاون.' },
+  { Icon: Lightbulb, title: 'قدّم مبادرة تطوير', points: '+٥ · اعتمادها +٢٠ · تنفيذها +٣٠', desc: 'أفكارك لتحسين العمل تُحتسب في رصيدك.' },
+  { Icon: Target, title: 'شارك في تحدي الشهر', points: '+٢٠ إن تحقق', desc: 'لكل من أسهم في الشهر بعمل حين يبلغ الفريق الهدف.' },
+];
 
-  const label = nowLabel();
-  const monthName = new Date().toLocaleString(intl, { month: 'long' });
-
-  const loadMine = useCallback(() => {
-    setLoading(true);
-    api.get('/motivation/pledges', { params: { periodLabel: label } })
-      .then(r => setPledge(r.data))
-      .catch(() => setPledge(null))
-      .finally(() => setLoading(false));
-  }, [label]);
-
-  useEffect(() => { loadMine(); }, [loadMine]);
-
-  const loadTeam = () => {
-    if (!isManager) return;
-    setTeamLoading(true);
-    Promise.all(
-      (users||[]).filter(u=>u.roles?.includes('EMPLOYEE')).map(u =>
-        api.get('/motivation/pledges', { params: { periodLabel: label, userId: u.id } })
-          .then(r => r.data ? { ...r.data, empName:`${u.firstName} ${u.lastName}` } : null)
-          .catch(() => null)
-      )
-    ).then(results => setTeamPledges(results.filter(Boolean)))
-     .finally(() => setTeamLoading(false));
-  };
-
-  const handleSave = async () => {
-    if (!form.pledge1.trim()) { toast.error(t('motivation.pledge1Required')); return; }
-    setSaving(true);
-    try {
-      await api.post('/motivation/pledges', { ...form, periodLabel: label });
-      toast.success(t('motivation.pledgeSaved'));
-      loadMine();
-    } catch (e) { toast.error(e?.response?.data?.message || t('common.error')); }
-    finally { setSaving(false); }
-  };
-
-  const handleEvaluate = async (pledgeId, evals) => {
-    try {
-      const r = await api.put('/motivation/pledges/evaluate', {
-        pledgeId,
-        fulfilled1: evals.f1 ?? null,
-        fulfilled2: evals.f2 ?? null,
-        fulfilled3: evals.f3 ?? null,
-      });
-      toast.success(t('motivation.evaluated', { rate: r.data.fulfillRate ?? '—' }));
-      setEvaluating(p => { const n={...p}; delete n[pledgeId]; return n; });
-      loadTeam();
-    } catch { toast.error(t('common.error')); }
-  };
-
-  const FulfillDot = ({ val }) => (
-    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full
-      ${val === true ? 'bg-forest-50 text-accent border border-accent/20'
-        : val === false ? 'bg-burgundy/10 text-danger border border-burgundy/20'
-        : 'bg-background text-text-soft/40 border border-border'}`}>
-      {val === true ? <Check size={11} aria-hidden="true" /> : val === false ? <X size={11} aria-hidden="true" /> : <Circle size={9} aria-hidden="true" />}
-    </span>
-  );
-
-  const pledgeFields = [
-    { key:'pledge1', label:t('motivation.pledge1'), req:true,  ph:t('motivation.pledge1Placeholder') },
-    { key:'pledge2', label:t('motivation.pledge2'), req:false, ph:t('motivation.pledge2Placeholder') },
-    { key:'pledge3', label:t('motivation.pledge3'), req:false, ph:t('motivation.pledge3Placeholder') },
-  ];
-
+function BoostSection() {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    api.get('/points/ledger/me').then((r) => setData(r.data)).catch(() => setData(null));
+  }, []);
+  const ops = data?.opportunities || [];
   return (
     <div className="space-y-4">
-      {loading ? <Spinner /> : !pledge ? (
-        /* لم يُعبئ التعهد بعد */
-        <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
-          <div className="bg-gradient-to-l from-primary/5 to-white px-5 py-4 border-b border-border">
-            <h3 className="inline-flex items-center gap-2 font-extrabold text-primary">
-              <CalendarDays size={18} aria-hidden="true" /> {t('motivation.myPledges', { month: monthName })}
-            </h3>
-            <p className="text-xs text-text-soft mt-0.5">{t('motivation.pledgeIntro')}</p>
+      {data?.row && (
+        <a href="/points" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-white p-5 shadow-card transition hover:shadow-soft">
+          <div>
+            <p className="text-xs text-text-soft">رصيدك هذه السنة</p>
+            <p className="text-3xl font-extrabold text-primary" dir="ltr">{Number(data.total || 0).toLocaleString('ar-SA')}</p>
           </div>
-          <div className="p-5 space-y-3">
-            {pledgeFields.map(f => (
-              <div key={f.key}>
-                <label className="mb-1 block text-xs font-bold text-text-main">
-                  {f.label} {f.req && <span className="text-danger">*</span>}
-                </label>
-                <input
-                  value={form[f.key]}
-                  onChange={e => setForm(p=>({...p,[f.key]:e.target.value}))}
-                  placeholder={f.ph}
-                  className="w-full rounded-xl border border-border px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
-                />
-              </div>
+          <div className="text-end text-sm">
+            <p className="font-bold text-text-main">{data.level?.name}{data.rank ? ` · الترتيب ${data.rank} من ${data.of}` : ''}</p>
+            {data.level?.next && <p className="text-[12px] text-text-soft">بقي {Number(data.level.next.remaining).toLocaleString('ar-SA')} درجة لمستوى «{data.level.next.name}»</p>}
+          </div>
+        </a>
+      )}
+
+      {ops.length > 0 && (
+        <div className="rounded-2xl border border-border bg-white p-5 shadow-card">
+          <h3 className="mb-3 inline-flex items-center gap-2 font-extrabold text-primary"><Sparkles size={18} aria-hidden="true" /> فرصك القريبة</h3>
+          <ul className="grid gap-2 md:grid-cols-2">
+            {ops.slice(0, 6).map((o, i) => (
+              <li key={i}>
+                <a href={o.courseId ? `/courses/${o.courseId}` : '/points'} className={`flex items-start justify-between gap-3 rounded-xl border px-3 py-2.5 transition hover:shadow-card ${o.kind === 'stop' ? 'border-danger/30 bg-danger/5' : 'border-border bg-background'}`}>
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-bold text-text-main">{o.title}</span>
+                    <span className="block truncate text-[11px] text-text-soft">{o.courseName}</span>
+                    <span className={`block text-[11px] ${o.kind === 'stop' ? 'text-danger' : 'text-text-soft'}`}>{o.detail}</span>
+                  </span>
+                  <span className={`shrink-0 text-sm font-extrabold ${o.points < 0 ? 'text-danger' : 'text-primary'}`} dir="ltr">{o.points > 0 ? '+' : ''}{o.points}</span>
+                </a>
+              </li>
             ))}
-            <button onClick={handleSave} disabled={saving}
-              className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary py-3 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-60 transition">
-              {saving ? t('common.saving') : <><HeartHandshake size={16} aria-hidden="true" /> {t('motivation.pledgeCommit')}</>}
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* عرض التعهد الحالي */
-        <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
-          <div className="bg-gradient-to-l from-primary/5 to-white px-5 py-4 border-b border-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="inline-flex items-center gap-2 font-extrabold text-primary">
-                  <CalendarDays size={18} aria-hidden="true" /> {t('motivation.myPledges', { month: monthName })}
-                </h3>
-                {pledge.fulfillRate != null && (
-                  <p className="text-xs text-text-soft mt-0.5">
-                    {t('motivation.fulfillRate')} <span className="font-extrabold text-primary">{pledge.fulfillRate}%</span>
-                  </p>
-                )}
-              </div>
-              {pledge.fulfillRate === 100 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-forest-50 border border-accent/20 px-3 py-1 text-xs font-extrabold text-accent">
-                  <Medal size={14} aria-hidden="true" /> {t('motivation.pledgeKept')}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="p-5 space-y-3">
-            {[
-              { text: pledge.pledge1, fulfilled: pledge.fulfilled1 },
-              { text: pledge.pledge2, fulfilled: pledge.fulfilled2 },
-              { text: pledge.pledge3, fulfilled: pledge.fulfilled3 },
-            ].filter(p => p.text).map((p, i) => (
-              <div key={i} className="flex items-start gap-3 rounded-xl border border-border bg-background px-3 py-2.5">
-                <FulfillDot val={p.fulfilled} />
-                <p className={`flex-1 text-sm ${p.fulfilled === false ? 'line-through text-text-soft/50' : 'text-text-main'}`}>
-                  {p.text}
-                </p>
-              </div>
-            ))}
-            {pledge.fulfillRate != null && (
-              <div className="mt-2">
-                <ProgressBar
-                  value={pledge.fulfillRate}
-                  color={pledge.fulfillRate === 100 ? 'bg-accent' : pledge.fulfillRate >= 66 ? 'bg-primary' : 'bg-sand'}
-                />
-              </div>
-            )}
-            {pledge.evaluatedAt && (
-              <p className="text-[11px] text-text-soft text-center">
-                {t('motivation.evaluatedAt')} {new Date(pledge.evaluatedAt).toLocaleDateString(intl, { day:'numeric', month:'short', year:'numeric' })}
-              </p>
-            )}
-          </div>
+          </ul>
         </div>
       )}
 
-      {/* قسم تقييم الفريق — مدير فقط */}
-      {isManager && (
-        <div className="rounded-2xl border border-border bg-white shadow-card overflow-hidden">
-          <button onClick={() => { setShowTeam(v=>!v); if (!showTeam) loadTeam(); }}
-            className="flex w-full items-center justify-between px-5 py-3.5 hover:bg-background transition">
-            <h4 className="inline-flex items-center gap-2 font-extrabold text-text-main">
-              <Users size={18} aria-hidden="true" /> {t('motivation.evaluateTeamPledges')}
-            </h4>
-            {showTeam
-              ? <ChevronUp size={16} aria-hidden="true" className="text-text-soft" />
-              : <ChevronDown size={16} aria-hidden="true" className="text-text-soft" />}
-          </button>
-          {showTeam && (
-            <div className="border-t border-border p-4">
-              {teamLoading ? <Spinner /> : teamPledges.length === 0 ? (
-                <p className="py-6 text-center text-sm text-text-soft">{t('motivation.noTeamPledges')}</p>
-              ) : (
-                <div className="space-y-3">
-                  {teamPledges.map(tp => {
-                    const ev = evaluating[tp.id] || {};
-                    return (
-                      <div key={tp.id} className="rounded-xl border border-border p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="font-bold text-sm text-text-main">{tp.empName}</p>
-                          {tp.fulfillRate != null && (
-                            <span className={`text-xs font-extrabold ${tp.fulfillRate===100?'text-accent':tp.fulfillRate>=50?'text-primary':'text-danger'}`}>
-                              {tp.fulfillRate}%
-                            </span>
-                          )}
-                        </div>
-                        <div className="space-y-1.5 mb-2">
-                          {[
-                            { text: tp.pledge1, key:'f1', fulfilled: tp.fulfilled1 },
-                            { text: tp.pledge2, key:'f2', fulfilled: tp.fulfilled2 },
-                            { text: tp.pledge3, key:'f3', fulfilled: tp.fulfilled3 },
-                          ].filter(p=>p.text).map((p,i) => (
-                            <div key={i} className="flex items-center gap-2 text-xs text-text-soft">
-                              <label className="flex items-center gap-1.5 cursor-pointer flex-1">
-                                <input type="checkbox"
-                                  checked={ev[p.key] ?? (p.fulfilled ?? false)}
-                                  onChange={e => setEvaluating(prev => ({
-                                    ...prev,
-                                    [tp.id]: { ...(prev[tp.id]||{}), [p.key]: e.target.checked }
-                                  }))}
-                                  className="h-3.5 w-3.5 rounded" />
-                                <span>{p.text}</span>
-                              </label>
-                              <FulfillDot val={p.fulfilled} />
-                            </div>
-                          ))}
-                        </div>
-                        <button
-                          onClick={() => handleEvaluate(tp.id, {
-                            f1: ev.f1 ?? tp.fulfilled1 ?? false,
-                            f2: tp.pledge2 ? (ev.f2 ?? tp.fulfilled2 ?? false) : null,
-                            f3: tp.pledge3 ? (ev.f3 ?? tp.fulfilled3 ?? false) : null,
-                          })}
-                          className="rounded-lg bg-primary px-3 py-1 text-[11px] font-bold text-white hover:bg-primary-dark">
-                          {t('motivation.saveEvaluation')}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {BOOST_WAYS.map(({ Icon, title, points, desc }) => (
+          <div key={title} className="rounded-2xl border border-border bg-white p-4 shadow-card">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary-light text-primary"><Icon size={18} aria-hidden="true" /></span>
+              <span className="text-[12px] font-extrabold text-accent-dark">{points}</span>
             </div>
-          )}
-        </div>
-      )}
+            <p className="text-[14px] font-extrabold text-text-main">{title}</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-text-soft">{desc}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -926,10 +771,10 @@ function DocumentationSection({ isManager }) {
 }
 
 const TABS = [
+  { key:'boost',     Icon: Flame, label: 'ارفع رصيدك' },
   { key:'badges',    Icon: Award },
   { key:'ideas',     Icon: Lightbulb },
   { key:'challenge', Icon: Target },
-  { key:'pledge',    Icon: CalendarDays },
   { key:'documentation', Icon: BookOpen },
 ];
 
@@ -939,7 +784,7 @@ export default function MotivationPage() {
   const intl = locale === 'en' ? 'en-US' : 'ar-SA-u-ca-gregory';
   const isManager    = activeRole === 'MANAGER';
   const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
-  const [tab,   setTab]   = useState('badges');
+  const [tab,   setTab]   = useState('boost');
   const [users, setUsers] = useState([]);
 
   useEffect(() => {
@@ -953,7 +798,7 @@ export default function MotivationPage() {
 
   const monthName = new Date().toLocaleString(intl, { month: 'long' });
 
-  const tabLabel = (key) => t(`motivation.tabs.${key}`);
+  const tabLabel = (key) => TABS.find((x) => x.key === key)?.label || t(`motivation.tabs.${key}`);
 
   return (
     <MainLayout>
@@ -966,12 +811,11 @@ export default function MotivationPage() {
               <Sparkles size={24} aria-hidden="true" /> {t('motivation.title')}
             </h1>
             <p className="text-sm opacity-80 mb-4">{t('motivation.subtitle', { month: monthName })}</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {[
                 { Icon: Award,        label:t('motivation.tabs.badges'),    desc:t('motivation.bannerBadges') },
                 { Icon: Lightbulb,    label:t('motivation.tabs.ideas'),     desc:t('motivation.bannerIdeas') },
                 { Icon: Target,       label:t('motivation.tabs.challenge'), desc:t('motivation.bannerChallenge') },
-                { Icon: CalendarDays, label:t('motivation.tabs.pledge'),    desc:t('motivation.bannerPledge') },
                 { Icon: BookOpen,     label:t('motivation.tabs.documentation'), desc:t('motivation.bannerDocumentation') },
               ].map(item => {
                 const ItemIcon = item.Icon;
@@ -1009,11 +853,11 @@ export default function MotivationPage() {
         </div>
 
         {/* المحتوى */}
+        {tab === 'boost'     && <BoostSection />}
         {tab === 'badges'    && <BadgesSection   isManager={isManager||isSupervisor} currentUser={user} users={users} t={t} intl={intl} />}
         {tab === 'ideas'     && <IdeasSection    isManager={isManager||isSupervisor} currentUser={user} t={t} intl={intl} />}
-        {tab === 'challenge' && <ChallengeSection isManager={isManager}              currentUser={user} t={t} intl={intl} />}
+        {tab === 'challenge' && <ChallengeSection isManager={isManager} t={t} intl={intl} />}
         {tab === 'documentation' && <DocumentationSection isManager={isManager} />}
-        {tab === 'pledge'    && <PledgeSection   isManager={isManager}               currentUser={user} users={users} t={t} intl={intl} />}
 
       </div>
     </MainLayout>
