@@ -31,6 +31,7 @@ import {
   User,
 } from 'lucide-react';
 import MainLayout from '../components/layout/MainLayout';
+import TeamReminders from '../components/operational/TeamReminders';
 import api from '../lib/axios';
 import useAuth from '../context/AuthContext';
 import { useTranslation } from '../lib/i18n';
@@ -568,5 +569,13 @@ export default function ApprovalsPage() {
   const { activeRole } = useAuth();
   const isManager = activeRole === 'MANAGER';
 
-  return <MainLayout>{isManager ? <ManagerOversight /> : <SupervisorApprovals />}</MainLayout>;
+  return (
+    <MainLayout>
+      <div className="space-y-4">
+        {/* تذكير المنسقين بما حلّ موعده ولم يُقدَّم */}
+        <TeamReminders />
+        {isManager ? <ManagerOversight /> : <SupervisorApprovals />}
+      </div>
+    </MainLayout>
+  );
 }

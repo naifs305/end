@@ -303,20 +303,8 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const handleRemind = async () => {
     setReminding(true);
     try {
-      const res = await api.get('/messages/users');
-      const approvers = (res.data || []).filter(
-        (u) => Array.isArray(u.roles) && (u.roles.includes('MANAGER') || u.roles.includes('PROJECT_SUPERVISOR'))
-      );
-      if (!approvers.length) {
-        toast.error(t('element.toast.noApprover'));
-        return;
-      }
-      await api.post('/messages', {
-        recipientIds: approvers.map((u) => u.id),
-        subject: t('element.remind.subject', { course: element?.course?.name || t('course.form.editTitle') }),
-        message: t('element.remind.body', { element: element?.element?.name || '', course: element?.course?.name || '' }),
-        courseId: element?.courseId || undefined,
-      });
+      // يصل مشرف الدورة (أو المدير إن لم يكن لها مشرف) — لا كل المشرفين
+      await api.post(`/courses/${element.courseId}/remind-supervisor`);
       toast.success(t('element.toast.reminderSent'));
     } catch (err) {
       toast.error(err.response?.data?.message || t('element.toast.reminderFailed'));
@@ -324,6 +312,7 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
       setReminding(false);
     }
   };
+
 
   // بطاقة المترجم تُفتح للاطلاع في كل حالاتها: قبل التقديم لمن لا ينفّذ،
   // وبعد التقديم أو الاعتماد للجميع — فيُرى العقد ورسائل القانونية والمالية.

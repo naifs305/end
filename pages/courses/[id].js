@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import useAuth from '../../context/AuthContext';
 import api from '../../lib/axios';
+import RemindCoordinatorButton from '../../components/operational/RemindCoordinatorButton';
 import MainLayout from '../../components/layout/MainLayout';
 import ElementRow from '../../components/operational/ElementRow';
 import ClosureReviewCard from '../../components/operational/ClosureReviewCard';
@@ -701,6 +702,9 @@ export default function CourseDetail() {
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                {(isManager || isSupervisor) && course.primaryEmployeeId !== user?.id && !['CLOSED', 'ARCHIVED'].includes(course.status) && (
+                  <RemindCoordinatorButton courseId={id} />
+                )}
                 <button
                   onClick={() => setShowNotesReport(true)}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-accent/30 bg-forest-50 px-3 py-2 text-xs font-extrabold text-accent shadow-sm transition hover:bg-accent hover:text-white"
