@@ -2,6 +2,7 @@ import Head from 'next/head';
 import { AuthProvider } from '../context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 import { I18nProvider, useTranslation } from '../lib/i18n';
+import AutoTranslate from '../lib/i18n/AutoTranslate';
 import '../styles/globals.css';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -46,6 +47,8 @@ export default function App({ Component, pageProps }) {
       <I18nProvider>
         <AuthProvider>
           <AppChrome />
+          {/* ترجمة ما كُتب بالعربية مباشرة حين تكون الواجهة إنجليزية */}
+          <AutoTranslate />
           <Component {...pageProps} />
         </AuthProvider>
       </I18nProvider>
