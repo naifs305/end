@@ -37,6 +37,8 @@ export default function ClosureElementsPage() {
   const [saving, setSaving] = useState(false);
   const [confirmState, setConfirmState] = useState(null);
   const [busy, setBusy] = useState(false);
+  // تغيير نوع العنصر: { el, to, applyToOpen }
+  const [typeChange, setTypeChange] = useState(null);
 
   const [name, setName] = useState('');
   const [elementType, setElementType] = useState('MANDATORY');
@@ -107,6 +109,27 @@ export default function ClosureElementsPage() {
   };
 
   if (authLoading || !user) return null;
+
+  const TYPE_EFFECT = {
+    OPTIONAL: 'يصبح العنصر اختيارياً يفعّله المنسق في دورته إن احتاجه. وفي الدورات الجارية يسقط حيث لم يُقدَّم بعد.',
+    MANDATORY: 'يصبح العنصر مطلوباً في كل دورة جديدة. وفي الدورات الجارية يُضاف لما لم تبدأ بعد فقط — فلا يُطالَب أحد به بأثر رجعي.',
+    CONDITIONAL: 'يعود العنصر مشروطاً بشرطه المحفوظ. وفي الدورات الجارية يُضاف لما لم تبدأ وتحقق فيها الشرط، ويسقط حيث لا ينطبق ولم يُقدَّم.',
+  };
+
+  const confirmTypeChange = async () => {
+    setBusy(true);
+    try {
+      const res = await api.patch(`/closure-elements/${typeChange.el.id}`, { elementType: typeChange.to, applyToOpen: typeChange.applyToOpen });
+      const n = res.data?.appliedToOpenCourses || 0;
+      toast.success(`صار «${typeChange.el.name}» ${t(`admin.closureElements.types.${typeChange.to}`)}${typeChange.applyToOpen ? ` — طُبّق على ${n} دورة جارية` : ' — للدورات الجديدة'}`);
+      setTypeChange(null);
+      await load();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'تعذّر تغيير النوع');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <MainLayout>
@@ -187,12 +210,19 @@ export default function ClosureElementsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.bg} ${meta.text} ${meta.border}`}>
-                          {t(`admin.closureElements.types.${el.elementType}`) || el.elementType}
-                        </span>
+                        <select
+                          value={el.elementType}
+                          onChange={(e) => setTypeChange({ el, to: e.target.value, applyToOpen: false })}
+                          aria-label={`نوع العنصر ${el.name}`}
+                          className={`rounded-full border px-2 py-0.5 text-[11px] font-bold outline-none ${meta.bg} ${meta.text} ${meta.border}`}
+                        >
+                          <option value="MANDATORY">{t('admin.closureElements.types.MANDATORY')}</option>
+                          <option value="OPTIONAL">{t('admin.closureElements.types.OPTIONAL')}</option>
+                          {el.conditionField && <option value="CONDITIONAL">{t('admin.closureElements.types.CONDITIONAL')}</option>}
+                        </select>
                       </td>
                       <td className="px-4 py-3 text-xs text-text-soft">
-                        {el.conditionField ? t(`admin.closureElements.conditions.${el.conditionField}`) : '—'}
+                        {el.conditionField && el.elementType === 'CONDITIONAL' ? t(`admin.closureElements.conditions.${el.conditionField}`) : '—'}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${el.isActive ? 'bg-success/10 text-success' : 'bg-burgundy/10 text-danger'}`}>
@@ -219,6 +249,25 @@ export default function ClosureElementsPage() {
       <div className="mt-4">
         <ElementSuspensions elements={elements} />
       </div>
+
+      {typeChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !busy && setTypeChange(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-soft" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-extrabold text-text-main">
+              «{typeChange.el.name}»: {t(`admin.closureElements.types.${typeChange.el.elementType}`)} ← {t(`admin.closureElements.types.${typeChange.to}`)}
+            </h3>
+            <p className="mt-2 text-[13px] leading-relaxed text-text-soft">{TYPE_EFFECT[typeChange.to]}</p>
+            <label className="mt-4 flex cursor-pointer items-start gap-2 rounded-xl border border-border bg-background p-3 text-[13px]">
+              <input type="checkbox" checked={typeChange.applyToOpen} onChange={(e) => setTypeChange({ ...typeChange, applyToOpen: e.target.checked })} className="mt-0.5" />
+              <span><b>طبّقه على الدورات الجارية أيضاً</b><span className="block text-[11px] text-text-soft">وإلا يسري على الدورات الجديدة وحدها، وتبقى الجارية كما هي.</span></span>
+            </label>
+            <div className="mt-4 flex gap-2">
+              <button type="button" onClick={confirmTypeChange} disabled={busy} className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-bold text-white disabled:opacity-50">{busy ? 'جارٍ الحفظ…' : 'تأكيد'}</button>
+              <button type="button" onClick={() => setTypeChange(null)} disabled={busy} className="rounded-xl border border-border px-4 py-2.5 text-sm text-text-soft">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         open={!!confirmState}

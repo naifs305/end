@@ -700,7 +700,12 @@
         "requiresPreTest": "تتطلب اختبار قبلي",
         "requiresPostTest": "تتطلب اختبار بعدي",
         "requiresOpeningReport": "تتطلب تقرير افتتاح",
-        "requiresClosingReport": "تتطلب تقرير اختتام"
+        "requiresClosingReport": "تتطلب تقرير اختتام",
+        "courseType=external": "دورة خارجية",
+        "requiresInterpreter": "تتطلب مترجماً",
+        "interpreterContractType=CONTRACT": "مترجم بعقد",
+        "interpreterContractType=TRANSFER": "مترجم بتحويل",
+        "interpreterContractType=ADVANCE": "مترجم بسلفة"
       }
     },
     "jobs": {
