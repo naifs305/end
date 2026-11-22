@@ -380,7 +380,7 @@
     "dashboard": "Dashboard",
     "courses": "Courses",
     "approvals": "Approvals",
-    "kpis": "KPIs",
+    "kpis": "Achievement points",
     "reports": "Reports",
     "executiveReport": "Executive Report",
     "quality": "Quality",
@@ -700,7 +700,12 @@
         "requiresPreTest": "Requires pre-test",
         "requiresPostTest": "Requires post-test",
         "requiresOpeningReport": "Requires opening report",
-        "requiresClosingReport": "Requires closing report"
+        "requiresClosingReport": "Requires closing report",
+        "courseType=external": "External course",
+        "requiresInterpreter": "Requires interpreter",
+        "interpreterContractType=CONTRACT": "Interpreter (contract)",
+        "interpreterContractType=TRANSFER": "Interpreter (transfer)",
+        "interpreterContractType=ADVANCE": "Interpreter (advance)"
       }
     },
     "jobs": {

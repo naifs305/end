@@ -5,6 +5,9 @@ import {
   Archive,
   BarChart3,
   Gauge,
+  Flame,
+  UserCheck,
+  ClipboardList,
   FileText,
   FileSearch,
   Award,
@@ -66,10 +69,13 @@ export function buildNavSections(activeRole, t) {
 
   // ── 3. الأداء والتقارير ──
   const reports = [];
-  if (canViewKpis) reports.push(item('/kpis', Gauge, t('nav.kpis')));
+  if (canViewKpis) reports.push(item('/points', Flame, t('nav.kpis')));
+  if (activeRole === 'MANAGER') reports.push(item('/evaluation', ClipboardList, 'التقييم السنوي'));
   reports.push(item('/reports', BarChart3, t('nav.reports')));
   // التقارير الميدانية مفتوحة للجميع: يطّلع الزملاء على الملاحظات ويعلّقون
   reports.push(item('/field-reports', NotebookPen, t('nav.fieldReports')));
+  // مراجعات الشهادات: من يراجع، وكم يستغرق، وما يكتشفه
+  reports.push(item('/reviews', UserCheck, 'مراجعات الشهادات'));
   if (isOversight) reports.push(item('/executive-report', FileText, t('nav.executiveReport')));
   // أداء الإدارات: من تقييمات المنسقين لصعوبات الإقفال
   if (isOversight) reports.push(item('/departments', Building2, t('nav.departments')));

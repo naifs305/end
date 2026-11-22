@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/router';
-import { SlidersHorizontal, Save, Mail, ShieldAlert, Languages, CalendarClock } from 'lucide-react';
+import { SlidersHorizontal, Save, Mail, ShieldAlert, Languages, CalendarClock, Scale } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
 import MainLayout from '../components/layout/MainLayout';
@@ -24,6 +24,7 @@ import {
 } from '../lib/modules/config/operationalSettings';
 
 const GROUP_ICON = {
+  evaluation: Scale,
   blockers: ShieldAlert,
   courses: CalendarClock,
   interpreter: Languages,

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/router';
-import { Plus, UserPlus, ChevronUp, ChevronDown, AlertTriangle, Trash2 } from 'lucide-react';
+import { Plus, UserPlus, ChevronUp, ChevronDown, AlertTriangle, Trash2, Pencil, Check, X } from 'lucide-react';
 import MainLayout from '../components/layout/MainLayout';
 import ConfirmModal from '../components/operational/ConfirmModal';
 import { useAuth } from '../context/AuthContext';
@@ -37,6 +37,9 @@ export default function ProjectsPage() {
   // إسناد المنسقين: اختيار منفصل لكل مشروع { [projectId]: userId }
   const [coordPick,        setCoordPick]        = useState({});
   const [coordBusy,        setCoordBusy]        = useState(null);
+  // تعديل اسم المشروع: { id, name } للمشروع الجاري تعديله
+  const [renaming,         setRenaming]         = useState(null);
+  const isManagerRole = activeRole === 'MANAGER';
 
   useEffect(() => {
     if (!authLoading && (!user || !canManageProjects(activeRole))) router.replace('/');
@@ -83,6 +86,39 @@ export default function ProjectsPage() {
       toast.success(t('admin.projects.supervisorRemoved'));
       load();
     } catch (e) { toast.error(e.response?.data?.message || t('admin.projects.removeFailed')); }
+  };
+
+  // تعديل اسم المشروع — يسري على كل دوراته ومنسقيه فوراً
+  const saveRename = async () => {
+    const name = String(renaming?.name || '').trim();
+    if (name.length < 2) return toast.error('اكتب اسم المشروع');
+    setBusy(true);
+    try {
+      await api.put(`/projects/${renaming.id}`, { name });
+      toast.success('عُدّل اسم المشروع');
+      setRenaming(null);
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذّر تعديل الاسم');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // نقل منسق من مشروعه إلى مشروع آخر (من قائمة منسقي مشروعه)
+  const moveCoordinator = async (member, projectId) => {
+    if (!projectId) return;
+    const target = projects.find((p) => p.id === projectId);
+    setCoordBusy(member.id);
+    try {
+      await api.put(`/users/${member.id}`, { operationalProjectId: projectId });
+      toast.success(`نُقل ${member.firstName} ${member.lastName} إلى ${target?.name || 'المشروع'} — ودوراته القائمة تبقى في مشاريعها`);
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذّر نقل المنسق');
+    } finally {
+      setCoordBusy(null);
+    }
   };
 
   // إسناد منسق لمشروع — ينقله من مشروعه الحالي إلى هذا المشروع
@@ -214,8 +250,32 @@ export default function ProjectsPage() {
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg font-extrabold text-primary">
                         {project.name?.[0]}
                       </div>
-                      <div>
-                        <h3 className="font-extrabold text-text-main">{project.name}</h3>
+                      <div onClick={(e) => { if (renaming?.id === project.id) e.stopPropagation(); }}>
+                        {renaming?.id === project.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              autoFocus
+                              value={renaming.name}
+                              onChange={(e) => setRenaming({ ...renaming, name: e.target.value })}
+                              onKeyDown={(e) => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') setRenaming(null); }}
+                              aria-label="اسم المشروع"
+                              className="w-64 max-w-full rounded-lg border border-primary px-2 py-1 text-sm font-bold outline-none"
+                            />
+                            <button type="button" onClick={saveRename} disabled={busy} aria-label="حفظ الاسم" className="rounded-lg bg-primary p-1.5 text-white disabled:opacity-50"><Check size={14} aria-hidden="true" /></button>
+                            <button type="button" onClick={() => setRenaming(null)} aria-label="إلغاء" className="rounded-lg border border-border p-1.5 text-text-soft"><X size={14} aria-hidden="true" /></button>
+                          </div>
+                        ) : (
+                          <h3 className="inline-flex items-center gap-1.5 font-extrabold text-text-main">
+                            {project.name}
+                            {isManagerRole && (
+                              <button type="button" onClick={(e) => { e.stopPropagation(); setRenaming({ id: project.id, name: project.name }); }}
+                                aria-label={`تعديل اسم ${project.name}`} title="تعديل الاسم"
+                                className="rounded-md p-1 text-text-soft hover:bg-primary-light hover:text-primary">
+                                <Pencil size={13} aria-hidden="true" />
+                              </button>
+                            )}
+                          </h3>
+                        )}
                         <p className="text-xs text-text-soft">
                           {t('admin.projects.courseCount', { count: project._count?.courses || 0 })} • {t('admin.projects.coordinatorCount', { count: members.length })}
                           {supervisorUser
@@ -299,7 +359,7 @@ export default function ProjectsPage() {
                           {members.length === 0 ? (
                             <p className="text-xs text-text-soft">{t('admin.projects.noCoordinators')}</p>
                           ) : (
-                            <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                            <div className="space-y-1.5 max-h-56 overflow-y-auto">
                               {members.map((m) => (
                                 <div key={m.id} className="flex items-center gap-2 rounded-lg bg-background px-2.5 py-1.5">
                                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
@@ -311,6 +371,18 @@ export default function ProjectsPage() {
                                   )}
                                   {!m.isActive && (
                                     <span className="text-[9px] rounded-full bg-burgundy/10 text-danger px-1.5 py-0.5 font-bold">{t('admin.users.disabledBadge')}</span>
+                                  )}
+                                  {projects.length > 1 && (
+                                    <select
+                                      value=""
+                                      disabled={coordBusy === m.id}
+                                      onChange={(e) => moveCoordinator(m, e.target.value)}
+                                      aria-label={`نقل ${m.firstName} ${m.lastName} إلى مشروع آخر`}
+                                      className="shrink-0 rounded-md border border-border bg-white px-1.5 py-0.5 text-[10px] text-text-soft outline-none focus:border-primary"
+                                    >
+                                      <option value="">{coordBusy === m.id ? 'جارٍ النقل…' : 'نقل إلى…'}</option>
+                                      {projects.filter((p) => p.id !== project.id).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    </select>
                                   )}
                                 </div>
                               ))}

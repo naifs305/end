@@ -10,6 +10,7 @@ import { toast } from 'react-hot-toast';
 import { NotebookPen, MessageCircle, Search, Send, Trash2, Printer, Users, CalendarDays, MapPin, Paperclip } from 'lucide-react';
 import MainLayout from '../components/layout/MainLayout';
 import Avatar from '../components/shared/Avatar';
+import CourseInsights from '../components/fieldReports/CourseInsights';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
 import { useTranslation } from '../lib/i18n';
@@ -37,6 +38,9 @@ export default function FieldReportsPage() {
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  // «التقارير الميدانية» أو «ملاحظات من تقارير الدورات»
+  const [view, setView] = useState('reports');
+  const [insightsCount, setInsightsCount] = useState(null);
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -56,6 +60,11 @@ export default function FieldReportsPage() {
   }, []);
 
   useEffect(() => { if (user) load(); }, [user, load]);
+  // عدد ملاحظات تقارير الدورات للتبويب — بلا انتظار
+  useEffect(() => {
+    if (!user) return;
+    api.get('/field-reports/insights').then((r) => setInsightsCount(unwrap(r)?.counts?.total ?? null)).catch(() => {});
+  }, [user]);
 
   // التقرير المختار: من الرابط (شريط الأخبار والإشعار) أو أحدث تقرير
   useEffect(() => {
@@ -137,7 +146,20 @@ export default function FieldReportsPage() {
           <p className="mt-1 text-sm text-text-soft">ملاحظات الزملاء من الميدان — اطّلع عليها لتتلافاها في دوراتك، وشارك برأيك.</p>
         </div>
 
-        {loading ? (
+        <div className="flex gap-1 rounded-2xl border border-border bg-white p-1 shadow-card">
+          {[
+            { key: 'reports', label: 'التقارير الميدانية', n: items.length },
+            { key: 'insights', label: 'ملاحظات من تقارير الدورات', n: insightsCount },
+          ].map((tab) => (
+            <button key={tab.key} type="button" onClick={() => setView(tab.key)}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${view === tab.key ? 'bg-primary text-white' : 'text-text-soft hover:bg-background'}`}>
+              {tab.label}
+              {tab.n != null && <span className={`rounded-full px-2 text-[12px] ${view === tab.key ? 'bg-white/20' : 'bg-background'}`}>{Number(tab.n).toLocaleString('ar-SA')}</span>}
+            </button>
+          ))}
+        </div>
+
+        {view === 'insights' ? <CourseInsights /> : loading ? (
           <div className="flex justify-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>
         ) : items.length === 0 ? (
           <p className="rounded-[20px] border border-dashed border-border bg-white py-12 text-center text-sm text-text-soft">لا تقارير ميدانية بعد.</p>

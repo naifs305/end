@@ -214,6 +214,8 @@ async function main() {
     { key: 'materials',            name: 'إعادة المواد التدريبية المعارة', isFormBased: false, deadlineRefPoint: 'END', deadlineIdealHours:  24,  deadlineMaxHours:  72, isDeadlineWorkingDays: false, elementType: 'CONDITIONAL', conditionField: 'materialsIssued' },
     { key: 'settlement',           name: 'تسوية السلفة المؤقتة',        isFormBased: true,  deadlineRefPoint: 'END',   deadlineIdealHours: 120,  deadlineMaxHours: 240, isDeadlineWorkingDays: true,  elementType: 'CONDITIONAL', conditionField: 'requiresAdvanceSettlement' },
     { key: 'medical_insurance',    name: 'استخراج التأمين الطبي للمتدربين', isFormBased: true, deadlineRefPoint: 'START', deadlineIdealHours: -72, deadlineMaxHours:  72, isDeadlineWorkingDays: false, elementType: 'CONDITIONAL', conditionField: 'courseType=external' },
+    // دليل السفر التعريفي: للدورات الخارجية وحدها، قبل البداية بأسبوع (والأقصى ٣ أيام)
+    { key: 'travel_guide',         name: 'دليل السفر التعريفي',          isFormBased: true, deadlineRefPoint: 'START', deadlineIdealHours: -168, deadlineMaxHours: -72, isDeadlineWorkingDays: false, elementType: 'CONDITIONAL', conditionField: 'courseType=external' },
     // ----- مترجم الدورة: نوع التعاقد يحدد العنصر المطلوب -----
     { key: 'interpreter_contract', name: 'عقد مترجم الدورة',              isFormBased: true,  deadlineRefPoint: 'START', deadlineIdealHours: -120, deadlineMaxHours: -72, isDeadlineWorkingDays: true, elementType: 'CONDITIONAL', conditionField: 'interpreterContractType=CONTRACT' },
     { key: 'interpreter_transfer', name: 'طلب صرف مستحقات المترجم (تحويل)', isFormBased: true, deadlineRefPoint: 'END',  deadlineIdealHours:  72,  deadlineMaxHours: 120, isDeadlineWorkingDays: true, elementType: 'CONDITIONAL', conditionField: 'interpreterContractType=TRANSFER' },
@@ -222,6 +224,10 @@ async function main() {
   ];
 
   // الخطوة 1: upsert الحقول الأساسية فقط (آمنة دائماً)
+  // العناصر الموجودة سلفاً لا تُمسّ مواعيدها ولا نوعها في الخطوة 2: المدير يضبط
+  // نوع العنصر من صفحة «عناصر الإقفال»، والبذرة تعمل مع كل نشر فكانت تُلغي ضبطه.
+  // وأي تغيير مقصود في عنصر قائم يُرحَّل بتعديل على القاعدة لا بالبذرة.
+  const existingKeys = new Set((await prisma.closureElement.findMany({ select: { key: true } })).map((e) => e.key));
   for (const el of elements) {
     await prisma.closureElement.upsert({
       where: { key: el.key },
@@ -232,7 +238,7 @@ async function main() {
 
   // الخطوة 2: تحديث حقول المواعيد ونوع العنصر بعد التأكد من وجود الأعمدة
   try {
-    for (const el of elements) {
+    for (const el of elements.filter((e) => !existingKeys.has(e.key))) {
       await directPrisma.$executeRawUnsafe(
         `UPDATE "ClosureElement" SET "deadlineRefPoint"=$1, "deadlineIdealHours"=$2, "deadlineMaxHours"=$3, "isDeadlineWorkingDays"=$4, "elementType"=$5, "conditionField"=$6 WHERE key=$7`,
         el.deadlineRefPoint, el.deadlineIdealHours, el.deadlineMaxHours, el.isDeadlineWorkingDays, el.elementType, el.conditionField, el.key

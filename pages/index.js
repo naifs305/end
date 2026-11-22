@@ -343,9 +343,7 @@ export default function Home() {
   const isSupervisor = activeRole === 'PROJECT_SUPERVISOR';
   const isEmployee   = activeRole === 'EMPLOYEE';
   const [dash, setDash]               = useState(null);
-  const [kpiSnaps, setKpiSnaps]       = useState([]);
   const [pageLoad, setPageLoad]       = useState(true);
-  const [teamPeriod, setTeamPeriod]   = useState('current');
   const [ticker, setTicker]           = useState({ tickerItems: [], pendingElements: [] });
   // تعاميم الشريط — للمدير
   const [announcements, setAnnouncements] = useState([]);
@@ -388,33 +386,15 @@ export default function Home() {
     }
   }, [user, activeRole, isAdmin, isSupervisor]);
 
-  const teamPeriodParams = useMemo(() => {
-    const now = new Date();
-    if (teamPeriod === 'year') return { periodType: 'YEARLY', periodLabel: String(now.getFullYear()) };
-    if (teamPeriod === 'previous') {
-      const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      return { periodType: 'MONTHLY', periodLabel: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` };
-    }
-    return { periodType: 'MONTHLY', periodLabel: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}` };
-  }, [teamPeriod]);
-
-  const teamPeriodLabel = useMemo(() => {
-    const now = new Date();
-    if (teamPeriod === 'year') return t('dashboard.yearLabel', { year: now.getFullYear() });
-    if (teamPeriod === 'previous') {
-      const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      return `${d.toLocaleString('ar-SA-u-ca-gregory', { month: 'long' })} ${d.getFullYear()}`;
-    }
-    return `${now.toLocaleString('ar-SA-u-ca-gregory', { month: 'long' })} ${now.getFullYear()}`;
-  }, [teamPeriod]);
-
+  // رصيد الإنجاز: ترتيب السنة للفريق، وبطاقة المنسق
+  const [pointsBoard, setPointsBoard] = useState(null);
   useEffect(() => {
-    if (!user || !activeRole || !(isAdmin || isSupervisor)) return;
+    if (!user || !activeRole) return;
     api
-      .get('/kpis', { params: teamPeriodParams })
-      .then((res) => setKpiSnaps(res?.data || []))
-      .catch(() => setKpiSnaps([]));
-  }, [user, activeRole, isAdmin, isSupervisor, teamPeriodParams]);
+      .get('/points', { params: { year: new Date().getFullYear() } })
+      .then((res) => setPointsBoard(res?.data || null))
+      .catch(() => setPointsBoard(null));
+  }, [user, activeRole]);
 
   const donutData = useMemo(() => {
     if (!dash) return [];
@@ -431,13 +411,12 @@ export default function Home() {
   }, [dash, t]);
 
   const teamBarData = useMemo(() => {
-    return kpiSnaps
-      .filter((s) => s.isSubjectToEvaluation && s.finalScoreDisplay != null)
-      .map((s) => ({
-        name: `${s.user?.firstName || ''} ${s.user?.lastName || ''}`.trim(),
-        score: Number(s.finalScoreDisplay || s.finalScore || 0),
-      }));
-  }, [kpiSnaps]);
+    return (pointsBoard?.rows || [])
+      .filter((r) => r.inScope)
+      .map((r) => ({ name: r.name, score: Number(r.total || 0) }));
+  }, [pointsBoard]);
+  const myPoints = useMemo(() => (pointsBoard?.rows || []).find((r) => r.userId === user?.id) || null, [pointsBoard, user]);
+  const topPoints = useMemo(() => (pointsBoard?.rows || []).filter((r) => r.inScope)[0] || null, [pointsBoard]);
 
   if (loading || pageLoad) {
     return (
@@ -518,7 +497,7 @@ export default function Home() {
                   <Plus size={16} aria-hidden="true" /> {t('course.addCourse')}
                 </Link>
               )}
-              <Link href="/kpis" className="rounded-xl bg-accent/80 px-4 py-2 text-sm font-bold transition hover:bg-accent">
+              <Link href="/points" className="rounded-xl bg-accent/80 px-4 py-2 text-sm font-bold transition hover:bg-accent">
                 {t('nav.kpis')}
               </Link>
             </div>
@@ -568,32 +547,18 @@ export default function Home() {
             </ChartCard>
 
             <ChartCard
-              title={t('dashboard.teamComparison')}
-              sub={t('dashboard.teamComparisonSub', { period: teamPeriodLabel })}
+              title="رصيد الإنجاز للفريق"
+              sub={`ترتيب ${new Date().getFullYear()} بالدرجات`}
               action={
-                <div className="flex items-center gap-2">
-                  <select
-                    value={teamPeriod}
-                    onChange={(e) => setTeamPeriod(e.target.value)}
-                    className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-bold text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    <option value="previous">{t('dashboard.previousMonth')}</option>
-                    <option value="current">{t('dashboard.currentMonth')}</option>
-                    <option value="year">{t('dashboard.year')}</option>
-                  </select>
-                  <Link href="/kpis" className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:text-primary-dark">
-                    {t('dashboard.details')} <ArrowRight size={12} aria-hidden="true" />
-                  </Link>
-                </div>
+                <Link href="/points" className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:text-primary-dark">
+                  {t('dashboard.details')} <ArrowRight size={12} aria-hidden="true" />
+                </Link>
               }
             >
               {teamBarData.length ? (
-                <TeamBarChart data={teamBarData} />
+                <TeamBarChart data={teamBarData} points />
               ) : (
-                <p className="py-6 text-center text-sm text-text-soft">
-                  {t('dashboard.noPeriodData')}
-                  {teamPeriod === 'year' ? t('dashboard.noPeriodDataYear') : ''}
-                </p>
+                <p className="py-6 text-center text-sm text-text-soft">لا درجات بعد هذه السنة</p>
               )}
             </ChartCard>
           </div>
@@ -603,7 +568,18 @@ export default function Home() {
         {(isAdmin || isSupervisor) && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <ChartCard title={t('dashboard.topPerformance')} sub={t('dashboard.topPerformanceSub')}>
-              {dash.topPerformer ? (
+              {topPoints ? (
+                <div className="flex flex-col items-center gap-2 py-2 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-forest-50 text-accent">
+                    <Trophy size={26} aria-hidden="true" />
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-text-main">{topPoints.name}</p>
+                    <p className="text-xs text-text-soft">{topPoints.project || ''} · {topPoints.level?.name}</p>
+                    <p className="mt-1 text-lg font-extrabold text-accent">{fmt(topPoints.total)} درجة</p>
+                  </div>
+                </div>
+              ) : dash.topPerformer ? (
                 <div className="flex flex-col items-center gap-2 py-2 text-center">
                   <div className="flex h-14 w-14 items-center justify-center rounded-full bg-forest-50 text-accent">
                     <Trophy size={26} aria-hidden="true" />
@@ -656,7 +632,7 @@ export default function Home() {
                 </h3>
                 <p className="mt-0.5 text-[11px] text-text-soft">{t('dashboard.projectRankingSub')}</p>
               </div>
-              <Link href="/kpis" className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:text-primary-dark">
+              <Link href="/points" className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:text-primary-dark">
                 {t('dashboard.details')} <ArrowRight size={12} aria-hidden="true" />
               </Link>
             </div>
@@ -684,27 +660,21 @@ export default function Home() {
         )}
 
         {/* الموظف: مؤشرات */}
-        {isEmployee && dash.kpi && (
+        {isEmployee && myPoints && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {[
-              { label: t('dashboard.productivity'), val: dash.kpi.productivityScore, Icon: BarChart3 },
-              { label: t('dashboard.quality'), val: dash.kpi.qualityScore, Icon: Star },
-              { label: t('dashboard.totalScore'), val: dash.kpi.finalScore, Icon: Target },
+              { label: 'رصيدي هذه السنة', val: `${fmt(myPoints.total)} درجة`, Icon: Target },
+              { label: 'ترتيبي', val: `${myPoints.rank} من ${pointsBoard?.rows?.length || 0}`, Icon: Trophy },
+              { label: 'مستواي', val: myPoints.level?.next ? `${myPoints.level.name} · بقي ${fmt(myPoints.level.next.remaining)} لـ${myPoints.level.next.name}` : myPoints.level?.name, Icon: Star },
             ].map((k) => (
-              <Link key={k.label} href="/kpis">
+              <Link key={k.label} href="/points">
                 <div className="flex items-center gap-4 rounded-2xl border border-border bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-soft">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     <k.Icon size={24} aria-hidden="true" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs text-text-soft">{k.label}</p>
-                    <p className="text-2xl font-extrabold text-primary">{fmt(k.val)}%</p>
-                  </div>
-                  <div className="ms-auto h-12 w-12 flex-shrink-0">
-                    <svg viewBox="0 0 36 36" className="rotate-180">
-                      <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F0F0EE" strokeWidth="3" />
-                      <circle cx="18" cy="18" r="15.9" fill="none" stroke="#006C6D" strokeWidth="3" strokeDasharray={`${Math.min(100, Number(k.val) || 0)} 100`} strokeLinecap="round" />
-                    </svg>
+                    <p className="truncate text-xl font-extrabold text-primary">{k.val}</p>
                   </div>
                 </div>
               </Link>

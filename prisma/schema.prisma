@@ -1133,3 +1133,36 @@ model DocumentationTrainee {
 
   @@index([documentationId, sortOrder])
 }
+
+// ── رصيد الإنجاز: أرشيف كل سنة منقضية كما حُسب يومها ──────────
+// بلا روابط خارجية عمداً: يبقى السجل ولو حُذف المستخدم، ويعمل على
+// القاعدتين (معرّفات نصية وغيرها) بلا اختلاف أنواع.
+model PointsYearArchive {
+  id           String   @id @default(uuid())
+  year         Int
+  userId       String
+  total        Float
+  rank         Int
+  summary      Json
+  entries      Json
+  rulesVersion Int      @default(1)
+  archivedAt   DateTime @default(now())
+  archivedById String?
+
+  @@unique([year, userId])
+  @@index([year])
+}
+
+// ── تقدير المدير في التقييم السنوي: خانة واحدة من ١٠٠ لكل موظف وسنة ──
+model EvaluationRating {
+  id        String   @id @default(uuid())
+  year      Int
+  userId    String
+  rating    Float
+  ratedById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([year, userId])
+  @@index([year])
+}

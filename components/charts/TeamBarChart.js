@@ -11,7 +11,7 @@ const scoreColor = (v) => {
   return '#633646';
 };
 
-function TeamBarChart({ data = [] }) {
+function TeamBarChart({ data = [], points = false }) {
   const { t } = useTranslation();
 
   if (!data.length) return (
@@ -28,7 +28,7 @@ function TeamBarChart({ data = [] }) {
         margin={{ top: 4, right: 48, bottom: 4, left: 4 }}
       >
         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F0F0EE" />
-        <XAxis type="number" domain={[0, 100]} tick={{ fontFamily: 'Cairo, sans-serif', fontSize: 11 }} />
+        <XAxis type="number" domain={points ? [(min) => Math.min(0, min), 'auto'] : [0, 100]} tick={{ fontFamily: 'Cairo, sans-serif', fontSize: 11 }} />
         <YAxis
           type="category"
           dataKey="name"
@@ -36,17 +36,17 @@ function TeamBarChart({ data = [] }) {
           tick={{ fontFamily: 'Cairo, sans-serif', fontSize: 11, fill: '#2F3437' }}
         />
         <Tooltip
-          formatter={(value) => [`${Number(value).toFixed(1)}%`, t('charts.score')]}
+          formatter={(value) => [points ? `${Number(value).toLocaleString('ar-SA')} درجة` : `${Number(value).toFixed(1)}%`, points ? 'الرصيد' : t('charts.score')]}
           contentStyle={{ fontFamily: 'Cairo, sans-serif', fontSize: 12, borderRadius: 12, border: '1px solid #D8DDDA' }}
         />
         <Bar dataKey="score" radius={[0, 6, 6, 0]} maxBarSize={22}>
           {sorted.map((entry) => (
-            <Cell key={entry.name} fill={scoreColor(entry.score)} />
+            <Cell key={entry.name} fill={points ? (entry.score < 0 ? '#633646' : '#2E6066') : scoreColor(entry.score)} />
           ))}
           <LabelList
             dataKey="score"
             position="right"
-            formatter={(v) => `${Number(v).toFixed(0)}%`}
+            formatter={(v) => (points ? Number(v).toLocaleString('ar-SA', { maximumFractionDigits: 0 }) : `${Number(v).toFixed(0)}%`)}
             style={{ fontFamily: 'Cairo, sans-serif', fontSize: 11, fontWeight: 700, fill: '#2F3437' }}
           />
         </Bar>

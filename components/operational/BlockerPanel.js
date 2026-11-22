@@ -31,13 +31,15 @@ function Spinner() {
   return <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />;
 }
 
-export default function BlockerPanel({ element, canAct, onUpdate }) {
+export default function BlockerPanel({ element, canAct, canOversee = false, onUpdate }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [quota, setQuota] = useState(null);
   const [reason, setReason] = useState('TRAINER_GRADES');
   const [party, setParty] = useState('');
   const [details, setDetails] = useState('');
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectNote, setRejectNote] = useState('');
 
   const blockers = element.blockers || [];
   const openBlocker = blockers.find((b) => b.status === 'OPEN');
@@ -120,6 +122,23 @@ export default function BlockerPanel({ element, canAct, onUpdate }) {
     }
   }
 
+  // رفض بلاغ غير صحيح (للمدير ومشرف المشروع): يُلغى أثره على المواعيد
+  async function handleReject() {
+    if (rejectNote.trim().length < 5) return toast.error('اكتب سبب الرفض — يصل للمنسق');
+    setLoading(true);
+    try {
+      await api.post(`/blockers/${openBlocker.id}/cancel`, { note: rejectNote.trim() });
+      toast.success('رُفض البلاغ — عادت المواعيد كأنه لم يُرفع، وأُبلغ المنسق');
+      setRejecting(false);
+      setRejectNote('');
+      onUpdate?.();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذّر رفض البلاغ');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const selectedReason = REASONS.find((r) => r.value === reason) || REASONS[0];
 
   // الجذر «شفاف» في التخطيط: زر الرفع يجلس في سطر أزرار ذيل البطاقة،
@@ -147,6 +166,15 @@ export default function BlockerPanel({ element, canAct, onUpdate }) {
                 <p className="mt-1 text-[11px] text-text-main">{openBlocker.details}</p>
               )}
             </div>
+            {!canAct && canOversee && !rejecting && (
+              <button
+                type="button"
+                onClick={() => setRejecting(true)}
+                className="shrink-0 rounded-lg border border-danger/40 bg-white px-2.5 py-1.5 text-[11px] font-bold text-danger transition hover:bg-danger/5"
+              >
+                رفض البلاغ
+              </button>
+            )}
             {canAct && (
               <div className="flex shrink-0 items-center gap-2">
                 <button
@@ -168,6 +196,29 @@ export default function BlockerPanel({ element, canAct, onUpdate }) {
               </div>
             )}
           </div>
+          {rejecting && (
+            <div className="mt-2 space-y-2 border-t border-sand/40 pt-2">
+              <p className="text-[11px] text-text-soft">
+                رفض البلاغ يُلغي أثره: تسري مواعيد العنصر كأنه لم يُرفع، ويصل السبب للمنسق.
+              </p>
+              <textarea
+                value={rejectNote}
+                onChange={(e) => setRejectNote(e.target.value)}
+                rows={2}
+                maxLength={600}
+                placeholder="سبب الرفض — مثلاً: لا عائق فعلي، والمطلوب رفع المستحقات"
+                className="w-full resize-none rounded-lg border border-sand/40 bg-white p-2 text-xs outline-none focus:border-danger"
+              />
+              <div className="flex gap-2">
+                <button type="button" onClick={handleReject} disabled={loading} className="rounded-lg bg-danger px-3 py-1 text-xs font-bold text-white disabled:opacity-50">
+                  {loading ? <Spinner /> : 'تأكيد الرفض'}
+                </button>
+                <button type="button" onClick={() => { setRejecting(false); setRejectNote(''); }} className="rounded-lg border border-border px-3 py-1 text-xs text-text-soft">
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
