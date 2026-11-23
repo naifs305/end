@@ -5,8 +5,9 @@
 -- • نوع الشهادة: حضور أو اجتياز أو «بانتظار التحديد». الاجتياز
 --   يستلزم الاختبار البعدي، والحضور لا اختبار فيه.
 -- • عنصر «تأكيد نوع الشهادة» على المنسق حين يكون النوع بانتظار
---   التحديد: موعده المثالي قبل البداية بسبعة أيام عمل، والأقصى
---   بخمسة — مهلة تكفي لإعداد الاختبارات إن كانت الدورة اجتيازاً.
+--   التحديد: موعده إلى ما قبل إطلاق الشهادات (المثالي نهاية الدورة،
+--   والأقصى بعدها بثلاثة أيام عمل = الموعد المثالي لإصدار الشهادات)،
+--   فالدورة قد تُضاف قبل بدايتها بيومين. ولا تُقدَّم الشهادات قبله.
 -- • بلاغ عائق جديد «بانتظار تحديد نوع الشهادة» يوقف ساعة العنصر
 --   ويُنسب إلى إدارة تصميم البرامج التدريبية.
 --
@@ -24,6 +25,7 @@ END $$;
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "certificateType" TEXT;
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "certificateTypeConfirmedAt" TIMESTAMP(3);
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "certificateTypeChangedAt" TIMESTAMP(3);
+ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "certificateTypeResolvedAt" TIMESTAMP(3);
 ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "certificateTypeChangeCount" INTEGER NOT NULL DEFAULT 0;
 
 DO $$ BEGIN
@@ -45,7 +47,7 @@ INSERT INTO "ClosureElement" (
   "elementType", "conditionField", "isActive", "isCustom"
 )
 SELECT 'c3d4e5f6-0007-4b2c-8d3e-4f5061728396', 'certificate_type', 'تأكيد نوع الشهادة', false,
-       'START', -168, -120, true,
+       'END', 0, 72, true,
        'CONDITIONAL', 'certificateType=PENDING', true, false
 WHERE NOT EXISTS (SELECT 1 FROM "ClosureElement" WHERE "key" = 'certificate_type');
 

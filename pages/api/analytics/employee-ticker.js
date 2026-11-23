@@ -57,7 +57,7 @@ async function handler(req, res) {
       },
       select: {
         id: true, name: true, startDate: true, endDate: true, status: true,
-        lateEntryStatus: true, entryBaselineAt: true, certificateTypeChangedAt: true,
+        lateEntryStatus: true, entryBaselineAt: true, certificateTypeChangedAt: true, certificateTypeResolvedAt: true,
       },
     });
     const activeCourseIds = activeCourses.map(c => c.id);

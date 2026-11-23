@@ -345,12 +345,13 @@ model Course {
   // ----- المجال ونوع الشهادة -----
   // المجال يحدد مشروع الدورة. ونوع الشهادة يحدد عناصرها: الاجتياز
   // يستلزم الاختبار البعدي، والحضور لا اختبار فيه. «بانتظار التحديد»
-  // يفتح عنصر «تأكيد نوع الشهادة» على المنسق بموعد قبل البداية.
+  // يفتح عنصر «تأكيد نوع الشهادة» على المنسق، موعده قبل إطلاق الشهادات.
   domainId                       String?
   domain                         ProjectDomain? @relation(fields: [domainId], references: [id], onDelete: SetNull)
   certificateType                String?      // ATTENDANCE | PASS | PENDING (فارغ = دورة قبل هذه الخاصية)
   certificateTypeConfirmedAt     DateTime?    // لحظة تأكيد النوع (حضور أو اجتياز)
   certificateTypeChangedAt       DateTime?    // آخر تغيير بعد التأكيد — يُعفي ما استجدّ من عناصر ويُسجَّل على الإدارة
+  certificateTypeResolvedAt      DateTime?    // لحظة تأكيد ما كان «بانتظار التحديد» — يُعفي الاختبار الذي استجدّ به بلا مهلة
   certificateTypeChangeCount     Int          @default(0)
 
   status                         CourseStatus @default(PREPARATION)

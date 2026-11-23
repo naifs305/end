@@ -148,6 +148,8 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const isCertificates = element?.element?.key === 'certificates';
   const certReview = element?.formData?.certReview;
   const certConfirmed = certReview?.status === 'CONFIRMED';
+  // لا تُطلق شهادة قبل معرفة نوعها
+  const certTypePending = element?.course?.certificateType === 'PENDING';
   const isCertReviewer = !!user?.id && certReview?.reviewerId === user.id;
   const isApprover = activeRole === 'MANAGER' || activeRole === 'PROJECT_SUPERVISOR';
   // فصل المهام: لا يعتمد أحد ما قدّمه بنفسه، ولا يعتمد المشرف عناصر دورة ينسّقها هو
@@ -427,8 +429,9 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
             ) : (
               <button
                 onClick={handleSubmit}
-                disabled={loading || (isCertificates && !certConfirmed)}
-                title={isCertificates && !certConfirmed ? 'يُقدَّم بعد أن يؤكد المنسق المراجِع مراجعة الشهادات' : undefined}
+                disabled={loading || (isCertificates && (!certConfirmed || certTypePending))}
+                title={isCertificates && certTypePending ? 'أكّد نوع الشهادة (حضور أو اجتياز) قبل تقديم الشهادات'
+                  : isCertificates && !certConfirmed ? 'يُقدَّم بعد أن يؤكد المنسق المراجِع مراجعة الشهادات' : undefined}
                 className={isFinancialElement ? `order-first ${BTN.warn} border border-sand/60 bg-white` : BTN.primary}
               >
                 {loading ? (
