@@ -87,6 +87,7 @@ enum BlockerReason {
   INSURANCE_SUSPENDED  // إيقاف إصدار التأمين الطبي
   FINANCE_PENDING      // بانتظار إجراء مالي
   BENEFICIARY_PENDING  // بانتظار الجهة المستفيدة
+  CERTIFICATE_TYPE_PENDING // بانتظار تحديد نوع الشهادة من إدارة تصميم البرامج التدريبية
   OTHER
 }
 
@@ -288,6 +289,7 @@ model ProjectDomain {
   createdAt            DateTime @default(now())
 
   operationalProject   OperationalProject @relation(fields: [operationalProjectId], references: [id], onDelete: Cascade)
+  courses              Course[]
 
   @@index([operationalProjectId])
 }
@@ -339,6 +341,18 @@ model Course {
   // المطلوب منه: عقد، أو طلب صرف بتحويل، أو نموذج استحقاق بسلفة.
   requiresInterpreter            Boolean      @default(false)
   interpreterContractType        String?      // CONTRACT | TRANSFER | ADVANCE
+
+  // ----- المجال ونوع الشهادة -----
+  // المجال يحدد مشروع الدورة. ونوع الشهادة يحدد عناصرها: الاجتياز
+  // يستلزم الاختبار البعدي، والحضور لا اختبار فيه. «بانتظار التحديد»
+  // يفتح عنصر «تأكيد نوع الشهادة» على المنسق بموعد قبل البداية.
+  domainId                       String?
+  domain                         ProjectDomain? @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  certificateType                String?      // ATTENDANCE | PASS | PENDING (فارغ = دورة قبل هذه الخاصية)
+  certificateTypeConfirmedAt     DateTime?    // لحظة تأكيد النوع (حضور أو اجتياز)
+  certificateTypeChangedAt       DateTime?    // آخر تغيير بعد التأكيد — يُعفي ما استجدّ من عناصر ويُسجَّل على الإدارة
+  certificateTypeChangeCount     Int          @default(0)
+
   status                         CourseStatus @default(PREPARATION)
 
   operationalProjectId           String

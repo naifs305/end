@@ -56,17 +56,19 @@ const DateInput = forwardRef(function DateInput({ startDate, endDate, onClick, o
   );
 });
 
-function Toggle({ label, desc, checked, onChange, critical }) {
+function Toggle({ label, desc, checked, onChange, critical, disabled }) {
   const { t } = useTranslation();
   return (
     <label
-      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition
+      className={`flex items-start gap-3 rounded-xl border p-3 transition
+        ${disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}
         ${checked ? 'border-primary/30 bg-primary-light/50' : 'border-border bg-background hover:border-primary/20'}
         ${critical ? 'ring-1 ring-primary/20' : ''}`}
     >
       <button
         type="button"
-        onClick={() => onChange(!checked)}
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)}
         className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-primary' : 'bg-forest-200'}`}
       >
         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-[-1px] rtl:translate-x-4' : 'translate-x-[-1px] rtl:translate-x-0.5'}`} />
@@ -131,6 +133,8 @@ export default function EditCoursePage() {
           endDate: c.endDate ? fmtDate(new Date(c.endDate)) : '',
           numTrainees: c.numTrainees != null ? String(c.numTrainees) : '',
           operationalProjectId: c.operationalProjectId || c.operationalProject?.id || '',
+          domainId: c.domainId || '',
+          certificateType: c.certificateType || '',
           requiresAdvance: !!c.requiresAdvance,
           requiresRevenue: !!c.requiresRevenue,
           materialsIssued: !!c.materialsIssued,
@@ -150,6 +154,23 @@ export default function EditCoursePage() {
   }, [id, t]);
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  // المجال يحدد المشروع، وتغيير المشروع يُلغي مجالاً لا يتبعه
+  const allDomains = useMemo(
+    () => projects.flatMap((p) => (p.domains || []).map((d) => ({ ...d, projectId: p.id }))),
+    [projects],
+  );
+  const pickDomain = (domainId) => {
+    const d = allDomains.find((x) => x.id === domainId);
+    setForm((p) => ({ ...p, domainId, ...(d ? { operationalProjectId: d.projectId } : {}) }));
+  };
+  const pickProject = (projectId) => {
+    setForm((p) => ({
+      ...p,
+      operationalProjectId: projectId,
+      domainId: allDomains.some((d) => d.id === p.domainId && d.projectId === projectId) ? p.domainId : '',
+    }));
+  };
 
   const canSubmit = useMemo(
     () =>
@@ -181,6 +202,7 @@ export default function EditCoursePage() {
         endDate: form.endDate,
         numTrainees: Number(form.numTrainees),
         operationalProjectId: form.operationalProjectId,
+        domainId: form.domainId || null,
         courseType: form.locationType === 'INTERNAL' ? 'internal' : form.locationType === 'REMOTE' ? 'remote' : 'external',
         requiresAdvance: form.requiresAdvance,
         requiresRevenue: form.requiresRevenue,
@@ -265,7 +287,7 @@ export default function EditCoursePage() {
                   placeholder={t('course.form.cityPlaceholder')} className={inputCls} />
               </Field>
               <Field label={t('course.form.project')} required>
-                <select value={form.operationalProjectId} onChange={(e) => set('operationalProjectId', e.target.value)} required className={inputCls}>
+                <select value={form.operationalProjectId} onChange={(e) => pickProject(e.target.value)} required className={inputCls}>
                   <option value="">{t('course.form.selectProject')}</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -273,6 +295,17 @@ export default function EditCoursePage() {
                     </option>
                   ))}
                 </select>
+              </Field>
+              <Field label="مجال الدورة">
+                <select value={form.domainId} onChange={(e) => pickDomain(e.target.value)} className={inputCls} disabled={!allDomains.length}>
+                  <option value="">{allDomains.length ? 'اختر المجال' : 'لا مجالات مسجّلة'}</option>
+                  {projects.filter((p) => p.domains?.length).map((p) => (
+                    <optgroup key={p.id} label={p.name}>
+                      {p.domains.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-text-soft">نوع الشهادة يُحدَّد ويُغيَّر من صفحة الدورة.</p>
               </Field>
               <Field label={t('course.form.dateRangeShort')} required span2>
                 <DatePicker
@@ -316,8 +349,14 @@ export default function EditCoursePage() {
               <Toggle label={t('course.form.requiresRevenue')} desc={t('course.form.requiresRevenueDesc')} checked={form.requiresRevenue} onChange={(v) => set('requiresRevenue', v)} />
               <Toggle label={t('course.form.materialsIssued')} desc={t('course.form.materialsIssuedDesc')} checked={form.materialsIssued} onChange={(v) => set('materialsIssued', v)} />
               <Toggle label={t('course.form.requiresSupervisorCompensation')} desc={t('course.form.requiresSupervisorCompensationDesc')} critical checked={form.requiresSupervisorCompensation} onChange={(v) => set('requiresSupervisorCompensation', v)} />
-              <Toggle label={t('course.form.requiresPreTest')} desc={t('course.form.requiresPreTestDesc')} checked={form.requiresPreTest} onChange={(v) => set('requiresPreTest', v)} />
-              <Toggle label={t('course.form.requiresPostTest')} desc={t('course.form.requiresPostTestDesc')} checked={form.requiresPostTest} onChange={(v) => set('requiresPostTest', v)} />
+              <Toggle label={t('course.form.requiresPreTest')}
+                desc={form.certificateType === 'ATTENDANCE' ? 'شهادة حضور — لا اختبارات فيها.' : t('course.form.requiresPreTestDesc')}
+                disabled={form.certificateType === 'ATTENDANCE'}
+                checked={form.requiresPreTest} onChange={(v) => set('requiresPreTest', v)} />
+              <Toggle label={t('course.form.requiresPostTest')}
+                desc={form.certificateType === 'PASS' ? 'شهادة اجتياز — الاختبار البعدي لازم.' : form.certificateType === 'ATTENDANCE' ? 'شهادة حضور — لا اختبارات فيها.' : t('course.form.requiresPostTestDesc')}
+                disabled={['PASS', 'ATTENDANCE'].includes(form.certificateType)}
+                checked={form.requiresPostTest} onChange={(v) => set('requiresPostTest', v)} />
               <Toggle
                 label={t('course.form.requiresInterpreter')}
                 desc={t('course.form.requiresInterpreterDesc')}

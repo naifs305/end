@@ -29,6 +29,7 @@ import RemindCoordinatorButton from '../../components/operational/RemindCoordina
 import MainLayout from '../../components/layout/MainLayout';
 import ElementRow from '../../components/operational/ElementRow';
 import ClosureReviewCard from '../../components/operational/ClosureReviewCard';
+import CertificateTypeCard from '../../components/operational/CertificateTypeCard';
 import CourseNotesReportForm from '../../components/operational/CourseNotesReportForm';
 import toast from 'react-hot-toast';
 import { useTranslation } from '../../lib/i18n';
@@ -739,6 +740,7 @@ export default function CourseDetail() {
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               <Pill label={t('course.project')} value={course.operationalProject?.name || '-'} />
+              {course.domain?.name && <Pill label="المجال" value={course.domain.name} />}
               <Pill label={t('course.owner')} value={`${course.primaryEmployee?.firstName || ''} ${course.primaryEmployee?.lastName || ''}`.trim() || '-'} />
               <Pill label={t('course.form.from')} value={fmt(course.startDate)} />
               <Pill label={t('course.form.to')} value={fmt(course.endDate)} />
@@ -749,6 +751,12 @@ export default function CourseDetail() {
               <Pill label={t('courseDetail.settlement')} value={<YesNo value={course.requiresAdvanceSettlement} />} />
               <Pill label={t('courseDetail.materials')} value={<YesNo value={course.materialsIssued} />} />
             </div>
+
+            <CertificateTypeCard
+              course={course}
+              canEdit={isApprover || isCoordinator || (course.supportingTeam || []).some((m) => (m.userId || m.user?.id) === user?.id)}
+              onUpdated={fetchCourse}
+            />
 
             <div className="rounded-xl border border-border bg-background px-4 py-3">
               <div className="mb-2 flex items-center justify-between text-xs">

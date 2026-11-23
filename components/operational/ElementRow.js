@@ -90,6 +90,8 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
   const [trainerReadOnly, setTrainerReadOnly] = useState(false);
   // عنصر «دليل السفر التعريفي»: رابط الدليل أو طلب تصميم دليل جديد
   const isTravelGuide = element?.element?.key === 'travel_guide';
+  // تأكيد نوع الشهادة: يُنجز باختيار النوع (لا يُقدَّم للاعتماد) — وهو إثبات واقعة
+  const isCertificateType = element?.element?.key === 'certificate_type';
   const [showGuideForm, setShowGuideForm] = useState(false);
   const [guideReadOnly, setGuideReadOnly] = useState(false);
   const [guideMode, setGuideMode] = useState(null); // 'existing' | 'request' | null للاطلاع
@@ -388,6 +390,31 @@ export default function ElementRow({ element, activeRole, isOverdue = false, onU
                 <Languages size={14} aria-hidden="true" />
                 {element.status === 'RETURNED' ? t('element.resubmit') : t('element.submit')}
               </button>
+            ) : isCertificateType ? (
+              <>
+                {['PASS', 'ATTENDANCE'].map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    disabled={loading}
+                    onClick={async () => {
+                      setLoading(true);
+                      try {
+                        await api.put(`/courses/${element.courseId}/certificate-type`, { certificateType: v });
+                        toast.success(`أُكّد نوع الشهادة: ${v === 'PASS' ? 'اجتياز' : 'حضور'}`);
+                        onUpdate();
+                      } catch (err) {
+                        toast.error(err.response?.data?.message || 'تعذّر تأكيد نوع الشهادة');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className={BTN.primary}
+                  >
+                    <Check size={14} aria-hidden="true" /> {v === 'PASS' ? 'اجتياز' : 'حضور'}
+                  </button>
+                ))}
+              </>
             ) : isCourseReport ? (
               <button
                 onClick={() => setShowReportForm(true)}

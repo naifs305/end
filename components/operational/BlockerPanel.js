@@ -17,6 +17,7 @@ const REASONS = [
   { value: 'INSURANCE_SUSPENDED', label: 'إيقاف إصدار التأمين الطبي', partyHint: 'الجهة المسؤولة' },
   { value: 'FINANCE_PENDING', label: 'بانتظار إجراء مالي', partyHint: 'الجهة المالية' },
   { value: 'BENEFICIARY_PENDING', label: 'بانتظار الجهة المستفيدة', partyHint: 'اسم الجهة المستفيدة' },
+  { value: 'CERTIFICATE_TYPE_PENDING', label: 'بانتظار تحديد نوع الشهادة', partyHint: 'إدارة تصميم البرامج التدريبية' },
   { value: 'OTHER', label: 'سبب آخر', partyHint: 'الجهة المنتظَرة' },
 ];
 
