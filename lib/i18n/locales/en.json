@@ -621,7 +621,7 @@
       "title": "Operational Projects",
       "subtitle": "Configure the relationships between supervisors and coordinators — each project has a responsible supervisor and a team of coordinators",
       "noteTitle": "Important note:",
-      "noteBody": "When a coordinator covers a course in another project, their elements are approved by the course's project supervisor (not the coordinator's original project supervisor). The coordinator's KPIs count all their courses regardless of project.",
+      "noteBody": "Internal courses are approved by the course's project supervisor; external courses are approved by the coordinator's own project supervisor, whatever the course's project. The coordinator's KPIs count all their courses regardless of project.",
       "createTitle": "Create new project",
       "createPlaceholder": "Operational project name",
       "createButton": "Create",

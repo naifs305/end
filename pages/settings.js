@@ -25,6 +25,7 @@ import {
 
 const GROUP_ICON = {
   evaluation: Scale,
+  supervision: Scale,
   blockers: ShieldAlert,
   courses: CalendarClock,
   interpreter: Languages,

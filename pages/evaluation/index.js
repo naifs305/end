@@ -109,7 +109,8 @@ export default function EvaluationPage() {
             <Info size={15} aria-hidden="true" className="mt-0.5 shrink-0 text-primary" />
             <p className="leading-relaxed">
               التقييم = التنفيذ <b className="text-text-main">{num(w.execution)}</b> + تسجيل الدورات المسندة <b className="text-text-main">{num(w.registration)}</b> + التميّز <b className="text-text-main">{num(w.excellence)}</b> + تقديرك <b className="text-text-main">{num(w.manager)}</b>
-              {' · '}والمشرف يُضاف إليه <b className="text-text-main">{num(data.settings.supervisorShare)}٪</b> من مؤشر إشرافه بسقف ١٠٠.
+              {' · '}والمشرف الذي يتولى دورات يُضاف إليه <b className="text-text-main">{num(data.settings.supervisorShare)}٪</b> من مؤشر إشرافه بسقف ١٠٠
+              {' · '}والمشرف المتفرّغ يُقاس بمؤشر إشرافه (البتّ <b className="text-text-main">{num(data.settings.supervision?.speed ?? 50)}</b> + إقفال الفريق <b className="text-text-main">{num(data.settings.supervision?.closure ?? 25)}</b> + أداء الفريق <b className="text-text-main">{num(data.settings.supervision?.team ?? 25)}</b>) مع تقديرك.
               {' '}<Link href="/settings" className="font-bold text-primary hover:underline">تعديل الأوزان</Link>
               {pending > 0 && <span className="ms-1 font-bold text-warning">· بانتظار تقديرك لـ{num(pending, 0)} موظفاً (التقييم مؤقت حتى تُدخله)</span>}
             </p>
@@ -150,7 +151,9 @@ export default function EvaluationPage() {
                       <td className="px-2 py-2.5 text-center tabular-nums" title={p.assigned ? `سجّل ${p.registered} من ${p.assigned}` : 'لم يُسجَّل عدد مسند'}>{num(p.registration)}</td>
                       <td className="px-2 py-2.5 text-center tabular-nums">{num(p.excellence)}</td>
                       <td className="px-2 py-2.5 text-center tabular-nums">
-                        {ev.supervision ? <>{num(ev.supervision.index)}<span className="block text-[10px] text-primary" dir="ltr">+{num(ev.supervisionBonus)}</span></> : '—'}
+                        {ev.supervision ? <>{num(ev.supervision.index)}{ev.track === 'supervisor'
+                          ? <span className="block text-[10px] text-primary">مؤشره الأساسي</span>
+                          : <span className="block text-[10px] text-primary" dir="ltr">+{num(ev.supervisionBonus)}</span>}</> : '—'}
                       </td>
                       <td className="px-2 py-2.5"><RatingCell row={r} year={year} onSaved={load} /></td>
                       <td className="px-2 py-2.5 text-center">

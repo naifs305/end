@@ -160,18 +160,20 @@ async function main() {
   console.log('Schema columns ensured.');
 
   // --- المشاريع الافتراضية ---
+  // تُنشأ لقاعدة جديدة فقط ولا يُعاد تسميتها: المدير يسمّي المشاريع من
+  // صفحتها، والإعداد يعمل عند كل تشغيل فلا يجوز أن يعيد الأسماء القديمة.
   const projects = [
-    { id: 'proj_1', name: 'مشروع القيادة الأمنية' },
+    { id: 'proj_1', name: 'مشروع السلامة العامة' },
     { id: 'proj_2', name: 'مشروع التهديدات الحديثة' },
-    { id: 'proj_3', name: 'مشروع الوقاية الأمنية' },
+    { id: 'proj_3', name: 'مشروع الأمن والحدود' },
   ];
 
   for (const p of projects) {
-    await prisma.operationalProject.upsert({
-      where: { id: p.id },
-      update: { name: p.name },
-      create: p,
+    const exists = await prisma.operationalProject.findFirst({
+      where: { OR: [{ id: p.id }, { name: p.name }] },
+      select: { id: true },
     });
+    if (!exists) await prisma.operationalProject.create({ data: p });
   }
 
   // --- المستخدم الافتراضي ---

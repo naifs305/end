@@ -116,6 +116,8 @@ model OperationalProject {
   users        User[]
   courses      Course[]
   supervisors  ProjectSupervisor[]
+  // المجالات التدريبية التابعة للمشروع
+  domains      ProjectDomain[]
   // لقطات الأداء المنسوبة لهذا المشروع لحظة التقاطها (تاريخ ثابت لا يتغيّر بنقل المنسقين)
   kpiSnapshots EmployeeKpiSnapshot[] @relation("KpiSnapshotProject")
 }
@@ -276,6 +278,20 @@ model Interpreter {
 // يربط مستخدماً يحمل دور PROJECT_SUPERVISOR بمشروع تشغيلي واحد
 // القاعدة: كل مشرف لمشروع واحد فقط (فرض عبر الفهرس الفريد على userId)
 // =============================================================
+// ── المجالات التدريبية ──────────────────────────────────────
+// كل مجال يتبع مشروعاً واحداً، ويديرها المدير من صفحة المشاريع.
+model ProjectDomain {
+  id                   String   @id @default(uuid())
+  name                 String   @unique
+  operationalProjectId String
+  sortOrder            Int      @default(0)
+  createdAt            DateTime @default(now())
+
+  operationalProject   OperationalProject @relation(fields: [operationalProjectId], references: [id], onDelete: Cascade)
+
+  @@index([operationalProjectId])
+}
+
 model ProjectSupervisor {
   id                   String   @id @default(uuid())
   userId               String

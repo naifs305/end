@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/router';
-import { Plus, UserPlus, ChevronUp, ChevronDown, AlertTriangle, Trash2, Pencil, Check, X } from 'lucide-react';
+import { Plus, UserPlus, ChevronUp, ChevronDown, AlertTriangle, Trash2, Pencil, Check, X, Layers } from 'lucide-react';
 import MainLayout from '../components/layout/MainLayout';
 import ConfirmModal from '../components/operational/ConfirmModal';
 import { useAuth } from '../context/AuthContext';
@@ -16,9 +16,11 @@ import { useTranslation } from '../lib/i18n';
 //   • مشرف مشروع  — يعتمد عناصر الإقفال لدورات مشروعه
 //   • منسقون       — ينفّذون الدورات ويرفعون العناصر
 //
-// ملاحظة: المنسق يمكن أن يعمل في دورات مشروع آخر (تغطية)
-// في هذه الحالة يعتمد عناصره مشرف المشروع الذي تنتمي إليه الدورة
-// (مشرف الدورة = مشرف مشروع الدورة — وليس مشرف مشروع المنسق)
+//   • مجالات       — المجالات التدريبية التابعة للمشروع
+//
+// ملاحظة: المنسق يمكن أن يعمل في دورات مشروع آخر (تغطية):
+//   الدورة الداخلية يعتمد عناصرها مشرف مشروع الدورة،
+//   والدورة الخارجية يعتمدها مشرف مشروع المنسق نفسه.
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -39,6 +41,10 @@ export default function ProjectsPage() {
   const [coordBusy,        setCoordBusy]        = useState(null);
   // تعديل اسم المشروع: { id, name } للمشروع الجاري تعديله
   const [renaming,         setRenaming]         = useState(null);
+  // المجالات: اسم جديد لكل مشروع { [projectId]: name }، والمجال الجاري تعديله
+  const [domainDraft,      setDomainDraft]      = useState({});
+  const [domainEdit,       setDomainEdit]       = useState(null);
+  const [domainBusy,       setDomainBusy]       = useState(null);
   const isManagerRole = activeRole === 'MANAGER';
 
   useEffect(() => {
@@ -136,6 +142,47 @@ export default function ProjectsPage() {
     } finally {
       setCoordBusy(null);
     }
+  };
+
+  // ── المجالات ──────────────────────────────────────────────
+  const domainCall = async (key, fn, success) => {
+    setDomainBusy(key);
+    try {
+      await fn();
+      toast.success(success);
+      await load();
+      return true;
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'تعذّر حفظ المجال');
+      return false;
+    } finally {
+      setDomainBusy(null);
+    }
+  };
+
+  const addDomain = async (projectId) => {
+    const name = String(domainDraft[projectId] || '').trim();
+    if (name.length < 2) return toast.error('اكتب اسم المجال');
+    const done = await domainCall(projectId, () => api.post('/projects/domains', { name, operationalProjectId: projectId }), 'أُضيف المجال');
+    if (done) setDomainDraft((p) => ({ ...p, [projectId]: '' }));
+  };
+
+  const saveDomainName = async () => {
+    const name = String(domainEdit?.name || '').trim();
+    if (name.length < 2) return toast.error('اكتب اسم المجال');
+    const done = await domainCall(domainEdit.id, () => api.put(`/projects/domains/${domainEdit.id}`, { name }), 'عُدّل اسم المجال');
+    if (done) setDomainEdit(null);
+  };
+
+  const moveDomain = (domain, projectId) => {
+    if (!projectId) return;
+    const target = projects.find((p) => p.id === projectId);
+    domainCall(domain.id, () => api.put(`/projects/domains/${domain.id}`, { operationalProjectId: projectId }), `نُقل «${domain.name}» إلى ${target?.name || 'المشروع'}`);
+  };
+
+  const removeDomain = (domain) => {
+    if (!window.confirm(`حذف مجال «${domain.name}»؟`)) return;
+    domainCall(domain.id, () => api.delete(`/projects/domains/${domain.id}`), 'حُذف المجال');
   };
 
   const confirmDeleteProject = async () => {
@@ -277,7 +324,7 @@ export default function ProjectsPage() {
                           </h3>
                         )}
                         <p className="text-xs text-text-soft">
-                          {t('admin.projects.courseCount', { count: project._count?.courses || 0 })} • {t('admin.projects.coordinatorCount', { count: members.length })}
+                          {t('admin.projects.courseCount', { count: project._count?.courses || 0 })} • {t('admin.projects.coordinatorCount', { count: members.length })} • {project.domains?.length || 0} مجالات
                           {supervisorUser
                             ? ` • ${t('admin.projects.supervisorPrefix', { name: `${supervisorUser.firstName} ${supervisorUser.lastName}` })}`
                             : ` • ${t('admin.projects.noSupervisorInline')}`}
@@ -389,6 +436,73 @@ export default function ProjectsPage() {
                             </div>
                           )}
                         </div>
+                      </div>
+
+                      {/* المجالات */}
+                      <div className="mt-4 border-t border-border pt-3">
+                        <h4 className="mb-2 inline-flex items-center gap-1.5 text-xs font-extrabold text-text-soft">
+                          <Layers size={13} aria-hidden="true" /> المجالات ({project.domains?.length || 0})
+                        </h4>
+                        <div className="mb-2 flex gap-1.5">
+                          <input
+                            value={domainDraft[project.id] || ''}
+                            onChange={(e) => setDomainDraft((p) => ({ ...p, [project.id]: e.target.value }))}
+                            onKeyDown={(e) => e.key === 'Enter' && addDomain(project.id)}
+                            placeholder="اسم مجال جديد"
+                            aria-label={`مجال جديد في ${project.name}`}
+                            className="min-w-0 flex-1 rounded-lg border border-border bg-white px-2 py-1.5 text-xs outline-none focus:border-primary"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => addDomain(project.id)}
+                            disabled={domainBusy === project.id || !String(domainDraft[project.id] || '').trim()}
+                            className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {domainBusy === project.id ? t('common.saving') : 'إضافة مجال'}
+                          </button>
+                        </div>
+                        {!project.domains?.length ? (
+                          <p className="text-xs text-text-soft">لا مجالات لهذا المشروع بعد.</p>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                            {project.domains.map((d) => (
+                              <div key={d.id} className="flex items-center gap-1.5 rounded-lg bg-background px-2.5 py-1.5">
+                                {domainEdit?.id === d.id ? (
+                                  <>
+                                    <input
+                                      autoFocus
+                                      value={domainEdit.name}
+                                      onChange={(e) => setDomainEdit({ ...domainEdit, name: e.target.value })}
+                                      onKeyDown={(e) => { if (e.key === 'Enter') saveDomainName(); if (e.key === 'Escape') setDomainEdit(null); }}
+                                      aria-label="اسم المجال"
+                                      className="min-w-0 flex-1 rounded-md border border-primary px-1.5 py-0.5 text-xs outline-none"
+                                    />
+                                    <button type="button" onClick={saveDomainName} disabled={domainBusy === d.id} aria-label="حفظ اسم المجال" className="rounded-md bg-primary p-1 text-white disabled:opacity-50"><Check size={12} aria-hidden="true" /></button>
+                                    <button type="button" onClick={() => setDomainEdit(null)} aria-label="إلغاء" className="rounded-md border border-border p-1 text-text-soft"><X size={12} aria-hidden="true" /></button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="flex-1 text-xs text-text-main">{d.name}</span>
+                                    <button type="button" onClick={() => setDomainEdit({ id: d.id, name: d.name })} aria-label={`تعديل اسم ${d.name}`} title="تعديل الاسم" className="rounded-md p-1 text-text-soft hover:bg-primary-light hover:text-primary"><Pencil size={12} aria-hidden="true" /></button>
+                                    {projects.length > 1 && (
+                                      <select
+                                        value=""
+                                        disabled={domainBusy === d.id}
+                                        onChange={(e) => moveDomain(d, e.target.value)}
+                                        aria-label={`نقل ${d.name} إلى مشروع آخر`}
+                                        className="shrink-0 rounded-md border border-border bg-white px-1.5 py-0.5 text-[10px] text-text-soft outline-none focus:border-primary"
+                                      >
+                                        <option value="">نقل إلى…</option>
+                                        {projects.filter((p) => p.id !== project.id).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                      </select>
+                                    )}
+                                    <button type="button" onClick={() => removeDomain(d)} disabled={domainBusy === d.id} aria-label={`حذف ${d.name}`} title="حذف" className="rounded-md p-1 text-text-soft hover:bg-burgundy/5 hover:text-danger"><Trash2 size={12} aria-hidden="true" /></button>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* حذف المشروع */}

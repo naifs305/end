@@ -74,7 +74,7 @@ export default function EvaluationFile() {
       <section className="avoid mt-4 grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl bg-primary-light/60 p-4">
         <div>
           <p className="text-xl font-extrabold">{row.name}</p>
-          <p className="text-[12px] text-text-soft">{row.project || '—'} · {row.isSupervisor ? 'منسق ومشرف' : 'منسق'} · {num(row.coursesCount, 0)} دورة · الترتيب {num(row.rank, 0)} من {num(data.of, 0)}</p>
+          <p className="text-[12px] text-text-soft">{row.project || '—'} · {ev.track === 'supervisor' ? 'مشرف' : row.isSupervisor ? 'منسق ومشرف' : 'منسق'} · {num(row.coursesCount, 0)} دورة · الترتيب {num(row.rank, 0)} من {num(data.of, 0)}</p>
         </div>
         <div className="text-center">
           <p className="text-4xl font-extrabold text-primary tabular-nums">{num(ev.final)}</p>
@@ -85,15 +85,22 @@ export default function EvaluationFile() {
 
       <section className="avoid mt-4">
         <h2 className="mb-2 text-sm font-extrabold text-primary">مكوّنات التقييم</h2>
+        {ev.track === 'supervisor' ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Part label="مؤشر الإشراف" value={ev.supervision?.index} weight={w.execution + w.registration + w.excellence} />
+            <Part label="تقدير المدير" value={ev.managerRating} weight={w.manager} />
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Part label="الأداء في التنفيذ" value={p.execution} weight={w.execution} note={p.possible ? `حصّل ${num(p.earned)} من ${num(p.possible)} ممكنة` : 'لا عناصر مستحقة'} />
           <Part label="تسجيل الدورات المسندة" value={p.registration} weight={w.registration} note={p.assigned ? `سجّل ${num(p.registered, 0)} من ${num(p.assigned, 0)}` : 'لم يُسجَّل عدد مسند'} />
           <Part label="التميّز والتعاون" value={p.excellence} weight={w.excellence} note={`${num(p.excellencePoints)} درجة`} />
           <Part label="تقدير المدير" value={ev.managerRating} weight={w.manager} />
         </div>
+        )}
         {ev.supervision && (
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Part label="مؤشر الإشراف" value={ev.supervision.index} note={`يُضاف ${num(settings.supervisorShare)}٪ منه: +${num(ev.supervisionBonus)}`} />
+            <Part label="مؤشر الإشراف" value={ev.supervision.index} note={ev.track === 'supervisor' ? 'مؤشره الأساسي' : `يُضاف ${num(settings.supervisorShare)}٪ منه: +${num(ev.supervisionBonus)}`} />
             <Part label="سرعة البتّ" value={ev.supervision.speed} note={ev.supervision.avgHours != null ? `${num(ev.supervision.decisions, 0)} قراراً بمتوسط ${num(ev.supervision.avgHours)} ساعة` : ''} />
             <Part label="إقفال دورات الفريق في موعدها" value={ev.supervision.closure} />
             <Part label="أداء الفريق" value={ev.supervision.team} />
@@ -101,7 +108,8 @@ export default function EvaluationFile() {
         )}
         <p className="mt-2 text-[11px] text-text-soft">
           مؤشر الأداء نسبة ما حصّله الموظف إلى أقصى ما أتاحته دوراته هو، فلا يتأثر بعدد الدورات المسندة إليه.
-          {ev.supervision && ' والمشرف يُقيَّم منسقاً تقييماً كاملاً، ويُضاف إليه جزء من مؤشر إشرافه بسقف ١٠٠.'}
+          {ev.track === 'supervisor' && ' والمشرف المتفرّغ للإشراف يُقاس بمؤشر إشرافه: سرعة البتّ، وإقفال دورات فريقه في موعدها، وأداء منسقيه.'}
+          {ev.track === 'coordinator-supervisor' && ' والمشرف الذي يتولى دورات يُقيَّم منسقاً تقييماً كاملاً، ويُضاف إليه جزء من مؤشر إشرافه بسقف ١٠٠.'}
         </p>
       </section>
 
