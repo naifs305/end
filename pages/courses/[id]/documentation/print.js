@@ -10,6 +10,7 @@ import Head from 'next/head';
 import MagazineViewer from '../../../../components/documentation/MagazineViewer';
 import { buildPages } from '../../../../components/documentation/MagazinePages';
 import api from '../../../../lib/axios';
+import { useAuth } from '../../../../context/AuthContext';
 
 const TITLES = { magazine: 'المجلة', report: 'التقرير الفني', both: 'المجلة والتقرير الفني' };
 
@@ -20,16 +21,18 @@ export default function DocumentationEdition() {
   const [data, setData] = useState(null);
   const [qrSvg, setQrSvg] = useState(null);
   const [error, setError] = useState('');
+  // تُفتح في نافذة جديدة: ننتظر حتى تصلها جلسة الدخول قبل الطلب
+  const { loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || authLoading) return;
     api.get(`/courses/${id}/documentation`)
       .then((res) => setData(res?.data?.data ?? res?.data))
       .catch((e) => setError(e.response?.data?.message || 'تعذّر تحميل التوثيق'));
     api.get(`/courses/${id}/documentation/qr`, { responseType: 'text' })
       .then((res) => setQrSvg(typeof res.data === 'string' ? res.data : null))
       .catch(() => setQrSvg(null));
-  }, [id]);
+  }, [id, authLoading]);
 
   if (error) return <p style={{ padding: 40, fontFamily: 'Cairo', direction: 'rtl' }}>{error}</p>;
   if (!data) return <p style={{ padding: 40, fontFamily: 'Cairo', direction: 'rtl' }}>جارٍ إعداد الإصدار…</p>;

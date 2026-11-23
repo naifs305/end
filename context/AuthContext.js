@@ -2,6 +2,7 @@ import { createContext, useState, useContext, useEffect } from 'react';
 import Router from 'next/router';
 import api from '../lib/axios';
 import { getDefaultRole } from '../lib/roles';
+import { serveSession, borrowSession, isPublicPath } from '../lib/sessionShare';
 
 const AuthContext = createContext({});
 
@@ -25,12 +26,17 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // تجيب النوافذ الأخرى بجلستها، وتأخذ جلسة غيرها إن فُتحت بلا جلسة
+    const stop = serveSession();
     hydrateSession();
+    return stop;
   }, []);
 
   const hydrateSession = async () => {
     try {
-      const storage = getStorageScope();
+      let storage = getStorageScope();
+      // نافذة جديدة بلا جلسة (فُتحت من صفحة أخرى): تأخذها من النوافذ المفتوحة
+      if (!storage && !isPublicPath() && (await borrowSession())) storage = getStorageScope();
       const token = storage?.getItem('token');
 
       if (!token) {
@@ -65,7 +71,8 @@ export const AuthProvider = ({ children }) => {
       storage.setItem('activeRole', resolvedRole);
     } catch (error) {
       console.error('Session invalid - AuthContext.js', error);
-      logout(true);
+      // المجلة العامة تُعرض لكل أحد، فلا يُحوَّل زائرها إلى الدخول
+      logout(!isPublicPath());
     } finally {
       setLoading(false);
     }

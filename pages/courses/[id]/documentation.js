@@ -1011,7 +1011,7 @@ export default function CourseDocumentationPage() {
                     { e: 'report', label: 'التقرير الفني', hint: 'للقيادات: ملخص، ونتائج، ومتميّزون، وتوصيات', Icon: FileBarChart2 },
                     { e: 'both', label: 'المجلة والتقرير معاً', hint: 'إصدار كامل للطباعة', Icon: Layers },
                   ].map(({ e, label, hint, Icon }) => (
-                    <a key={e} href={editionUrl(e)} target="_blank" rel="noreferrer"
+                    <a key={e} href={editionUrl(e)} target="_blank" rel="opener"
                       className="flex items-start gap-3 rounded-2xl px-3 py-2.5 hover:bg-background">
                       <Icon size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-primary" />
                       <span className="min-w-0 flex-1">
